@@ -1,0 +1,11 @@
+{
+  "_comment": "夹持器可调参数。改完保存即生效, 不用动 clamp_control.py。x越小夹得越高: levels[0]=最高 ... levels[3]=最低。",
+  "jaw_close": -0.001,
+  "jaw_open": -0.003,
+  "levels": [0.0, 0.04, 0.08, 0.115],
+  "settle": 1.0,
+  "move_settle": 4.0,
+  "z": 0.0,
+  "container": "fawkes-robotino-fawkes-robotino-1",
+  "use_sudo": true
+}

@@ -1,24 +1,26 @@
 # 拆卸配置 —— 独立于装配, 不要和装配 yaml(final_product_*.yaml / tasks*.yaml) 混用。
 #
-# 从上往下拆: steps 的顺序就是拆的顺序(先拆最顶上的)。
-# 每一步:
-#   name:        步骤名(随便起, 只用于打印)
-#   clamp_level: 夹持器夹住"目标块下面那块"所在的档位
-#                0..3 对应 clamp_control.py 的高度 0.0 / 0.04 / 0.08 / 0.115
-#   arm_pose:    机械臂拔这一块用的(示教)动作名, 会传给 disassembly_arm_pull.sh
+# 夹持器: x 越小夹得越高。档位 0/1/2/3 -> x = 0.0/0.04/0.08/0.115 = 从高到低。
+#   x=0.0   最高 (顶层 L3 那一层)
+#   x=0.04  L2 层
+#   x=0.08  L1 层
+#   x=0.115 最低 (底座 L0)
 #
-# 注意档位随塔变矮而下降(从上往下拆): clamp_level 一步比一步小。
-# 最底下那块一般留着不拆; 要拆再加一步。
+# 4层塔(从下到上 L0/L1/L2/L3), 从上往下拆顶上3块, 底座 L0 留着(下面没东西可夹)。
+# 从上往下拆 -> 夹持器一步步往下 -> clamp_level 一步比一步【大】。
+#   name:        步骤名(只用于打印)
+#   clamp_level: 夹持器夹住"目标块下面那块"的档位
+#   arm_pose:    机械臂拔这一块用的(示教)动作名, 传给 disassembly_arm_pull.sh
 
 settle_after_clamp: 1.0    # 夹紧后、机械臂动作前等待秒数(确保已夹稳)
 
 steps:
-  - name: block_top
-    clamp_level: 2
-    arm_pose: pull_top
-  - name: block_3
+  - name: L3_top      # 拔顶层 L3, 夹持器夹住 L2 (x=0.04)
     clamp_level: 1
+    arm_pose: pull_top
+  - name: L2          # 拔 L2, 夹持器夹住 L1 (x=0.08)
+    clamp_level: 2
     arm_pose: pull_3
-  - name: block_2
-    clamp_level: 0
+  - name: L1          # 拔 L1, 夹持器夹住底座 L0 (x=0.115)
+    clamp_level: 3
     arm_pose: pull_2
