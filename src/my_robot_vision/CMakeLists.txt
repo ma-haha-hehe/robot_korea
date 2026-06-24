@@ -19,6 +19,10 @@ install(DIRECTORY config
 install(PROGRAMS
   my_robot_vision/vision_node.py
   my_robot_vision/foundation_wrapper.py
+  my_robot_vision/capture_calibration_image.py
+  my_robot_vision/handeye_calibrate.py
+  my_robot_vision/vision_to_execution_yaml.py
+  my_robot_vision/run_auto_pick_pipeline.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

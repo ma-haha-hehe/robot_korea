@@ -1,0 +1,1 @@
+trial_id,tier,step_index,target,product_yaml,planner_time_s,vision_time_s,conversion_time_s,robot_execution_time_s,total_step_time_s,async_overlap_enabled,next_vision_ready_before_execution_done,overlap_saved_s,vision_success,grasp_success,placement_success,insertion_quality,failure_stage,notes

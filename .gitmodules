@@ -1,0 +1,3 @@
+[submodule "FoundationPose/root/FoundationPose"]
+	path = FoundationPose/root/FoundationPose
+	url = git@github.com:ma-haha-hehe/FoundatioPose.git

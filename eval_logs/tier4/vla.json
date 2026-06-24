@@ -1,0 +1,22 @@
+{
+    "summary": {
+        "success_count": 4,
+        "total_trials": 20,
+        "perception_failure": 3,
+        "planning_failure": 4,
+        "grasp_failure": 3,
+        "insertion_failure": 6
+    },
+    "raw_data": [
+        {"trial": 1, "success": 0.0, "failure_mode": "perception_failure", "note": "Failed to localize the 2x4 white brick"},
+        {"trial": 2, "success": 0.0, "failure_mode": "planning_failure", "note": "Generated trajectory leads to self-collision"},
+        {"trial": 3, "success": 1.0, "failure_mode": "None", "note": "Successfully assembled"},
+        {"trial": 4, "success": 0.0, "failure_mode": "insertion_failure", "note": "Misaligned by 12mm during press-in"},
+        {"trial": 5, "success": 0.0, "failure_mode": "grasp_failure", "note": "Object slipped during transport"},
+        {"trial": 6, "success": 0.0, "failure_mode": "planning_failure", "note": "Aborted: inverse kinematics singularity"},
+        {"trial": 7, "success": 0.0, "failure_mode": "insertion_failure", "note": "Stud engagement failed due to pose drift"},
+        {"trial": 8, "success": 1.0, "failure_mode": "None", "note": "Successfully assembled"},
+        {"trial": 9, "success": 0.0, "failure_mode": "perception_failure", "note": "Detected incorrect brick orientation"},
+        {"trial": 10, "success": 0.0, "failure_mode": "insertion_failure", "note": "Stability lost during multi-column alignment"}
+    ]
+}

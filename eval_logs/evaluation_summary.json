@@ -1,0 +1,16 @@
+{
+    "summary": {
+        "success_count": 15,
+        "total_compute_time": 45.2,
+        "total_manip_time": 620.5,
+        "collision_count": 2,
+        "stability_violations": 3
+    },
+    "raw_data": [
+        {"success": 1.0, "compute_time": 2.1, "manip_time": 30.5, "accuracy_error": 0.0015, "stability_violation": 0.0, "collision": 0.0},
+        {"success": 1.0, "compute_time": 2.2, "manip_time": 31.2, "accuracy_error": 0.0021, "stability_violation": 0.0, "collision": 0.0},
+        {"success": 0.0, "compute_time": 2.5, "manip_time": 15.0, "accuracy_error": 0.0150, "stability_violation": 1.0, "collision": 0.0},
+        {"success": 0.0, "compute_time": 2.0, "manip_time": 5.0, "accuracy_error": 0.0, "stability_violation": 0.0, "collision": 1.0}
+        
+    ]
+}

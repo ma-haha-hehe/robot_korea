@@ -1,0 +1,54 @@
+Robotiq Adaptive Gripper URCap
+
+This file describes the changes made to the software.
+
+------------------
+Release 1.0.0 - 2016/06/22
+------------------
+Initial release.
+
+------------------
+Release 1.0.1 - 2016/07/8
+------------------
+Bug fix. When a large amount of gripper nodes created, Polyscope become slow.
+
+------------------
+Release 1.0.2 - 2016/08/31
+------------------
+Bug fix. When the usb connection drops, the gripper keeps its activation and goto statuses.
+
+------------------
+Release 1.1.0 - 2017/03/15
+------------------
+Support of multiple grippers.
+
+------------------
+Release 1.1.1 - 2017/03/28
+------------------
+Bug fix releated to Polyscope 3.4 release.
+
+------------------
+Release 1.1.2 - 2017/06/22
+------------------
+Bug fix when trying to run a program with the Gripper URCap installed but no Gripper plugged in.
+Deactivation of the toolbar when a program is running or when no Gripper is plugged in.
+
+------------------
+Release 1.1.3 - 2017/11/29
+------------------
+Bug fix when installed on Polyscope 3.5, the toolbar was not displayed.
+
+------------------
+Release 1.2.0 - 2018/05/24
+------------------
+Added Hand-E gripper and generics icons on GUI.
+Added calibration in mm and inches in installation node.
+Added Grip Check program node.
+Added gripper functions in the script's functions list.
+Added rq_current_pos_mm(), rq_current_pos_inches() and rq_print_gripper_serial_number() functions.
+Updated About tab in installation node.
+
+------------------
+Release 1.2.1 - 2018/05/24
+------------------
+Bug fix for grip check for inches units.

@@ -3,348 +3,710 @@
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <geometry_msgs/msg/pose.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
-#include <control_msgs/action/gripper_command.hpp>
+#include <control_msgs/action/follow_joint_trajectory.hpp>
+#include <trajectory_msgs/msg/joint_trajectory_point.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <moveit_msgs/msg/planning_scene.hpp>
 #include <yaml-cpp/yaml.h>
+
 #include <filesystem>
 #include <vector>
 #include <thread>
+#include <fstream>
+#include <sstream>
+#include <regex>
+#include <unordered_set>
+#include <unordered_map>
+#include <algorithm>
+#include <chrono>
+#include <cmath>
+#include <iostream>
 
-// STL 与几何处理
 #include <geometric_shapes/mesh_operations.h>
 #include <geometric_shapes/shape_operations.h>
 #include <geometric_shapes/shapes.h>
 #include <shape_msgs/msg/mesh.hpp>
 
-// 时间参数化相关头文件
 #include <moveit/trajectory_processing/iterative_time_parameterization.h>
 #include <moveit_msgs/msg/robot_trajectory.hpp>
-
 #include <moveit/trajectory_processing/time_optimal_trajectory_generation.h>
 #include <moveit/robot_trajectory/robot_trajectory.h>
 
+using FollowJT = control_msgs::action::FollowJointTrajectory;
+using namespace std::chrono;
 
-const double GRIPPER_HEIGHT = 0.104;
+// ================= 配置 =================
+const std::string SCENE_XML_FILE = "/home/i6user/Desktop/robot_lego/src/mj_bridge/mj_bridge/scene.xml";
+const std::string PLAN_FILE      = "/home/i6user/Desktop/robot_lego/src/panda_pick/src/plan.yaml";
+const std::string MESH_PATH      = "/home/i6user/Desktop/robot_lego/FoundationPose/meshes/";
 
-using GripperCommand = control_msgs::action::GripperCommand;
+const double ASSEMBLY_ORIGIN_X = 0.35;
+const double ASSEMBLY_ORIGIN_Y = 0.35;
+const double ASSEMBLY_ORIGIN_Z = 0.046; //change 0.04 to 0.046 because of baseplate
 
-// ================= 0. 配置 =================
-const std::string RESULT_FILE = "/home/i6user/Desktop/robot_lego/src/panda_pick/src/active_task.yaml";
-const std::string MESH_PATH = "/home/i6user/Desktop/robot_lego/FoundationPose/meshes/";
+const double GRIPPER_OFFSET = 0.1234;
+const double HOVER = 0.15;
 
-// 🔥 结构体更新：分离物体显示姿态与抓取姿态
+const double GRIPPER_OPEN = 0.04;
+const double GRIPPER_CLOSE = 0.001;
+
+// ================= 评测数据结构 =================
+struct EvalMetrics {
+    bool success = true;
+    double compute_time = 0.0;
+    double manip_time = 0.0;
+    double max_accuracy_error = 0.0;
+    int collision_count = 0;
+    int stability_violations = 0;
+};
+
+// ================= 数据结构 =================
+struct SceneBrick {
+    std::string body_name;
+    std::string brick_type;
+    geometry_msgs::msg::Pose scene_pose;
+};
+
+struct PlanStep {
+    std::string raw_name;
+    std::string brick_type;
+    geometry_msgs::msg::Pose pick_pose;
+    geometry_msgs::msg::Pose place_pose;
+};
+
 struct Task {
     std::string name;
     std::string mesh_file;
-    geometry_msgs::msg::Pose brick_pose;   // 物体在场景中生成的真实姿态
-    geometry_msgs::msg::Pose gripper_pick; // 机械臂前往抓取的姿态
-    geometry_msgs::msg::Pose place_pose;   // 放置姿态
+    geometry_msgs::msg::Pose brick_pose;
+    geometry_msgs::msg::Pose gripper_pick;
+    geometry_msgs::msg::Pose place_pose;
 };
 
-// ================= 1. STL 加载 =================
+// ================= 工具函数 =================
+std::vector<double> parse_numbers(const std::string& s) {
+    std::vector<double> nums;
+    std::stringstream ss(s);
+    double v;
+    while (ss >> v) nums.push_back(v);
+    return nums;
+}
+
+geometry_msgs::msg::Quaternion multiply_quat(
+    const geometry_msgs::msg::Quaternion& q1,
+    const geometry_msgs::msg::Quaternion& q2
+) {
+    geometry_msgs::msg::Quaternion q;
+    q.w = q1.w*q2.w - q1.x*q2.x - q1.y*q2.y - q1.z*q2.z;
+    q.x = q1.w*q2.x + q1.x*q2.w + q1.y*q2.z - q1.z*q2.y;
+    q.y = q1.w*q2.y - q1.x*q2.z + q1.y*q2.w + q1.z*q2.x;
+    q.z = q1.w*q2.z + q1.x*q2.y - q1.y*q2.x + q1.z*q2.w;
+    return q;
+}
+
+geometry_msgs::msg::Quaternion yaw_to_quat(double yaw_rad) {
+    geometry_msgs::msg::Quaternion q;
+    q.x = 0.0;
+    q.y = 0.0;
+    q.z = std::sin(yaw_rad * 0.5);
+    q.w = std::cos(yaw_rad * 0.5);
+    return q;
+}
+
+std::string infer_brick_type_from_name(const std::string& name) {
+    if (name.find("2x2") != std::string::npos) return "brick_2x2";
+    if (name.find("4x2") != std::string::npos || name.find("2x4") != std::string::npos) return "brick_4x2";
+    return "";
+}
+
+std::string infer_mesh_from_type(const std::string& type) {
+    return (type == "brick_4x2") ? "LEGO_Duplo_brick_4x2.stl" : "LEGO_Duplo_brick_2x2.stl";
+}
+
+geometry_msgs::msg::Quaternion quat_wxyz_to_xyzw(const std::vector<double>& q) {
+    geometry_msgs::msg::Quaternion out;
+    if (q.size() != 4) {
+        out.x = 0.0;
+        out.y = 0.0;
+        out.z = 0.0;
+        out.w = 1.0;
+        return out;
+    }
+
+    out.x = q[1];
+    out.y = q[2];
+    out.z = q[3];
+    out.w = q[0];
+    return out;
+}
+
+geometry_msgs::msg::Quaternion quat_xyzw_from_yaml(const YAML::Node& node) {
+    geometry_msgs::msg::Quaternion q;
+    q.x = node[0].as<double>();
+    q.y = node[1].as<double>();
+    q.z = node[2].as<double>();
+    q.w = node[3].as<double>();
+    return q;
+}
+
 shape_msgs::msg::Mesh load_stl_mesh(const std::string& file_path) {
-    std::string uri = (file_path.substr(0, 7) != "file://") ? "file://" + file_path : file_path;
+    std::string uri = (file_path.substr(0, 7) != "file://")
+        ? "file://" + file_path
+        : file_path;
+
     shapes::Mesh* m = shapes::createMeshFromResource(uri);
-    if (m == nullptr) throw std::runtime_error("无法加载 STL: " + uri);
+    if (m == nullptr) {
+        throw std::runtime_error("无法加载 STL: " + uri);
+    }
 
     shapes::ShapeMsg mesh_msg;
     shapes::constructMsgFromShape(m, mesh_msg);
     shape_msgs::msg::Mesh mesh = boost::get<shape_msgs::msg::Mesh>(mesh_msg);
 
     for (auto& vertex : mesh.vertices) {
-        vertex.x *= 0.001; vertex.y *= 0.001; vertex.z *= 0.001;
+        vertex.x *= 0.001;
+        vertex.y *= 0.001;
+        vertex.z *= 0.001;
     }
+
     delete m;
     return mesh;
 }
 
-// ================= 2. 夹爪 Action =================
-bool driveGripperAction(rclcpp::Node::SharedPtr node, double pos) {
-    auto client = rclcpp_action::create_client<GripperCommand>(node, "/panda_hand_controller/gripper_cmd");
-    if (!client->wait_for_action_server(std::chrono::seconds(5))) return false;
-
-    auto goal = GripperCommand::Goal();
-    goal.command.position = pos;
-    goal.command.max_effort = 20.0;
-    client->async_send_goal(goal);
-    std::this_thread::sleep_for(std::chrono::milliseconds(2500));
-    return true;
-}
-void allow_all_collisions(rclcpp::Node::SharedPtr node, const std::string& obj_id) {
-    auto ps_pub = node->create_publisher<moveit_msgs::msg::PlanningScene>("/planning_scene", 10);
-    moveit_msgs::msg::PlanningScene ps;
-    ps.is_diff = true;
-    
-    // 强制允许以下所有部件之间的互相碰撞
-    std::vector<std::string> links = {obj_id, "table", "panda_leftfinger", "panda_rightfinger", "panda_hand", "panda_link8"};
-    
-    for (const auto& name : links) {
-        ps.allowed_collision_matrix.default_entry_names.push_back(name);
-        ps.allowed_collision_matrix.default_entry_values.push_back(true);
+// ================= 读取 scene.xml =================
+std::vector<SceneBrick> read_scene_bricks_from_xml(const std::string& xml_file) {
+    std::ifstream ifs(xml_file);
+    if (!ifs.is_open()) {
+        throw std::runtime_error("无法打开 scene.xml: " + xml_file);
     }
 
-    ps_pub->publish(ps);
-    std::this_thread::sleep_for(std::chrono::milliseconds(300)); // 增加等待时间确保生效
-}
-// ================= 5. YAML 解析逻辑 (位置复用 + 旋转独立) =================
-bool wait_for_task(Task& t) {
-    if (!std::filesystem::exists(RESULT_FILE)) return false;
-    try {
-        YAML::Node res = YAML::LoadFile(RESULT_FILE);
-        
-        // 1. 解析任务名称
-        std::string name = res["name"].as<std::string>(); 
-        t.name = name;
+    std::stringstream buffer;
+    buffer << ifs.rdbuf();
+    std::string content = buffer.str();
 
-        //  动态选择 STL 模型
-        if (name.find("2x4") != std::string::npos || name.find("4x2") != std::string::npos) {
-            t.mesh_file = "LEGO_Duplo_brick_4x2.stl";
-            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), " 匹配到 4x2 积木模型");
-        } 
-        else if (name.find("2x2") != std::string::npos) {
-            t.mesh_file = "LEGO_Duplo_brick_2x2.stl";
-            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), " 匹配到 2x2 积木模型");
-        } 
-        else {
-            t.mesh_file = "LEGO_Duplo_brick_4x2.stl"; // 默认
+    std::regex body_regex(
+        R"xxx(<body\s+name="([^"]*brick[^"]*)"\s+pos="([^"]+)"\s+quat="([^"]+)")xxx"
+    );
+
+    std::vector<SceneBrick> bricks;
+
+    auto begin = std::sregex_iterator(content.begin(), content.end(), body_regex);
+    auto end = std::sregex_iterator();
+
+    for (auto it = begin; it != end; ++it) {
+        std::smatch m = *it;
+
+        SceneBrick b;
+        b.body_name = m[1].str();
+        b.brick_type = infer_brick_type_from_name(b.body_name);
+
+        auto pos = parse_numbers(m[2].str());
+        auto quat = parse_numbers(m[3].str());
+
+        if (pos.size() != 3) continue;
+
+        b.scene_pose.position.x = pos[0];
+        b.scene_pose.position.y = pos[1];
+        b.scene_pose.position.z = pos[2];
+        b.scene_pose.orientation = quat_wxyz_to_xyzw(quat);
+
+        bricks.push_back(b);
+    }
+
+    return bricks;
+}
+
+// ================= 读取 plan.yaml =================
+std::vector<PlanStep> read_plan_steps(const std::string& plan_file) {
+    YAML::Node root = YAML::LoadFile(plan_file);
+    std::vector<PlanStep> steps;
+
+    YAML::Node task_nodes;
+
+    if (root["tasks"]) {
+        task_nodes = root["tasks"];
+    } else if (root["tasksh"]) {
+        task_nodes = root["tasksh"];
+    } else {
+        throw std::runtime_error("plan.yaml 中找不到 tasks 或 tasksh");
+    }
+
+    for (const auto& n : task_nodes) {
+        PlanStep s;
+
+        s.raw_name = n["name"].as<std::string>();
+        s.brick_type = infer_brick_type_from_name(s.raw_name);
+
+        if (s.brick_type.empty()) {
+            throw std::runtime_error("无法从任务名推断 brick type: " + s.raw_name);
         }
 
-        // 2. 解析 brick_info (物体在场景中的位姿)
-        t.brick_pose.position.x = res["brick_info"]["pos"][0].as<double>();
-        t.brick_pose.position.y = res["brick_info"]["pos"][1].as<double>();
-        t.brick_pose.position.z = res["brick_info"]["pos"][2].as<double>();
-        
-        t.brick_pose.orientation.x = res["brick_info"]["orientation"][0].as<double>();
-        t.brick_pose.orientation.y = res["brick_info"]["orientation"][1].as<double>();
-        t.brick_pose.orientation.z = res["brick_info"]["orientation"][2].as<double>();
-        t.brick_pose.orientation.w = res["brick_info"]["orientation"][3].as<double>();
+        s.pick_pose.orientation = quat_xyzw_from_yaml(n["pick"]["orientation"]);
 
-        // 3. 设定抓取位姿 (Robot Pick)
-        //  关键：Position 直接复用 brick_info 的坐标
-        t.gripper_pick.position = t.brick_pose.position;
+        const auto place_pos = n["place"]["pos"];
 
-        //  关键：Orientation 读取 robot_pick 专属的四元数
-        t.gripper_pick.orientation.x = res["robot_pick"]["orientation"][0].as<double>();
-        t.gripper_pick.orientation.y = res["robot_pick"]["orientation"][1].as<double>();
-        t.gripper_pick.orientation.z = res["robot_pick"]["orientation"][2].as<double>();
-        t.gripper_pick.orientation.w = res["robot_pick"]["orientation"][3].as<double>();
+        s.place_pose.position.x = ASSEMBLY_ORIGIN_X + place_pos[0].as<double>();
+        s.place_pose.position.y = ASSEMBLY_ORIGIN_Y + place_pos[1].as<double>();
+        s.place_pose.position.z = ASSEMBLY_ORIGIN_Z + place_pos[2].as<double>() + 0.0095;
 
-        // 4. 解析放置位姿 (Place)
-        t.place_pose.position.x = res["place"]["pos"][0].as<double>();
-        t.place_pose.position.y = res["place"]["pos"][1].as<double>();
-        t.place_pose.position.z = res["place"]["pos"][2].as<double>();
-        
-        t.place_pose.orientation.x = res["place"]["orientation"][0].as<double>();
-        t.place_pose.orientation.y = res["place"]["orientation"][1].as<double>();
-        t.place_pose.orientation.z = res["place"]["orientation"][2].as<double>();
-        t.place_pose.orientation.w = res["place"]["orientation"][3].as<double>();
+        std::cout << "[PLAN_PLACE] "
+          << s.raw_name
+          << " place_world = "
+          << s.place_pose.position.x << ", "
+          << s.place_pose.position.y << ", "
+          << s.place_pose.position.z
+          << std::endl;
 
-        return true;
-    } catch (const std::exception& e) {
-        RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "YAML 解析深度错误: %s", e.what());
-        return false;
+        s.place_pose.orientation = quat_xyzw_from_yaml(n["place"]["orientation"]);
+
+        steps.push_back(s);
     }
+
+    return steps;
 }
 
+// ================= scene + plan 匹配 =================
+std::vector<Task> build_tasks_from_scene_and_plan(
+    const std::vector<SceneBrick>& scene_bricks,
+    const std::vector<PlanStep>& plan_steps
+) {
+    std::vector<Task> tasks;
+    std::unordered_set<std::string> used_scene_bodies;
 
-bool move_linear(moveit::planning_interface::MoveGroupInterface& arm, double z_delta, double speed_scale = 0.1) {
+    for (const auto& step : plan_steps) {
+        const SceneBrick* chosen = nullptr;
+
+        for (const auto& b : scene_bricks) {
+            if (used_scene_bodies.count(b.body_name)) continue;
+
+            if (b.brick_type == step.brick_type) {
+                chosen = &b;
+                break;
+            }
+        }
+
+        if (!chosen) {
+            throw std::runtime_error("匹配失败: " + step.brick_type);
+        }
+
+        Task t;
+        t.name = chosen->body_name;
+        t.mesh_file = infer_mesh_from_type(chosen->brick_type);
+        t.brick_pose = chosen->scene_pose;
+
+        t.gripper_pick.position = chosen->scene_pose.position;
+
+        auto q_offset = yaw_to_quat(-M_PI / 4.0);
+        t.gripper_pick.orientation = multiply_quat(step.pick_pose.orientation, q_offset);
+
+        t.place_pose = step.place_pose;
+        t.place_pose.orientation = multiply_quat(step.place_pose.orientation, q_offset);
+
+        tasks.push_back(t);
+        used_scene_bodies.insert(chosen->body_name);
+    }
+
+    return tasks;
+}
+
+// ================= 夹爪动作：等待 action 完成 =================
+bool driveGripperAction(rclcpp::Node::SharedPtr node, double pos) {
+    auto client = rclcpp_action::create_client<FollowJT>(
+        node,
+        "/mj_panda_hand_controller/follow_joint_trajectory"
+    );
+
+    if (!client->wait_for_action_server(std::chrono::seconds(5))) {
+        RCLCPP_ERROR(node->get_logger(), "Hand action server not available");
+        return false;
+    }
+
+    FollowJT::Goal goal;
+    goal.trajectory.joint_names = {
+        "panda_finger_joint1",
+        "panda_finger_joint2"
+    };
+
+    trajectory_msgs::msg::JointTrajectoryPoint point;
+    point.positions = {pos, pos};
+    point.time_from_start = rclcpp::Duration::from_seconds(1.0);
+    goal.trajectory.points.push_back(point);
+
+    auto goal_handle_future = client->async_send_goal(goal);
+
+    if (goal_handle_future.wait_for(std::chrono::seconds(2)) != std::future_status::ready) {
+        RCLCPP_ERROR(node->get_logger(), "Failed to send hand goal");
+        return false;
+    }
+
+    auto goal_handle = goal_handle_future.get();
+
+    if (!goal_handle) {
+        RCLCPP_ERROR(node->get_logger(), "Hand goal was rejected");
+        return false;
+    }
+
+    auto result_future = client->async_get_result(goal_handle);
+
+    if (result_future.wait_for(std::chrono::seconds(4)) != std::future_status::ready) {
+        RCLCPP_ERROR(node->get_logger(), "Hand action result timeout");
+        return false;
+    }
+
+    auto wrapped_result = result_future.get();
+
+    if (wrapped_result.code != rclcpp_action::ResultCode::SUCCEEDED) {
+        RCLCPP_ERROR(node->get_logger(), "Hand action failed");
+        return false;
+    }
+
+    return true;
+}
+
+// ================= 垂直直线运动 =================
+bool move_linear(
+    moveit::planning_interface::MoveGroupInterface& arm,
+    double z_delta,
+    double speed_scale = 0.1
+) {
     std::vector<geometry_msgs::msg::Pose> waypoints;
+
     geometry_msgs::msg::Pose target = arm.getCurrentPose().pose;
     target.position.z += z_delta;
     waypoints.push_back(target);
 
     moveit_msgs::msg::RobotTrajectory trajectory_msg;
-    // 1. 计算笛卡尔路径点
-    double fraction = arm.computeCartesianPath(waypoints, 0.001, 0.0, trajectory_msg, false);
-    
-    if (fraction > 0.1) {
-        // 2. 将消息转换为 RobotTrajectory 对象，以便进行时间参数化
-        robot_trajectory::RobotTrajectory rt(arm.getRobotModel(), arm.getName());
-        rt.setRobotTrajectoryMsg(*arm.getCurrentState(), trajectory_msg);
 
-        // 3. 使用 TOTG 算法计算时间戳、速度和加速度
-        // 参数：轨迹, 速度缩放, 加速度缩放
-        trajectory_processing::TimeOptimalTrajectoryGeneration totg;
-        bool success = totg.computeTimeStamps(rt, speed_scale, speed_scale);
+    double fraction = arm.computeCartesianPath(
+        waypoints,
+        0.005,
+        0.0,
+        trajectory_msg,
+        false
+    );
 
-        if (success) {
-            rt.getRobotTrajectoryMsg(trajectory_msg);
-            arm.execute(trajectory_msg);
-            return true;
-        }
+    if (fraction < 0.95) {
+        RCLCPP_WARN(
+            rclcpp::get_logger("lego_batch_executor"),
+            "Cartesian path fraction too low: %.3f",
+            fraction
+        );
+        return false;
     }
-    RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "直线平移规划或调速失败！");
-    return false;
+
+    robot_trajectory::RobotTrajectory rt(arm.getRobotModel(), arm.getName());
+    rt.setRobotTrajectoryMsg(*arm.getCurrentState(), trajectory_msg);
+
+    trajectory_processing::TimeOptimalTrajectoryGeneration totg;
+
+    if (!totg.computeTimeStamps(rt, speed_scale, speed_scale)) {
+        RCLCPP_WARN(
+            rclcpp::get_logger("lego_batch_executor"),
+            "Time parameterization failed"
+        );
+        return false;
+    }
+
+    rt.getRobotTrajectoryMsg(trajectory_msg);
+
+    return arm.execute(trajectory_msg) == moveit::core::MoveItErrorCode::SUCCESS;
 }
 
-/**
- * @brief 执行单次抓放任务 - 动态速度控制版
- */
-bool execute_single_task(rclcpp::Node::SharedPtr node,
-                         moveit::planning_interface::MoveGroupInterface& arm,
-                         moveit::planning_interface::PlanningSceneInterface& psi,
-                         const Task& task) {
-    
-    RCLCPP_INFO(node->get_logger(), "开始任务: %s [动态调速模式]", task.name.c_str());
+// ================= 允许碰撞 =================
 
-    const double GRIPPER_OFFSET = 0.1234; 
-    const double HOVER = 0.15;           
+void add_table_collision(
+    moveit::planning_interface::PlanningSceneInterface& psi,
+    const std::string& frame_id
+) {
+    moveit_msgs::msg::CollisionObject table;
+    table.id = "table";
+    table.header.frame_id = frame_id;
 
-    // 1. 环境准备 (略过 Collision 设置，保持原有逻辑)
+    shape_msgs::msg::SolidPrimitive primitive;
+    primitive.type = primitive.BOX;
+
+    // MuJoCo table:
+    // <body name="table" pos="0.40 0 0.02">
+    //   <geom type="box" size="0.30 0.50 0.02"/>
+    // </body>
+    //
+    // MuJoCo size 是半尺寸
+    // 所以真实尺寸是 0.60 x 1.00 x 0.04
+    primitive.dimensions = {0.60, 1.00, 0.04};
+
+    geometry_msgs::msg::Pose table_pose;
+    table_pose.position.x = 0.40;
+    table_pose.position.y = 0.0;
+    table_pose.position.z = 0.02;
+    table_pose.orientation.w = 1.0;
+
+    table.primitives.push_back(primitive);
+    table.primitive_poses.push_back(table_pose);
+    table.operation = table.ADD;
+
+    psi.applyCollisionObject(table);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+}
+
+void add_brick_collision_at_pose(
+    moveit::planning_interface::PlanningSceneInterface& psi,
+    const std::string& frame_id,
+    const std::string& brick_id,
+    const std::string& mesh_file,
+    const geometry_msgs::msg::Pose& pose
+) {
     moveit_msgs::msg::CollisionObject brick;
-    brick.id = task.name; brick.header.frame_id = arm.getPlanningFrame();
-    brick.meshes.push_back(load_stl_mesh(MESH_PATH + task.mesh_file));
-    brick.mesh_poses.push_back(task.brick_pose); 
+    brick.id = brick_id;
+    brick.header.frame_id = frame_id;
+
+    brick.meshes.push_back(load_stl_mesh(MESH_PATH + mesh_file));
+    brick.mesh_poses.push_back(pose);
     brick.operation = brick.ADD;
+
     psi.applyCollisionObject(brick);
-    allow_all_collisions(node, task.name);
 
-    // --- [抓取序列] ---
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+}
 
-    // A. 快速接近悬停位 (PTP 运动)
-    RCLCPP_INFO(node->get_logger(), ">>> 快速接近...");
-    arm.setMaxVelocityScalingFactor(0.9); // 设置较快速度
+// ================= 单个任务执行 =================
+bool execute_single_task(
+    rclcpp::Node::SharedPtr node,
+    moveit::planning_interface::MoveGroupInterface& arm,
+    moveit::planning_interface::PlanningSceneInterface& psi,
+    const Task& task,
+    EvalMetrics& metrics
+) {
+    auto m_start = high_resolution_clock::now();
+
+
+    
+    // 1. 添加物体到 MoveIt planning scene
+    //moveit_msgs::msg::CollisionObject brick;
+    //brick.id = task.name;
+    //brick.header.frame_id = arm.getPlanningFrame();
+    //brick.meshes.push_back(load_stl_mesh(MESH_PATH + task.mesh_file));
+    //brick.mesh_poses.push_back(task.brick_pose);
+    //brick.operation = brick.ADD;
+
+    //psi.applyCollisionObject(brick);
+    //allow_all_collisions(node, task.name);
+    add_brick_collision_at_pose(
+        psi,
+        arm.getPlanningFrame(),
+        task.name,
+        task.mesh_file,
+        task.brick_pose
+    );
+
+    //allow_gripper_touch_object(node, task.name);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+    // 2. 移动到抓取 hover 位姿
     geometry_msgs::msg::Pose p_hover = task.gripper_pick;
     p_hover.position.z += (GRIPPER_OFFSET + HOVER);
+
     arm.setPoseTarget(p_hover);
-    arm.move();
 
-    driveGripperAction(node, 0.04); 
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+    if (arm.move() != moveit::core::MoveItErrorCode::SUCCESS) {
+        metrics.collision_count++;
+        return false;
+    }
 
-    // B. 慢速线性下降
-    RCLCPP_INFO(node->get_logger(), ">>> 慢速下降...");
-    // 调用 move_linear，最后一个参数 0.05 代表 5% 的极低速，确保不撞翻物体
-    move_linear(arm, -0.155, 0.1); 
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
-    // C. 抓取与 Attach
-    RCLCPP_INFO(node->get_logger(), ">>> 闭合夹爪...");
-    std::vector<std::string> touch_links = {"panda_leftfinger", "panda_rightfinger", "panda_hand"};
-    driveGripperAction(node, 0.02); 
-    arm.attachObject(task.name, "panda_hand", touch_links); 
-    std::this_thread::sleep_for(std::chrono::milliseconds(800));
+    // 3. 先张开夹爪，并等待完成
+    if (!driveGripperAction(node, GRIPPER_OPEN)) {
+        metrics.collision_count++;
+        return false;
+    }
 
-    // D. 中速抬起
-    RCLCPP_INFO(node->get_logger(), ">>> 抬起...");
-    move_linear(arm, HOVER, 0.8); // 20% 速度抬起
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
-    // --- [放置序列] ---
+    // 4. 垂直下降，必须完整下降成功
+    if (!move_linear(arm, -0.165, 0.1)) {
+        metrics.stability_violations++;
+        return false;
+    }
 
-    // E. 快速移动到放置点上方
-    RCLCPP_INFO(node->get_logger(), ">>> 移动至目标上方...");
-    arm.setMaxVelocityScalingFactor(0.9); 
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+    // 5. 闭合夹爪，并等待 close_hold action 返回
+    if (!driveGripperAction(node, GRIPPER_CLOSE)) {
+        metrics.collision_count++;
+        return false;
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(3000));
+
+    // 6. MoveIt attach object
+    // arm.attachObject(task.name, "panda_hand");
+    std::vector<std::string> touch_links = {
+        "panda_hand",
+        "panda_leftfinger",
+        "panda_rightfinger",
+        "panda_link8"
+    };
+
+    arm.attachObject(task.name, "panda_hand", touch_links);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+    // 7. 抬起
+    if (!move_linear(arm, HOVER, 0.5)) {
+        metrics.stability_violations++;
+        return false;
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+    // 8. 移动到放置 hover 位姿
     geometry_msgs::msg::Pose p_place = task.place_pose;
     p_place.position.z += (GRIPPER_OFFSET + HOVER);
-    
-    allow_all_collisions(node, task.name);
+
     arm.setPoseTarget(p_place);
-    arm.move();
 
-    // F. 极慢速放置
-    RCLCPP_INFO(node->get_logger(), ">>> 慢速放置...");
-    move_linear(arm, -HOVER, 0.05); // 3% 速度，最精细的放置
+    if (arm.move() != moveit::core::MoveItErrorCode::SUCCESS) {
+        metrics.collision_count++;
+        return false;
+    }
 
-    // G. 释放
-    RCLCPP_INFO(node->get_logger(), ">>> 释放...");
-    arm.detachObject(task.name);   
-    rclcpp::sleep_for(std::chrono::milliseconds(300)); // 给场景更新留出 0.5s
-    driveGripperAction(node, 0.04); 
-    
-    // H. 快速撤离
-    RCLCPP_INFO(node->get_logger(), ">>> 撤离...");
-    arm.setMaxVelocityScalingFactor(0.9);
-    move_linear(arm, HOVER, 0.4); 
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
-    if (std::filesystem::exists(RESULT_FILE)) std::filesystem::remove(RESULT_FILE);
+    // 9. 放置下降
+    if (!move_linear(arm, -HOVER, 0.05)) {
+        metrics.stability_violations++;
+        return false;
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+    // 10. 计算执行精度
+    auto curr_pose = arm.getCurrentPose().pose;
+
+    double err = std::sqrt(
+        std::pow(curr_pose.position.x - task.place_pose.position.x, 2) +
+        std::pow(curr_pose.position.y - task.place_pose.position.y, 2)
+    );
+
+    metrics.max_accuracy_error = std::max(metrics.max_accuracy_error, err);
+
+    // 11. detach + 张开
+    arm.detachObject(task.name);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+    // 放置完成后，把这块积木重新加入 MoveIt planning scene。
+    // 位置使用 task.place_pose。
+    // 后续任务会把它当作障碍物避开。
+    add_brick_collision_at_pose(
+        psi,
+        arm.getPlanningFrame(),
+        task.name,
+        task.mesh_file,
+        task.place_pose
+    );
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+    if (!driveGripperAction(node, GRIPPER_OPEN)) {
+        metrics.collision_count++;
+        return false;
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+    // 12. 抬起
+    if (!move_linear(arm, HOVER, 0.5)) {
+        metrics.stability_violations++;
+        return false;
+    }
+
+    auto m_end = high_resolution_clock::now();
+    metrics.manip_time += duration<double>(m_end - m_start).count();
+
     return true;
 }
+
+// ================= 主函数 =================
 int main(int argc, char** argv) {
-    // 1. 初始化 ROS 2
     rclcpp::init(argc, argv);
-    
-    // 2. 配置节点选项 (允许参数覆盖)
+
     rclcpp::NodeOptions node_options;
     node_options.automatically_declare_parameters_from_overrides(true);
-    auto node = rclcpp::Node::make_shared("lego_batch_executor", node_options);
 
-    // 💡 关键：使用多线程执行器
-    // MoveIt 2 需要在后台持续接收机器人状态（Joint States）和 TF 变换。
-    // 如果主循环阻塞了，机械臂将无法获取最新位姿，导致移动失败。
+    auto node = rclcpp::Node::make_shared(
+        "lego_batch_executor",
+        node_options
+    );
+
+    EvalMetrics final_metrics;
+
     rclcpp::executors::MultiThreadedExecutor executor;
     executor.add_node(node);
-    
-    // 在独立线程中启动 Spin
+
     std::thread spinning_thread([&executor]() {
         executor.spin();
     });
 
-    RCLCPP_INFO(node->get_logger(), ">>> [START] LEGO 批量执行节点已启动");
-
-    // 3. 使用大括号限定 MoveIt 接口的作用域
-    // 这样可以确保在调用 rclcpp::shutdown() 之前，MoveGroup 等对象已经先被销毁。
-    // 这能有效避免你之前遇到的 "Attempting to unload library while objects exist" 报错。
-    {
-        // 4. 初始化 MoveIt 接口
+    try {
         moveit::planning_interface::MoveGroupInterface arm(node, "panda_arm");
         moveit::planning_interface::PlanningSceneInterface psi;
+        add_table_collision(psi, arm.getPlanningFrame());
 
-        // 设置全局运动参数
-        arm.setPlanningTime(20.0);           // 增加规划时间，应对复杂环境
-        arm.setMaxVelocityScalingFactor(0.3); // 限制全局最大速度 slow down
-        arm.setMaxAccelerationScalingFactor(0.1);
 
-        // 5. 初始化环境场景：添加桌面
-        // 建议在循环开始前添加一次即可
-        moveit_msgs::msg::CollisionObject table;
-        table.id = "table";
-        table.header.frame_id = "world";
-        
-        shape_msgs::msg::SolidPrimitive box;
-        box.type = box.BOX;
-        box.dimensions = {2.0, 2.0, 0.02}; // 2米见方的大桌子
-        
-        geometry_msgs::msg::Pose table_pose;
-        table_pose.position.x = 0.0;
-        table_pose.position.y = 0.0;
-        table_pose.position.z = -0.011;    // 桌面高度设为 -0.011 (假设原点在桌面厚度中心)
-        table_pose.orientation.w = 1.0;
-        
-        table.primitives.push_back(box);
-        table.primitive_poses.push_back(table_pose);
-        table.operation = table.ADD;
+        arm.setPlanningTime(10.0);
+        arm.setMaxVelocityScalingFactor(1.0);
+        arm.setMaxAccelerationScalingFactor(1.0);
 
-        RCLCPP_INFO(node->get_logger(), ">>> 正在添加桌面碰撞体...");
-        psi.applyCollisionObject(table);
+        auto c_start = high_resolution_clock::now();
 
-        // 6. 主循环：监听并执行任务
-        RCLCPP_INFO(node->get_logger(), ">>> [READY] 正在监听 YAML 任务文件: %s", RESULT_FILE.c_str());
-        
-        while (rclcpp::ok()) {
-            Task current_task;
-            
-            // 轮询：检查是否有新的任务产生
-            if (wait_for_task(current_task)) {
-                RCLCPP_INFO(node->get_logger(), " 收到新任务: %s", current_task.name.c_str());
-                
-                // 执行抓取与放置序列 (含 15cm->3cm 下降及慢速放置)
-                try {
-                    execute_single_task(node, arm, psi, current_task);
-                    RCLCPP_INFO(node->get_logger(), " 任务执行成功。");
-                } catch (const std::exception& e) {
-                    RCLCPP_ERROR(node->get_logger(), " 任务执行异常: %s", e.what());
-                }
+        auto scene_bricks = read_scene_bricks_from_xml(SCENE_XML_FILE);
+        auto plan_steps = read_plan_steps(PLAN_FILE);
+        auto tasks = build_tasks_from_scene_and_plan(scene_bricks, plan_steps);
+
+        auto c_end = high_resolution_clock::now();
+        final_metrics.compute_time = duration<double>(c_end - c_start).count();
+
+        for (size_t i = 0; i < tasks.size(); ++i) {
+            RCLCPP_INFO(
+                node->get_logger(),
+                "Executing task %zu / %zu: %s",
+                i + 1,
+                tasks.size(),
+                tasks[i].name.c_str()
+            );
+
+            if (!execute_single_task(node, arm, psi, tasks[i], final_metrics)) {
+                final_metrics.success = false;
+                break;
             }
-
-            // 频率控制：每 500ms 检查一次文件是否存在
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
-    } // arm 和 psi 在这里被析构
 
-    // 7. 优雅关闭
-    RCLCPP_INFO(node->get_logger(), ">>> [SHUTDOWN] 节点正在关闭...");
+        std::cout << "\n[METRICS_START]" << std::endl;
+        std::cout << "success: " << (final_metrics.success ? 1 : 0) << std::endl;
+        std::cout << "compute_time: " << final_metrics.compute_time << std::endl;
+        std::cout << "manip_time: " << final_metrics.manip_time << std::endl;
+        std::cout << "accuracy_error: " << final_metrics.max_accuracy_error << std::endl;
+        std::cout << "stability_violation: " << (final_metrics.stability_violations > 0 ? 1 : 0) << std::endl;
+        std::cout << "collision: " << (final_metrics.collision_count > 0 ? 1 : 0) << std::endl;
+        std::cout << "[METRICS_END]" << std::endl;
+
+    } catch (const std::exception& e) {
+        std::cerr << "Exception: " << e.what() << std::endl;
+
+        std::cout << "\n[METRICS_START]" << std::endl;
+        std::cout << "success: 0" << std::endl;
+        std::cout << "compute_time: 0" << std::endl;
+        std::cout << "manip_time: 0" << std::endl;
+        std::cout << "accuracy_error: 0" << std::endl;
+        std::cout << "stability_violation: 0" << std::endl;
+        std::cout << "collision: 1" << std::endl;
+        std::cout << "[METRICS_END]" << std::endl;
+    }
+
     rclcpp::shutdown();
-    
+
     if (spinning_thread.joinable()) {
         spinning_thread.join();
     }

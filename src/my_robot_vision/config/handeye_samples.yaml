@@ -1,0 +1,69 @@
+# Hand-eye calibration samples for the gripper-mounted camera on UR5 tool0.
+#
+# Important:
+# - image and T_base_tool must come from the same robot pose.
+# - Do not use any sample where print_pose returned all zeros.
+# - You said this is a 2x2 ChArUco-style calibration board. A true ChArUco
+#   board with only 2x2 squares has only one interpolated chess corner, so
+#   pose estimation may need to use it as an ArUco grid board.
+pattern: charuco
+dictionary: DICT_4X4_50
+board_size: [2, 2]
+square_size: 0.025
+marker_size: 0.018
+marker_ids: [4, 5]
+
+# Leave these null unless you want to force RealSense intrinsics manually.
+camera_matrix: null
+dist_coeffs: null
+
+samples:
+  - image: /home/i6user/Desktop/robot_lego/calibration_images/img_001.jpg
+    T_base_tool:
+      - [0.032322242, 0.999445638, -0.007980563, 0.168716889]
+
+      - [0.996982521, -0.032804363, -0.070354290, 0.627075571]
+
+      - [-0.070577086, -0.005682474, -0.997490143, 0.397580059]
+
+      - [0.000000000, 0.000000000, 0.000000000, 1.000000000]
+
+
+  - image: /home/i6user/Desktop/robot_lego/calibration_images/img_002.jpg
+    T_base_tool:
+      - [-0.001609505, 0.844434257, 0.535656789, -0.022219997]
+      - [0.994051524, 0.059683645, -0.091101213, 0.626647190]
+      - [-0.108898935, 0.532323819, -0.839507221, 0.411013299]
+      - [0.000000000, 0.000000000, 0.000000000, 1.000000000]
+
+
+  - image: /home/i6user/Desktop/robot_lego/calibration_images/img_003.jpg
+    T_base_tool:
+      - [0.077705355, 0.851983897, -0.517769560, 0.325451257]
+
+      - [0.992254299, -0.116576504, -0.042910657, 0.624789893]
+
+      - [-0.096918954, -0.510424684, -0.854443303, 0.328009071]
+
+      - [0.000000000, 0.000000000, 0.000000000, 1.000000000]
+
+
+  - image: /home/i6user/Desktop/robot_lego/calibration_images/img_004.jpg
+    T_base_tool:
+      - [-0.013118903, 0.999479527, -0.029471492, 0.145071952]
+
+      - [0.862689702, 0.026215872, 0.505053667, 0.385760909]
+
+      - [0.505563421, -0.018799003, -0.862584619, 0.334199570]
+
+      - [0.000000000, 0.000000000, 0.000000000, 1.000000000]
+
+  - image: /home/i6user/Desktop/robot_lego/calibration_images/img_005.jpg
+    T_base_tool:
+    - [0.117457197, 0.992911134, 0.018201275, 0.162906671]
+
+    - [0.929898270, -0.103533130, -0.352944894, 0.720199889]
+
+    - [-0.348558480, 0.058381252, -0.935467057, 0.348273401]
+
+    - [0.000000000, 0.000000000, 0.000000000, 1.000000000]

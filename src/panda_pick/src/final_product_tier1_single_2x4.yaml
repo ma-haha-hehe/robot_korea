@@ -1,0 +1,12 @@
+# Tier-1 real-robot validation product.
+#
+# One yellow 2x4 brick at the assembly origin. This isolates the
+# perception-to-execution pipeline without long-horizon error accumulation.
+
+blocks:
+  - name: "yellow_2x4_single"
+    type: "brick_4x2"
+    color: "yellow"
+    vision_label: "yellow 2x4 brick."
+    pos: [0.0000, 0.0000, 0.0000]
+    rotation: [0, 0, 0]

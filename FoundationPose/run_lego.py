@@ -191,29 +191,72 @@ if __name__ == "__main__":
 
             key = cv2.waitKey(1) & 0xFF
             
-            # --- 姿态捕获逻辑 ---
+            # --- 姿态捕获逻辑 (按下 1 或 2 触发) ---
             if key == ord('1') or key == ord('2'):
-                print(">>> 正在计算...")
+                print("\n" + "="*30)
+                print(">>> 开始分步处理流程...")
+                
+                # --- STEP 1: GroundingDINO 检测 ---
                 img_pil = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
                 results = detector(img_pil, candidate_labels=["block.", "lego."], threshold=0.35)
+                
+                # 绘制检测框预览
+                img_step1 = img.copy()
+                for r in results:
+                    box = r['box']
+                    cv2.rectangle(img_step1, (box['xmin'], box['ymin']), (box['xmax'], box['ymax']), (0, 255, 0), 2)
+                    cv2.putText(img_step1, f"{r['label']}: {r['score']:.2f}", (box['xmin'], box['ymin']-5), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                
+                cv2.imshow("STEP 1: GroundingDINO Detection (Press any key)", img_step1)
+                print("-> STEP 1 完成：请在窗口按下任意键继续下一步...")
+                cv2.waitKey(0) # 停顿
+
+                # --- STEP 2: Mask 区域生成 (模拟 SAM 效果) ---
                 dets = [DetectionResult(0, r['label'], BoundingBox(**r['box'])) for r in results]
-                
-                captured_pose = estimator.run_once(img, depth_m, K_MATRIX, dets)
-                
-                if captured_pose is not None:
-                    if key == ord('1'):
-                        pose_1, pose_2 = captured_pose, None
-                        last_text = "Pose 1 (Start) Captured!"
-                    elif key == ord('2'):
-                        if pose_1 is not None:
+                if len(dets) > 0:
+                    H, W = depth_m.shape
+                    mask_viz = np.zeros((H, W, 3), dtype=np.uint8)
+                    det = dets[0] # 取第一个检测目标
+                    y1, y2, x1, x2 = max(0, det.box.ymin), min(H, det.box.ymax), max(0, det.box.xmin), min(W, det.box.xmax)
+                    
+                    # 绘制半透明掩码效果
+                    img_step2 = img.copy()
+                    mask_color = np.array([255, 0, 0], dtype=np.uint8) # 蓝色蒙版
+                    roi = img_step2[y1:y2, x1:x2]
+                    img_step2[y1:y2, x1:x2] = cv2.addWeighted(roi, 0.5, np.full_like(roi, mask_color), 0.5, 0)
+                    
+                    cv2.imshow("STEP 2: Mask/Segmentation (Press any key)", img_step2)
+                    print("-> STEP 2 完成：掩码已生成。按下任意键开始 6D 姿态估计...")
+                    cv2.waitKey(0) # 停顿
+
+                    # --- STEP 3: FoundationPose 计算 ---
+                    captured_pose = estimator.run_once(img, depth_m, K_MATRIX, dets)
+                    
+                    if captured_pose is not None:
+                        img_step3 = img.copy()
+                        img_step3 = draw_pose_visuals(img_step3, captured_pose, K_MATRIX)
+                        
+                        # 记录姿态
+                        if key == ord('1'):
+                            pose_1, pose_2 = captured_pose, None
+                            last_text = "Pose 1 (Start) Finalized!"
+                        else:
+                            pose_1 = pose_1 # 保持不变
                             pose_2 = captured_pose
-                            # 计算 6D 变换
-                            T_diff = np.linalg.inv(pose_1) @ pose_2
-                            trans = T_diff[:3, 3] * 100 # cm
-                            last_text = f"Offset: X:{trans[0]:.1f} Y:{trans[1]:.1f} Z:{trans[2]:.1f} cm"
-                            print(f"\n🚀 变换矩阵:\n{T_diff}")
-                else:
-                    last_text = "Detection Failed!"
+                            last_text = "Pose 2 (End) Finalized!"
+
+                        cv2.imshow("STEP 3: FoundationPose Result (Press any key)", img_step3)
+                        print("-> STEP 3 完成：姿态估计已结束。")
+                        cv2.waitKey(0) # 停顿
+                        
+                        # 销毁所有中间步骤窗口，回到实时预览
+                        cv2.destroyWindow("STEP 1: GroundingDINO Detection (Press any key)")
+                        cv2.destroyWindow("STEP 2: Mask/Segmentation (Press any key)")
+                        cv2.destroyWindow("STEP 3: FoundationPose Result (Press any key)")
+                    else:
+                        print("❌ FoundationPose 运行失败")
+                        last_text = "Pose Estimation Failed!"
 
             # --- 实时渲染 ---
             img_display = img.copy()

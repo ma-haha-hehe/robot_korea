@@ -1,0 +1,5 @@
+trial_id,date,target,place_offset_m,grasp_spin_deg,mode,vision_success,perception_time_s,robot_execution_success,grasp_success,placement_success,insertion_quality,total_time_s,failure_stage,notes
+R001,2026-05-26,yellow 2x4 brick.,"0.00,0.00,0.00",0,dry-run,,,,,,,,,
+R002,2026-05-26,yellow 2x4 brick.,"0.00,0.00,0.00",0,real,,,,,,,,,
+R003,2026-05-26,blue 2x4 brick.,"0.08,0.00,0.00",0,real,,,,,,,,,
+R004,2026-05-26,"yellow 2x4 brick.; blue 2x4 brick.","0.00,0.00,0.00;0.08,0.00,0.00",0,two-step,,,,,,,,,

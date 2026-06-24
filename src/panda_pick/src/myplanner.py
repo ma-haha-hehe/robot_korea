@@ -1,10 +1,12 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
 import numpy as np
 import yaml
 import os
 import copy
+import argparse
+import math
 from scipy.spatial.transform import Rotation as R
 
 # 禁用 YAML 锚点
@@ -13,7 +15,7 @@ yaml.Dumper.ignore_aliases = lambda *args: True
 # ================= 1. 配置区域 =================
 THRESHOLD = 0.045       # 避障探测距离 (4.5cm)
 TABLE_HEIGHT = 0.42     # 桌面高度
-ASSEMBLY_CENTER = np.array([0.35, 0.0, TABLE_HEIGHT]) 
+ASSEMBLY_CENTER = np.array([0.0, 0.0, 0.0])
 
 # 原材料区位置
 SOURCE_LOCATIONS = {
@@ -33,6 +35,29 @@ def get_strategy_quaternion(spin_deg):
     base_rot = R.from_euler('x', 180, degrees=True)
     strategy_rot = R.from_euler('z', spin_deg, degrees=True)
     return to_native((strategy_rot * base_rot).as_quat().tolist())
+
+
+def infer_vision_label(block):
+    for key in ("vision_label", "vision_name", "target"):
+        if block.get(key):
+            return str(block[key]).strip()
+
+    name = str(block.get("name", "")).strip()
+    block_type = str(block.get("type", "")).lower()
+    text = f"{name.lower()} {block_type}"
+    if "4x2" in text or "2x4" in text:
+        size = "2x4"
+    elif "2x2" in text:
+        size = "2x2"
+    else:
+        size = "lego"
+
+    color = str(block.get("color", "")).strip()
+    if color:
+        return f"{color} {size} brick."
+    if " " in name:
+        return name if name.endswith(".") else name + "."
+    return f"{size} brick."
 
 # ================= 2. 核心判定逻辑 (带详细推理打印) =================
 
@@ -94,8 +119,7 @@ def process_blueprint(input_yaml, output_yaml):
     remaining_blocks = []
     for b in blueprint.get('blocks', []):
         bd = copy.deepcopy(b)
-        bd['abs_pos'] = ASSEMBLY_CENTER + np.array(b['pos'])
-        bd['abs_pos'][2] = TABLE_HEIGHT + b['pos'][2]
+        bd['abs_pos'] = np.array(b['pos'], dtype=float)
         remaining_blocks.append(bd)
 
     disassembly_tasks = []
@@ -150,10 +174,13 @@ def process_blueprint(input_yaml, output_yaml):
         
         disassembly_tasks.append({
             "name": target['name'],
+            "type": target.get("type", ""),
+            "color": target.get("color", ""),
+            "vision_label": infer_vision_label(target),
             "grasp_spin": final_spin,
-            "blueprint_yaw": to_native(blueprint_yaw),
+            "blueprint_yaw": to_native(math.radians(float(blueprint_yaw))),
             "pick": {
-                "pos": to_native([src_xy[0], src_xy[1], TABLE_HEIGHT + 0.015]),
+                "pos": to_native([src_xy[0], src_xy[1], 0.015]),
                 "orientation": get_strategy_quaternion(final_spin)
             },
             "place": {
@@ -179,6 +206,18 @@ def process_blueprint(input_yaml, output_yaml):
     print("="*50 + "\n")
 
 if __name__ == "__main__":
-    # 修改后的输出绝对路径
-    output_file = "/home/i6user/Desktop/robot_lego/src/my_robot_vision/my_robot_vision/task_test_flower.yaml"
-    process_blueprint("final_product_flower.yaml", output_file)
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "input_yaml",
+        nargs="?",
+        default="simple_shape.yaml",
+        help="final product YAML with a blocks: list",
+    )
+    parser.add_argument(
+        "output_yaml",
+        nargs="?",
+        default="/home/i6user/Desktop/robot_lego/src/panda_pick/src/plan.yaml",
+        help="planner output YAML consumed by vision/execution",
+    )
+    args = parser.parse_args()
+    process_blueprint(args.input_yaml, args.output_yaml)

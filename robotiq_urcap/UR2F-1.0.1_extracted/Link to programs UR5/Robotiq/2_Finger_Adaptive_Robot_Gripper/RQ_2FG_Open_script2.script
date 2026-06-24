@@ -1,0 +1,40 @@
+#Allocation of modbus output registers with the desired settings
+out_reg2_open = Speed_open2 * 256 + Force_open2
+modbus_set_output_register("Speed_Force_Req", out_reg2_open, False)
+modbus_set_output_register("Position_Req", Position_open2, False)
+
+#Allow movement
+modbus_set_output_signal("Go_to_Requested", True, False)
+while(modbus_get_signal_status("Action_Status", False) == False):
+    sync()
+end
+
+#Wait until the end of the movement
+sleep(0.2)
+while (not((modbus_get_signal_status("Obj_Det_Status1", False) == True) or (modbus_get_signal_status("Obj_Det_Status2", False) == True ))):
+    sleep(0.1)
+    sync()
+end
+
+sleep(0.2)
+#Status check object detection
+global obj_detect1 = modbus_get_signal_status("Obj_Det_Status1",False)
+global obj_detect2 = modbus_get_signal_status("Obj_Det_Status2",False)
+if ((obj_detect1 == False) and (obj_detect2 == True)):
+    global Contact_opening = False
+    global Contact_closing = True
+else:
+    if ((obj_detect1 == True) and (obj_detect2 == False)):
+        global Contact_opening = True
+        global Contact_closing = False
+    else:
+        global Contact_opening = False
+        global Contact_closing = False
+    end
+end
+
+#Prohibit the movement
+modbus_set_output_signal("Go_to_Requested", False, False)
+while(modbus_get_signal_status("Action_Status", False) == True):
+    sync()
+end

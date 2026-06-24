@@ -1,0 +1,54 @@
+% Suggested insertion point:
+% Chapter 4, after the general execution pipeline description or at the end of Section 4.4.
+
+\subsection{Real-Robot Perception-to-Execution Pipeline}
+\label{subsec:real_robot_pipeline}
+
+In addition to the simulated benchmark, the system was deployed on a physical tabletop
+assembly setup to validate that the perception, planning, and execution modules can be
+connected in a real robot loop. The real-robot setup consists of a UR5 manipulator equipped
+with a Robotiq parallel-jaw gripper, an RGB-D camera for object observation, a picking area
+containing separated LEGO Duplo bricks, and an assembly area in which the target structure is
+constructed. The target product is specified by the same structured YAML representation used
+in simulation. Each block entry defines the part type, color, target position, and target yaw in
+the assembly coordinate frame. The planner converts this product-level specification into an
+ordered list of pick-and-place tasks, which is then consumed by the perception and execution
+modules.
+
+The real-robot system follows the same high-level structure as the simulated pipeline, but the
+implementation uses a calibrated robot-camera transformation and taught reference poses to
+reduce the sensitivity of open-loop Cartesian execution. At the beginning of a run, the robot
+moves to a fixed observation pose and captures an RGB-D image of the picking area. For each
+target part, GroundingDINO proposes open-vocabulary detections, SAM produces instance
+masks, and FoundationPose estimates the CAD-based 6D object pose. The estimated pose is
+transformed into the robot base frame and converted into a small Cartesian offset relative to
+the taught pre-grasp pose. Placement targets are generated from the planned product YAML
+and expressed as offsets relative to the taught pre-place pose. This design keeps the physical
+execution close to repeatedly tested taught configurations while still using visual pose
+estimation for object-specific grasp offsets and yaw correction.
+
+\paragraph{Asynchronous perception during execution.}
+To reduce idle time between consecutive assembly steps, the real-robot implementation uses
+an asynchronous perception-execution schedule. In the synchronous version, the robot waits at
+the observation pose, the vision module estimates the next target, the robot executes the
+corresponding pick-and-place action, and the same sequence is repeated for the following
+part. This creates avoidable waiting time because the vision pipeline is inactive while the
+robot is moving.
+
+In the asynchronous version, the first RGB-D observation is captured once at the fixed
+observation pose and then reused as a frozen observation for subsequent target queries. While
+the robot executes the current pick-and-place action, the vision process estimates the 6D pose
+of the next target from the frozen observation. The selected instance mask is stored after each
+successful target selection and excluded from later detections, which prevents repeated
+selection of the same physical brick when multiple identical bricks are present in the initial
+image. This is particularly important for products containing several identical white 2x4
+bricks. The next execution step can therefore start as soon as the current action finishes and
+the corresponding vision output is available, reducing the sequential wait time between
+assembly steps.
+
+This optimization does not change the geometric task plan. It only changes the scheduling
+between perception and execution. The approach is suitable for the current real-robot
+validation because all loose parts are visible in the initial observation and the picking area is
+treated as a known initial scene. For more dynamic settings, the same interface could be
+extended with repeated observations or closed-loop re-detection after each manipulation
+step.

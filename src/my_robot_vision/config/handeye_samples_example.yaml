@@ -1,0 +1,41 @@
+# Hand-eye calibration sample file for an eye-in-hand camera on UR5 tool0.
+#
+# Workflow:
+# 1. Print a chessboard. Measure the square size accurately.
+# 2. Move the robot to 10-20 different poses where the camera sees the board.
+# 3. Save one image for each pose.
+# 4. For the same pose, run:
+#      ros2 launch panda_pick run_ur5.launch.py motion_control_mode:=print_pose
+#    Copy the printed T_base_tool block into the matching sample.
+#
+# board_size is the number of inner corners, not the number of printed squares.
+pattern: chessboard
+board_size: [9, 6]
+square_size: 0.025
+
+# Optional. If empty, the script estimates camera intrinsics from the same photos.
+# Prefer filling these from the RealSense stream intrinsics when available.
+camera_matrix: null
+dist_coeffs: null
+
+samples:
+  - image: /media/i6user/YOUR_USB/calibration/img_001.jpg
+    T_base_tool:
+      - [0.036900462, 0.999297100, 0.006607729, 0.171983752]
+
+      - [0.998516378, -0.036605070, -0.040312665, 0.622104279]
+
+      - [-0.040042453, 0.008085482, -0.999165265, 0.412042662]
+
+      - [0.000000000, 0.000000000, 0.000000000, 1.000000000]
+
+
+  - image: /media/i6user/YOUR_USB/calibration/img_002.jpg
+    T_base_tool:
+      - [-0.001609505, 0.844434257, 0.535656789, -0.022219997]
+
+      - [0.994051524, 0.059683645, -0.091101213, 0.626647190]
+
+      - [-0.108898935, 0.532323819, -0.839507221, 0.411013299]
+
+      - [0.000000000, 0.000000000, 0.000000000, 1.000000000]

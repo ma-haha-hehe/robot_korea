@@ -1,5 +1,5 @@
 tasksh:
-- name: blue 4x2_brick_1
+- name: yellow 4x2_brick.
   grasp_spin: 90
   blueprint_yaw: 0
   pick:

@@ -55,9 +55,6 @@ def get_color_distance(c1, c2):
     """计算两个 HSV 颜色之间的欧几里得距离，并考虑 Hue 的循环性"""
     h1, s1, v1 = c1
     h2, s2, v2 = c2
-
-hand get_
-    
     # Hue 是圆形的 (0 和 180 是相连的)
     dh = min(abs(h1 - h2), 180 - abs(h1 - h2))
     ds = s1 - s2
@@ -141,12 +138,13 @@ class RobotVisionNode:
 
     def run(self):
         """
-        全流程视觉控制逻辑：集成比例/颜色硬过滤、黑名单记忆机制以及自动重试。
+        全流程视觉控制逻辑：将调试标签从通用的 "Lego" 改为 YAML 中的具体任务名称。
         """
-        # 比例容差：允许 0.4 的偏差，防止斜放导致误判
+        # 比例容差
         RATIO_TOLERANCE = 0.4 
         
         for task in self.task_list:
+            # 获取当前任务的真实名称，例如 "yellow_4x2_brick"
             name = task['name']
             
             # --- 解析任务要求的颜色 ---
@@ -157,109 +155,114 @@ class RobotVisionNode:
                     break
 
             task_success = False
-            # 【核心】每个新任务开始前，初始化该任务的专属黑名单（坐标记忆）
-            blacklist = [] # 存储格式: [(cx1, cy1), ...]
+            blacklist = [] 
 
             while not task_success:
-                # 0. 任务同步：等待机器人清空 active_task.yaml
+                # 0. 任务同步
                 while os.path.exists(RESULT_FILE):
                     print(f"⏳ [{name}] 等待机器人拿走上一块积木...")
                     time.sleep(0.5)
 
-                print(f"\n🎯 [新一轮扫描] 寻找: {name} | 黑名单记录: {len(blacklist)} 个")
+                print(f"\n🎯 [新一轮扫描] 寻找目标: {name}")
                 
                 # 更新 3D 模型
                 mesh_path = self.get_mesh_path(name)
                 self.pose_est.update_mesh(mesh_path)
                 target_ratio = 2.0 if ("4x2" in name or "2x4" in name) else 1.0
 
-                # --- 1. 图像采集与全图检测 ---
+                # --- 1. 图像采集 ---
                 self.clear_buffer()
                 frames = self.pipeline.wait_for_frames()
                 aligned_frames = self.align.process(frames)
                 img_bgr = np.asanyarray(aligned_frames.get_color_frame().get_data())
-                img_pil = Image.fromarray(cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB))
+               s img_pil = Image.fromarray(cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB))
                 
-                # 运行 GroundingDINO
+                # --- 2. GroundingDINO 检测阶段 ---
+                print(f"🔍 [步骤 1] 正在全图搜索: {name}")
                 results = self.detector(img_pil, candidate_labels=["lego block"], threshold=0.15)
                 
-                valid_candidates = []
-                viz_frame = img_bgr.copy()
+                debug_dino = img_bgr.copy()
+                for r in results:
+                    b = r['box']
+                    # 【核心修改点】将标签改为当前任务的 name
+                    target_label = f"GOAL: {name} ({r['score']:.2f})"
+                    
+                    cv2.rectangle(debug_dino, (int(b['xmin']), int(b['ymin'])), (int(b['xmax']), int(b['ymax'])), (255, 255, 0), 2)
+                    cv2.putText(debug_dino, target_label, (int(b['xmin']), int(b['ymin'])-10), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
+                
+                cv2.imshow("Step 1: GroundingDINO Detection", debug_dino)
+                print(f"👉 DINO 找到了候选框。按任意键验证它们是否匹配 {name}...")
+                cv2.waitKey(0)
 
-                # --- 2. 几何与颜色校验 ---
+                valid_candidates = []
+
+                # --- 3. 几何与颜色校验阶段 ---
                 for r in results:
                     box = [r['box']['xmin'], r['box']['ymin'], r['box']['xmax'], r['box']['ymax']]
                     cx, cy = (box[0] + box[2]) / 2, (box[1] + box[3]) / 2
 
-                    # --- A. 检查坐标黑名单 ---
+                    # A. 检查黑名单
                     is_blacklisted = False
                     for (bx, by) in blacklist:
-                        if np.sqrt((cx - bx)**2 + (cy - by)**2) < 20: # 20像素容差
+                        if np.sqrt((cx - bx)**2 + (cy - by)**2) < 20:
                             is_blacklisted = True
                             break
-                    
-                    if is_blacklisted:
-                        # 黑名单目标画灰色框并跳过，不再重复计算 SAM
-                        cv2.rectangle(viz_frame, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), (100, 100, 100), 1)
-                        continue
+                    if is_blacklisted: continue
 
-                    # B. SAM 精确掩码
+                    # B. SAM 分割
                     self.sam_predictor.set_image(cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB))
                     masks, _, _ = self.sam_predictor.predict(box=np.array(box), multimask_output=False)
                     mask = masks[0]
                     
-                    # C. 几何比例校验
+                    # C. 几何与 D. 颜色分类
                     contours, _ = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                     if not contours: continue
                     rect = cv2.minAreaRect(max(contours, key=cv2.contourArea))
-                    w, h = rect[1]
-                    actual_ratio = max(w, h) / (min(w, h) + 1e-6)
+                    w, h = rect[1]; actual_ratio = max(w, h) / (min(w, h) + 1e-6)
                     
-                    if abs(actual_ratio - target_ratio) > RATIO_TOLERANCE:
-                        print(f"      - [{name}] 比例错误: {actual_ratio:.1f}，加入黑名单")
+                    hsv_img = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
+                    eroded_mask = cv2.erode(mask.astype(np.uint8), np.ones((5, 5), np.uint8), iterations=1)
+                    mask_pixels = hsv_img[eroded_mask > 0]
+                    detected_color = "unknown"
+                    if len(mask_pixels) > 0:
+                        detected_color = classify_color(np.mean(mask_pixels, axis=0))
+
+                    # --- 校验结果展示 ---
+                    ratio_ok = abs(actual_ratio - target_ratio) <= RATIO_TOLERANCE
+                    color_ok = (target_color_name is None) or (detected_color == target_color_name)
+                    
+                    debug_logic = img_bgr.copy()
+                    debug_logic[mask > 0] = debug_logic[mask > 0] * 0.5 + np.array([0, 255, 0], dtype=np.uint8) * 0.5
+                    
+                    label_color = (0, 255, 0) if (ratio_ok and color_ok) else (0, 0, 255)
+                    # 【核心修改点】标签前缀显示任务名
+                    status_txt = f"{name} | R:{actual_ratio:.1f} C:{detected_color}"
+                    
+                    cv2.rectangle(debug_logic, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), label_color, 2)
+                    cv2.putText(debug_logic, status_txt, (int(box[0]), int(box[1])-10), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, label_color, 2)
+                    
+                    cv2.imshow("Step 2: SAM & Logic Check", debug_logic)
+                    print(f"📊 校验中: {status_txt}. 按任意键继续...")
+                    cv2.waitKey(0)
+
+                    if not ratio_ok or not color_ok:
                         blacklist.append((cx, cy))
-                        cv2.rectangle(viz_frame, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), (0, 0, 255), 2)
                         continue 
 
-                    # D. 颜色分类判定 (最近邻分类逻辑)
-                    hsv_img = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
-                    kernel = np.ones((5, 5), np.uint8)
-                    eroded_mask = cv2.erode(mask.astype(np.uint8), kernel, iterations=1)
-                    mask_pixels = hsv_img[eroded_mask > 0]
-                    
-                    if len(mask_pixels) > 0:
-                        avg_hsv = np.mean(mask_pixels, axis=0)
-                        detected_color = classify_color(avg_hsv) # 调用之前的距离算法
-                        
-                        if target_color_name and detected_color != target_color_name:
-                            print(f"      - [{name}] 颜色不对 (检测到: {detected_color})，加入黑名单")
-                            blacklist.append((cx, cy))
-                            # 颜色不对画蓝框
-                            cv2.rectangle(viz_frame, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), (255, 0, 0), 1)
-                            cv2.putText(viz_frame, f"IS {detected_color}", (int(box[0]), int(box[1])-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
-                            continue
-                    
-                    # E. 校验通过
                     match_score = r['score'] * (1.0 / (abs(actual_ratio - target_ratio) + 0.1))
-                    valid_candidates.append({'mask': mask, 'score': match_score, 'box': box})
-                    cv2.rectangle(viz_frame, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), (0, 255, 255), 2)
+                    valid_candidates.append({'mask': mask, 'score': match_score, 'box': box, 'color': detected_color})
 
-                # --- 3. 重试判定 ---
+                # --- 4. 重试判定 ---
                 if not valid_candidates:
-                    print(f" ❌ [未发现匹配目标] 可能是目标被遮挡或在黑名单中。刷新中...")
-                    cv2.imshow("Detection Logic", viz_frame)
-                    cv2.waitKey(1500)
-                    continue # 跳回 while True 开头重新拍照检测
+                    print(f" ❌ 未找到匹配 {name} 的积木，刷新中...")
+                    time.sleep(1); continue
 
-                # 选出最高分 Winner
                 winner = max(valid_candidates, key=lambda x: x['score'])
-                cv2.rectangle(viz_frame, (int(winner['box'][0]), int(winner['box'][1])), 
-                              (int(winner['box'][2]), int(winner['box'][3])), (0, 255, 0), 4)
-                cv2.imshow("Detection Logic", viz_frame)
-                cv2.waitKey(1000) 
-
-                # --- 4. 6D 姿态追踪 ---
-                print("📐 正在精炼 6D 位姿...")
+                
+                # --- 5. 6D 姿态追踪 ---
+                print(f"📐 [步骤 3] 6D 锁定目标: {name}")
                 pose_samples = []
                 start_track = time.time()
                 while (time.time() - start_track) < 4.0:
@@ -271,15 +274,19 @@ class RobotVisionNode:
                     if T_curr is not None:
                         pose_samples.append(T_curr)
                         self.visualize_result(rgb, T_curr)
-                    cv2.imshow("6D Pose Tracking", rgb)
+                    
+                    # 追踪时也显示目标名称
+                    cv2.putText(rgb, f"Tracking Goal: {name}", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                    cv2.imshow("Step 3: 6D Pose Tracking", rgb)
                     if cv2.waitKey(1) & 0xFF == ord('q'): break
 
-                # --- 5. 发送结果 ---
-                if pose_samples:
-                    print(f"✅ 任务 {name} 位姿解算成功！")
-                    self.send_to_robot(name, pose_samples[-1], task)
-                    task_success = True # 成功解算，跳出 while True 循环进入下一个积木任务
+                print(f"✅ {name} 追踪完成。按任意键正式执行动作...")
+                cv2.waitKey(0)
 
+                # --- 6. 发送结果 ---
+                if pose_samples:
+                    self.send_to_robot(name, pose_samples[-1], task)
+                    task_success = True
     def visualize_result(self, image, T_cam_obj):
         l = 0.05
         pts_3d = np.float32([[0,0,0], [l,0,0], [0,l,0], [0,0,l]])

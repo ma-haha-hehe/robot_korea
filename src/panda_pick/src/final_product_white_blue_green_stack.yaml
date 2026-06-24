@@ -1,0 +1,23 @@
+# 三块 2x4 堆叠：白(底) -> 蓝(中) -> 绿(顶)。
+# 想改成平铺一排：把三块的 z 都设 0，x 分别设 -0.064 / 0 / 0.064 即可。
+blocks:
+  - name: "white_2x4_base"
+    type: "brick_4x2"
+    color: "white"
+    vision_label: "white 2x4 brick."
+    pos: [0.0000, 0.0000, 0.0000]
+    rotation: [0, 0, 0]
+
+  - name: "blue_2x4_middle"
+    type: "brick_4x2"
+    color: "blue"
+    vision_label: "blue 2x4 brick."
+    pos: [0.0000, 0.0000, 0.0192]
+    rotation: [0, 0, 0]
+
+  - name: "green_2x4_top"
+    type: "brick_4x2"
+    color: "green"
+    vision_label: "green 2x4 brick."
+    pos: [0.0000, 0.0000, 0.0384]
+    rotation: [0, 0, 0]

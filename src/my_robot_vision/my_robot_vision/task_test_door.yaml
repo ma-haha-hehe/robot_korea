@@ -5,7 +5,7 @@ tasks:
   # 第 1 层：底座 (地基)
   # ==========================================
   - 
-    name: "brick_4x2_1"
+    name: "yellow brick_4x2."
     grasp_spin: 0
     blueprint_yaw: 0
     place:

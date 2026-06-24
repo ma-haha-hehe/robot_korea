@@ -1,0 +1,7 @@
+{
+    "summary": {"success_count": 8, "total_compute_time": 160.0, "total_manip_time": 900.0, "collision_count": 5, "stability_violations": 7},
+    "raw_data": [
+        {"success": 1.0, "compute_time": 8.0, "manip_time": 45.0, "accuracy_error": 0.0110, "stability_violation": 0.0, "collision": 0.0},
+        {"success": 0.0, "compute_time": 8.2, "manip_time": 20.0, "accuracy_error": 0.0, "stability_violation": 0.0, "collision": 1.0}
+    ]
+}

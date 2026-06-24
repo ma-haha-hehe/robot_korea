@@ -1,0 +1,18 @@
+#Activation if not activated
+if ((modbus_get_signal_status("Gripper_Status1", False) == False)  and (modbus_get_signal_status("Gripper_Status2", False) == False)):
+    modbus_set_output_signal("Activate", True, False)
+end
+
+#Prohibit the movement
+modbus_set_output_signal("Go_to_Requested", False, False)
+while (modbus_get_signal_status("Action_Status", False) == True):
+    sync()
+end
+
+#Awaiting the activation of the gripper
+while (not(modbus_get_signal_status("Gripper_Status1", False) ==  True )):
+    sync()
+end
+while (not(modbus_get_signal_status("Gripper_Status2", False) ==  True )):
+    sync()
+end

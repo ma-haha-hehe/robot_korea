@@ -1,0 +1,62 @@
+# Convert planner + vision result into panda_pick/config/pick_place_task.yaml.
+#
+# This bridge keeps the robot on your stable taught-joint pipeline:
+# - Robot first movej() to the taught pregrasp / preplace joint poses.
+# - The generated YAML only adds small dx/dy/dz/yaw offsets.
+#
+# Fill these reference positions after running:
+#   ros2 launch panda_pick run_ur5.launch.py motion_control_mode:=print_pose ...
+# at the taught pregrasp and preplace poses.
+paths:
+  plan: /home/i6user/Desktop/robot_lego/src/panda_pick/src/plan_perception_test.yaml
+  vision_output: /home/i6user/Desktop/robot_lego/FoundationPose/root/FoundationPose/vision_output.yaml
+  output_task: /home/i6user/Desktop/robot_lego/src/panda_pick/config/pick_place_task.yaml
+
+handeye:
+  # If prefer_handeye is true and vision output contains T_cam_obj, the bridge
+  # recomputes T_base_obj as:
+  #   T_base_tool_observe @ T_tool_camera @ T_cam_obj
+  prefer_handeye: true
+  camera_to_tool_yaml: /home/i6user/Desktop/robot_lego/src/my_robot_vision/config/camera_to_tool.yaml
+  # Print this at the fixed home/observe pose after calibration:
+  #   ros2 launch panda_pick run_ur5.launch.py motion_control_mode:=print_pose ...
+  observe_T_base_tool:
+    - [0.022277359, 0.998847464, 0.042514260, -0.098177644]
+    - [0.999075849, -0.023805683, 0.035787381, 0.636536557]
+    - [0.036758216, 0.041677722, -0.998454707, 0.410142312]
+    - [0.000000000, 0.000000000, 0.000000000, 1.000000000]
+
+reference:
+  # TCP position when robot is at urscript_pregrasp_joints, before applying offsets.
+  pick_pre_base_xyz: [-0.078658613, 0.691396996, 0.390320440]
+  # TCP position when robot is at urscript_preplace_joints, before applying offsets.
+  place_pre_base_xyz: [0.299419245, 0.447975511, 0.336446423]
+
+placement:
+  # Base-frame coordinate of blueprint origin on the place area.
+  # Usually teach this once by putting tool0 above the assembly origin.
+  assembly_origin_base_xyz: [0.299419245, 0.447975511, 0.336446423]
+  # Optional extra correction for all placement positions.
+  place_offset_xyz: [0.0, 0.0, 0.050]
+
+pick:
+  # For first real tests keep z from the taught pose. Use camera x/y/yaw first.
+  use_vision_z: false
+  pick_offset_xyz: [0.0, 0.0, 0.0]
+  descend: 0.08
+
+place:
+  descend: 0.16
+
+yaw:
+  # In joint_pick_place this becomes wrist_3 relative rotation.
+  use_vision_yaw: true
+  use_planner_grasp_spin: true
+  pick_yaw_offset_deg: 0.0
+  use_planner_blueprint_yaw: true
+  place_yaw_offset_deg: 0.0
+
+safety:
+  max_xy_offset: 0.15
+  max_z_offset: 0.08
+  max_descend: 0.30
