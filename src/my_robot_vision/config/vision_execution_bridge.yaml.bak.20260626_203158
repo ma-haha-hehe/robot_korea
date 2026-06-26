@@ -1,0 +1,102 @@
+# Convert planner + vision result into panda_pick/config/pick_place_task.yaml.
+#
+# This bridge keeps the robot on your stable taught-joint pipeline:
+# - Robot first movej() to the taught pregrasp / preplace joint poses.
+# - The generated YAML only adds small dx/dy/dz/yaw offsets.
+#
+# Fill these reference positions after running:
+#   ros2 launch panda_pick run_ur5.launch.py motion_control_mode:=print_pose ...
+# at the taught pregrasp and preplace poses.
+paths:
+  plan: /home/i6user/Desktop/robot_lego/src/panda_pick/src/plan_perception_test.yaml
+  vision_output: /home/i6user/Desktop/robot_lego/FoundationPose/root/FoundationPose/vision_output.yaml
+  output_task: /home/i6user/Desktop/robot_lego/src/panda_pick/config/pick_place_task.yaml
+
+handeye:
+  # If prefer_handeye is true and vision output contains T_cam_obj, the bridge
+  # recomputes T_base_obj as:
+  #   T_base_tool_observe @ T_tool_camera @ T_cam_obj
+  prefer_handeye: true
+  camera_to_tool_yaml: /home/i6user/Desktop/robot_lego/src/my_robot_vision/config/camera_to_tool.yaml
+  # Print this at the fixed home/perception/observe pose after calibration.
+  # This must match UR5_OBSERVE_JOINTS in panda_pick/config/ur5_taught_joints.env.
+  # The automatic pipeline moves to that home pose before triggering vision:
+  #   ros2 launch panda_pick run_ur5.launch.py motion_control_mode:=print_pose ...
+  observe_T_base_tool:
+    - [0.022277359, 0.998847464, 0.042514260, -0.098177644]
+    - [0.999075849, -0.023805683, 0.035787381, 0.636536557]
+    - [0.036758216, 0.041677722, -0.998454707, 0.410142312]
+    - [0.000000000, 0.000000000, 0.000000000, 1.000000000]
+
+  # Manual temporary extrinsic note:
+  # The previous calibration estimated camera translation [0.010, -0.065, 0.277] m,
+  # which put detected objects below the table. For safe testing, camera_to_tool.yaml
+  # now keeps the calibrated rotation but uses translation [0.030, 0.000, 0.030] m,
+  # matching the rough physical measurement: camera slightly forward and about
+  # 3 cm deeper from the robot flange/tool0 area.
+  # Re-run hand-eye calibration later with 15-20 diverse samples.
+
+reference:
+  # TCP position when robot is at urscript_pregrasp_joints, before applying offsets.
+  pick_pre_base_xyz: [-0.096749708, 0.636813201, 0.410617265]
+  # TCP position when robot is at urscript_preplace_joints, before applying offsets.
+  place_pre_base_xyz: [0.290575993, 0.474813149, 0.350253893]
+
+placement:
+  # Base-frame coordinate of blueprint origin on the place area.
+  # Usually teach this once by putting tool0 above the assembly origin.
+  assembly_origin_base_xyz: [0.290575993, 0.474813149, 0.350253893]
+  # Optional extra correction for all placement positions.
+  # Because execution_axis.flip_x/flip_y are true, increasing X/Y here moves
+  # the generated final place offset right/forward on the current table.
+  # 2026-05-26: X +0.005 m moves place 0.5 cm right; Y already +0.005 m
+  # moves place 0.5 cm forward.
+  place_offset_xyz: [0.033, 0.02246, 0.080]
+
+pick:
+  # For first real tests keep z from the taught pose. Use camera x/y/yaw first.
+  use_vision_z: false
+  # Base-frame correction from robot tool0 reference to the real Robotiq fingertip
+  # grasp center. Start at zero because your taught pregrasp already includes the
+  # gripper geometry; tune in 5 mm steps after the camera extrinsic is sane.
+  pick_offset_xyz: [0.0, 0.010, 0.050]
+  # Final grasp height = generated pre-grasp height - descend.
+  # 2026-05-26: increased from 0.090 to 0.140 to lower the grasp 5.0 cm.
+  descend: 0.179   #0.183
+  # Keep the whole grasp descent at the normal descend speed.
+  slow_final_descend: 0.000
+
+place:
+  # Final place height = generated pre-place height - descend.
+  # 2026-05-26: increased from 0.145 to 0.155 to place 1.0 cm lower.
+  descend: 0.1615 #0.1612
+  # Use normal descend speed first, then extremely slow speed + wiggle for the last bit.
+  # 2026-06-19: 0.02 -> 0.016 so the normal-speed descent is a bit longer and the
+  # slow/wiggle phase starts slightly later/deeper (total descend unchanged).
+  slow_final_descend: 0.016
+
+yaw:
+  # In joint_pick_place this becomes wrist_3 relative rotation.
+  use_vision_yaw: true
+  use_planner_grasp_spin: true
+  pick_yaw_offset_deg: 0.0
+  use_planner_blueprint_yaw: true
+  place_yaw_offset_deg: 0.0
+
+execution_axis:
+  # Temporary field-frame correction: robot left/right currently moves opposite
+  # to the perceived/planned X direction, and front/back is also reversed.
+  flip_x: true
+  flip_y: true
+  # Final base-frame correction after the flip_x/flip_y mapping.
+  # The previous +Y test moved the grasp point backward on the real table, so
+  # the current correction uses -Y to move the grasp point forward.
+  # 2026-05-26: adjusted Y from -0.030 to -0.040 to move the grasp 1.0 cm forward.
+  final_pick_offset_xyz: [0.02, -0.040, 0.0]
+
+safety:
+  max_xy_offset: 0.15
+  # The five-block bridge product reaches planner z=0.0576 plus place_offset z=0.080,
+  # so the generated place dz can reach about 0.1376 m.
+  max_z_offset: 0.15
+  max_descend: 0.8

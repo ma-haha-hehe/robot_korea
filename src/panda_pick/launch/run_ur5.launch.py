@@ -42,6 +42,10 @@ def generate_launch_description():
     urscript_place_wiggle_z_amplitude = LaunchConfiguration("urscript_place_wiggle_z_amplitude")
     urscript_place_wiggle_velocity = LaunchConfiguration("urscript_place_wiggle_velocity")
     urscript_place_wiggle_steps = LaunchConfiguration("urscript_place_wiggle_steps")
+    urscript_disassemble_extra_lift = LaunchConfiguration("urscript_disassemble_extra_lift")
+    urscript_disassemble_place_offset_x = LaunchConfiguration("urscript_disassemble_place_offset_x")
+    urscript_disassemble_place_offset_y = LaunchConfiguration("urscript_disassemble_place_offset_y")
+    urscript_disassemble_place_offset_z = LaunchConfiguration("urscript_disassemble_place_offset_z")
     urscript_place_lift_after_release = LaunchConfiguration("urscript_place_lift_after_release")
     urscript_place_slow_final_descend = LaunchConfiguration("urscript_place_slow_final_descend")
     urscript_place_settle_wait_seconds = LaunchConfiguration("urscript_place_settle_wait_seconds")
@@ -248,6 +252,18 @@ def generate_launch_description():
                 "urscript_place_wiggle_steps": ParameterValue(
                     urscript_place_wiggle_steps, value_type=int
                 ),
+                "urscript_disassemble_extra_lift": ParameterValue(
+                    urscript_disassemble_extra_lift, value_type=float
+                ),
+                "urscript_disassemble_place_offset_x": ParameterValue(
+                    urscript_disassemble_place_offset_x, value_type=float
+                ),
+                "urscript_disassemble_place_offset_y": ParameterValue(
+                    urscript_disassemble_place_offset_y, value_type=float
+                ),
+                "urscript_disassemble_place_offset_z": ParameterValue(
+                    urscript_disassemble_place_offset_z, value_type=float
+                ),
                 "urscript_place_lift_after_release": ParameterValue(
                     urscript_place_lift_after_release, value_type=float
                 ),
@@ -326,6 +342,10 @@ def generate_launch_description():
         DeclareLaunchArgument("urscript_place_wiggle_z_amplitude", default_value="0.0"),
         DeclareLaunchArgument("urscript_place_wiggle_velocity", default_value="0.012"),
         DeclareLaunchArgument("urscript_place_wiggle_steps", default_value="12"),
+        DeclareLaunchArgument("urscript_disassemble_extra_lift", default_value="0.0"),
+        DeclareLaunchArgument("urscript_disassemble_place_offset_x", default_value="0.0"),
+        DeclareLaunchArgument("urscript_disassemble_place_offset_y", default_value="0.0"),
+        DeclareLaunchArgument("urscript_disassemble_place_offset_z", default_value="0.0"),
         DeclareLaunchArgument("urscript_place_lift_after_release", default_value="0.0"),
         DeclareLaunchArgument("urscript_place_slow_final_descend", default_value="0.020"),
         DeclareLaunchArgument("urscript_place_settle_wait_seconds", default_value="0.5"),

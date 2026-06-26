@@ -1,1 +1,1 @@
-orange 2x2 brick.
+white 2x4 brick.

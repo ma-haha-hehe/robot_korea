@@ -18,13 +18,21 @@ from dataclasses import dataclass
 from typing import Optional
 
 import cv2
+import json
 import numpy as np
-import pyrealsense2 as rs
+try:
+    import pyrealsense2 as rs   # 相机已换成 ifm O3P; RealSense 不再使用, 缺失也不报错
+except Exception:
+    rs = None
 import torch
 import trimesh
 import yaml
 from PIL import Image
 from transformers import pipeline
+
+# 同目录(容器内 /vision_code): O3P 高清 mask -> 深度帧 的鱼眼投影
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from o3p_align import build_depth_to_hi_map, sample_hi_to_depth
 
 
 FP_REPO = os.environ.get("FP_REPO", "/FoundationPose")
@@ -62,7 +70,11 @@ COLOR_MIN_FRACTION = float(os.environ.get("VISION_COLOR_MIN_FRACTION", "0.08"))
 USED_REGION_OVERLAP_THRESHOLD = float(os.environ.get("VISION_USED_REGION_OVERLAP_THRESHOLD", "0.35"))
 DISABLE_EMITTER = os.environ.get("VISION_DISABLE_EMITTER", "1") != "0"
 FROZEN_OBSERVATION = os.environ.get("VISION_FROZEN_OBSERVATION", "0") == "1"
-BRIDGE_VERSION = "2026-05-26-frozen-used-region-exclusion"
+# ifm O3P 相机: host 的 o3p_grabber.py 把【已对齐】的彩色+深度+内参写到这个目录,
+# 桥从这里读帧(替代 RealSense)。color.png(bgr8 240x180) / depth.npy(uint16 mm) / camera_K.json
+O3P_FRAME_DIR = os.environ.get("O3P_FRAME_DIR", "/shared_data/o3p")
+O3P_WAIT_RETRIES = int(os.environ.get("O3P_WAIT_RETRIES", "60"))
+BRIDGE_VERSION = "2026-06-25-o3p-tof-camera"
 
 
 if FP_REPO not in sys.path:
@@ -247,28 +259,50 @@ class RobotVisionBridge:
         return tasks
 
     def init_realsense(self):
-        self.pipeline = rs.pipeline()
-        config = rs.config()
-        config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
-        config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
-        profile = self.pipeline.start(config)
-        if DISABLE_EMITTER:
-            for sensor in profile.get_device().query_sensors():
-                if sensor.supports(rs.option.emitter_enabled):
-                    sensor.set_option(rs.option.emitter_enabled, 0)
-                if sensor.supports(rs.option.laser_power):
-                    sensor.set_option(rs.option.laser_power, 0)
-        intr = profile.get_stream(rs.stream.color).as_video_stream_profile().get_intrinsics()
-        self.K_MATRIX = np.array(
-            [[intr.fx, 0, intr.ppx], [0, intr.fy, intr.ppy], [0, 0, 1]],
-            dtype=np.float32,
-        )
-        self.K_MATRIX = np.ascontiguousarray(self.K_MATRIX, dtype=np.float32)
-        self.align = rs.align(rs.stream.color)
+        # 相机已从 RealSense 换成 ifm O3P(ToF)。帧由 host 的 o3p_grabber.py 写到
+        # O3P_FRAME_DIR。这里读 camera_params.json: depth_K(FoundationPose 用) +
+        # color_K/color_D/外参(高清 mask 投影回深度帧用), 不接相机硬件。
+        self._last_frame_id = None
+        ppath = os.path.join(O3P_FRAME_DIR, "camera_params.json")
+        for _ in range(O3P_WAIT_RETRIES):
+            if os.path.exists(ppath):
+                with open(ppath) as f:
+                    self.cam_params = json.load(f)
+                K = np.array(self.cam_params["depth_K"], dtype=np.float32)
+                self.K_MATRIX = np.ascontiguousarray(K, dtype=np.float32)
+                print(f"[VISION] O3P depth intrinsics from {ppath}: "
+                      f"fx={K[0,0]:.2f} cx={K[0,2]:.2f} cy={K[1,2]:.2f}")
+                return
+            print(f"[VISION] waiting for {ppath} (host 上跑 o3p_grabber.py 了吗?)")
+            time.sleep(1.0)
+        raise RuntimeError(f"找不到 {ppath}; 先在 host 跑 o3p_grabber.py --out {O3P_FRAME_DIR}")
+
+    def capture_hi(self):
+        # 高清彩色 1344x1008(给检测用, 比 240x180 清晰得多)。
+        path = os.path.join(O3P_FRAME_DIR, "color_hi.png")
+        if not os.path.exists(path):
+            return None
+        hi = cv2.imread(path, cv2.IMREAD_COLOR)
+        return np.ascontiguousarray(hi, dtype=np.uint8) if hi is not None else None
 
     def clear_buffer(self, count=30):
-        for _ in range(count):
-            self.pipeline.wait_for_frames()
+        # 文件帧没有"陈旧缓冲"概念: grabber 持续写最新帧, capture_aligned 总读最新。
+        # 这里等一帧确实更新过, 避免拿到机械臂移动前的旧帧。
+        self._wait_fresh_frame(timeout=2.0)
+
+    def _wait_fresh_frame(self, timeout=2.0):
+        fpath = os.path.join(O3P_FRAME_DIR, "frame.txt")
+        start = time.time()
+        while time.time() - start < timeout:
+            try:
+                with open(fpath) as f:
+                    fid = f.read().strip()
+            except Exception:
+                fid = None
+            if fid and fid != self._last_frame_id:
+                self._last_frame_id = fid
+                return
+            time.sleep(0.05)
 
     @staticmethod
     def task_label(task):
@@ -313,38 +347,49 @@ class RobotVisionBridge:
         return target or None
 
     def capture_aligned(self):
-        frames = self.pipeline.wait_for_frames()
-        aligned = self.align.process(frames)
-
-        color = aligned.get_color_frame()
-        depth = aligned.get_depth_frame()
-
-        if not color or not depth:
+        # 从 host grabber 写的共享目录读【已对齐】的彩色+深度(O3P, 240x180)。
+        # color.png: bgr8 已对齐到深度帧; depth.npy: uint16 毫米; 两者逐像素对齐。
+        cpath = os.path.join(O3P_FRAME_DIR, "color.png")
+        dpath = os.path.join(O3P_FRAME_DIR, "depth.npy")
+        if not (os.path.exists(cpath) and os.path.exists(dpath)):
             return None, None
 
-        img_bgr = np.asanyarray(color.get_data()).copy()
-        depth_m = np.asanyarray(depth.get_data()).astype(np.float32).copy() / 1000.0
+        img_bgr = cv2.imread(cpath, cv2.IMREAD_COLOR)
+        try:
+            depth_mm = np.load(dpath)
+        except Exception:
+            return None, None
+        if img_bgr is None or depth_mm is None:
+            return None, None
+        if img_bgr.shape[:2] != depth_mm.shape[:2]:
+            return None, None
 
+        depth_m = depth_mm.astype(np.float32) / 1000.0   # 毫米 -> 米
         img_bgr = np.ascontiguousarray(img_bgr, dtype=np.uint8)
         depth_m = np.ascontiguousarray(depth_m, dtype=np.float32)
 
         return img_bgr, depth_m
 
     def get_perception_frame(self):
+        # 返回 (hi 高清彩色1344x1008, aligned 对齐彩色240x180, depth 深度240x180 米)。
+        # 检测用 hi(清晰); FoundationPose 用 aligned+depth(深度帧)。
         if not self.frozen_observation:
-            return self.capture_aligned()
+            aligned, depth_m = self.capture_aligned()
+            hi = self.capture_hi()
+            return hi, aligned, depth_m
 
         if self.frozen_frame is None:
-            img_bgr, depth_m = self.capture_aligned()
-            if img_bgr is None or depth_m is None:
-                return None, None
-            self.frozen_frame = (img_bgr.copy(), depth_m.copy())
+            aligned, depth_m = self.capture_aligned()
+            hi = self.capture_hi()
+            if aligned is None or depth_m is None or hi is None:
+                return None, None, None
+            self.frozen_frame = (hi.copy(), aligned.copy(), depth_m.copy())
             os.makedirs(os.path.dirname(FROZEN_DEBUG_IMAGE_FILE), exist_ok=True)
-            cv2.imwrite(FROZEN_DEBUG_IMAGE_FILE, img_bgr)
+            cv2.imwrite(FROZEN_DEBUG_IMAGE_FILE, hi)
             print(f"[VISION] froze observe RGB-D frame; wrote {FROZEN_DEBUG_IMAGE_FILE}")
 
-        img_bgr, depth_m = self.frozen_frame
-        return img_bgr.copy(), depth_m.copy()
+        hi, aligned, depth_m = self.frozen_frame
+        return hi.copy(), aligned.copy(), depth_m.copy()
 
     @staticmethod
     def target_color(target):
@@ -549,23 +594,30 @@ class RobotVisionBridge:
 
         if not self.frozen_observation or self.frozen_frame is None:
             self.clear_buffer()
-        img_bgr, _ = self.get_perception_frame()
-        if img_bgr is None:
+        hi, aligned, depth = self.get_perception_frame()
+        if hi is None or aligned is None or depth is None:
             return None
-        mask, _ = self.select_mask(target, img_bgr)
-        if mask is None:
+        # 检测/分割在【高清彩色 1344x1008】上做(清晰, 不输 RealSense)
+        mask_hi, _ = self.select_mask(target, hi)
+        if mask_hi is None:
             print("[VISION] no valid candidate mask")
+            return None
+        # 把高清 mask 鱼眼投影回【深度帧 240x180】, 给 FoundationPose(深度密集帧)
+        uc, vc, valid = build_depth_to_hi_map(depth, self.cam_params, hi.shape[1], hi.shape[0])
+        mask = sample_hi_to_depth(mask_hi.astype(np.uint8), uc, vc, valid) > 0
+        if int(mask.sum()) < 10:
+            print("[VISION] mask 投影到深度帧后像素太少, 放弃")
             return None
 
         pose_samples = []
         last_debug = None
         start = time.time()
         while time.time() - start < ACC_SECONDS:
-            img_bgr, depth = self.get_perception_frame()
-            if img_bgr is None:
+            _, aligned, depth = self.get_perception_frame()
+            if aligned is None or depth is None:
                 continue
-            pose_input = np.ascontiguousarray(img_bgr.copy())
-            debug_img = img_bgr.copy()
+            pose_input = np.ascontiguousarray(aligned.copy())
+            debug_img = aligned.copy()
             pose = self.pose_est.estimator.register(
                 K=np.ascontiguousarray(self.K_MATRIX, dtype=np.float32),
                 rgb=pose_input,
@@ -590,7 +642,8 @@ class RobotVisionBridge:
 
         if not pose_samples:
             return None
-        self.remember_used_region(target, mask)
+        # "已用区域"全程用高清 mask(检测/重叠比较/叠加都在高清帧), 不能用深度帧 mask
+        self.remember_used_region(target, mask_hi)
         return pose_samples[-1]
 
     def write_result(self, target, transform, timing=None):
@@ -695,5 +748,7 @@ if __name__ == "__main__":
     try:
         node.run()
     finally:
-        node.pipeline.stop()
+        # O3P 无 RealSense pipeline 句柄; 仅在存在时停止
+        if getattr(node, "pipeline", None) is not None:
+            node.pipeline.stop()
         cv2.destroyAllWindows()

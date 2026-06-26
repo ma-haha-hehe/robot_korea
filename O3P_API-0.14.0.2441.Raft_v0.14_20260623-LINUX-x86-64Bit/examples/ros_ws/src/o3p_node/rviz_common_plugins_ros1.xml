@@ -1,0 +1,10 @@
+<library path="lib/libo3p_panel">
+    <!-- ROS1 -->
+    <class name="O3PRvizPanel"
+           type="o3p_node::O3PRvizPanel"
+           base_class_type="rviz::Panel">
+        <description>
+            A custom rviz panel to display data from an O3P device. 
+        </description>
+    </class>
+</library>

@@ -12,12 +12,12 @@ tasks:
     dy: 0.0
     dz: 0.0
     yaw_deg: 0.0
-    descend: 0.05          # TODO 按真机调
+    descend: 0.065          # from DIS_PULL_* pre-pull pose down to the brick
     slow_final_descend: 0.0
   place:
     dx: 0.0
     dy: 0.0
     dz: 0.0
     yaw_deg: 0.0
-    descend: 0.05          # TODO 按真机调
+    descend: 0.04          # from DIS_DROP_JOINTS down to the release height
     slow_final_descend: 0.0

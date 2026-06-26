@@ -1,0 +1,104 @@
+O3P API Third Party Software
+===========================
+
+The source code of the open source software used in the O3P API is available 
+upon request. Please contact info@pmdtec.com.
+
+The source version of the O3P API contains the following third party software:
+
+| Third Party package                       | License name                                                      | License file                                             | Comments                                           |
+|-------------------------------------------|-------------------------------------------------------------------|----------------------------------------------------------|----------------------------------------------------|
+| Depth2PCL                                 | Spectre License                                                   | doc/licenses/api/spectre_license.txt                     | Used to calculate the point cloud from depth       |
+| Kiss FFT                                  | 3-clause BSD-style license                                        | doc/licenses/api/kissfft_license.txt                     | Used by Spectre                                    |
+| pffft                                     | 3-clause BSD-style license                                        | doc/licenses/api/pffft_license.txt                       | Used by Spectre                                    |
+| Halide Runtime                            | MIT-style license                                                 | doc/licenses/api/halide_license.txt                      | Used by Spectre                                    |
+| PackedArray                               | DWTFYWT license                                                   | doc/licenses/api/packedarray_license.txt                 | Used by Spectre                                    |
+| Rosbag                                    | 3-clause BSD-style license                                        | doc/licenses/api/rosbag_license.txt                      | Recording                                          |
+| LZ4                                       | 2-clause BSD-style license                                        | doc/licenses/api/lz4_license.txt                         | Recording                                          |
+| Realsense-file                            | Apache License Version 2.0                                        | doc/licenses/api/realsense-file_license.txt              | Recording                                          |
+| Numpy.i                                   | 3-clause BSD-style license                                        | doc/licenses/api/numpy_license.txt                       | Builds - Used in the Python wrapper                |
+| Google Test                               | 3-clause BSD-style license                                        | doc/licenses/internal/googletest_license.txt             | Internal                                           |
+| Google Mock                               | 3-clause BSD-style license                                        | doc/licenses/internal/googlemock_license.txt             | Internal                                           |
+| Google Mock Generator                     | Apache License Version 2.0                                        | doc/licenses/internal/googlemock_generator_license.txt   | Internal                                           | 
+| Google Turbo Colormap                     | Apache License Version 2.0                                        | doc/licenses/api/turbo_license.txt                       | Used to colorize depth                             |
+| nlohmann JSON for modern C++              | MIT-style license                                                 | doc/licenses/api/nlohmann_json_license.txt               | Used for camera presets                            |
+|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+
+The viewer application uses Qt which uses the following third party libraries:
+
+| Third Party package                       | License name                                                      | License file                                             | Comments                                           |
+|-------------------------------------------|-------------------------------------------------------------------|----------------------------------------------------------|----------------------------------------------------|
+| Qt                                        | LGPL 3                                                            | doc/licenses/tools/qt_license.txt                        | Used by the GUI applications                       |
+| BLAKE2                                    | Creative Commons Zero v1.0 Universal or Apache License 2.0        | doc/licenses/tools/blake2_license.txt                    | Used by Qt Core                                    |
+| zlib                                      | zlib license                                                      | doc/licenses/tools/zlib_license.txt                      | Used by Qt Core                                    |
+| Easing Equations by Robert Penner         | 3-clause BSD-style license                                        | doc/licenses/tools/easing_equations_license.txt          | Used by Qt Core                                    |
+| Efficient Binary-Decimal Conversion       | 3-clause BSD-style license                                        | doc/licenses/tools/binary_decimal_conversion_license.txt | Used by Qt Core                                    |
+| KWin, version 5.13.4                      | BSD-3-Clause                                                      | doc/licenses/tools/kwin_license.txt                      | Used by Qt Core                                    |
+| MD4                                       | Public Domain                                                     |                                                          | Used by Qt Core                                    |
+| MD5                                       | Public Domain                                                     |                                                          | Used by Qt Core                                    |
+| FreeBSD strtoll and strtoull              | 3-clause BSD-style license                                        | doc/licenses/tools/strtoll_license.txt                   | Used by Qt Core                                    |
+| PCRE2 - Stack-less JIT Compiler           | 2-clause BSD-style simplified license                             | doc/licenses/tools/pcre2_jit_license.txt                 | Used by Qt Core                                    |
+| PCRE2                                     | 3-clause BSD-style license                                        | doc/licenses/tools/pcre2_license.txt                     | Used by Qt Core                                    |
+| QEventDispatcher on macOS                 | 3-clause BSD-style license                                        | doc/licenses/tools/qeventdispatcher_mac_license.txt      | Used by Qt Core                                    |
+| SHA-1                                     | Public Domain                                                     |                                                          | Used by Qt Core                                    |
+| SHA-3                                     | Creative Commons Zero v1.0 Universal                              | doc/licenses/tools/sha3_license.txt                      | Used by Qt Core                                    |
+| SHA-3 - brg_endian                        | 2-clause BSD-style simplified license                             | doc/licenses/tools/sha3_brg_endian_license.txt           | Used by Qt Core                                    |
+| SHA-384 and SHA-512                       | 3-clause BSD-style license                                        | doc/licenses/tools/sha384_sha512_license.txt             | Used by Qt Core                                    |
+| SipHash Algorithm                         | Creative Commons Zero v1.0 Universal                              | doc/licenses/tools/siphash_license.txt                   | Used by Qt Core                                    |
+| Text Codec: EUC-JP                        | 2-clause BSD-style simplified license                             | doc/licenses/tools/text_euc_jp_license.txt               | Used by Qt Core                                    |
+| Text Codec: EUC-KR                        | 2-clause BSD-style simplified license                             | doc/licenses/tools/text_euc_kr_license.txt               | Used by Qt Core                                    |
+| Text Codec: GBK                           | 2-clause BSD-style simplified license                             | doc/licenses/tools/text_gbk_license.txt                  | Used by Qt Core                                    |
+| Text Codec: ISO 2022-JP (JIS)             | 2-clause BSD-style simplified license                             | doc/licenses/tools/text_iso2022_jp_license.txt           | Used by Qt Core                                    |
+| Text Codec: Shift-JIS                     | 2-clause BSD-style simplified license                             | doc/licenses/tools/text_shift_jis_license.txt            | Used by Qt Core                                    |
+| Text Codec: TSCII                         | 2-clause BSD-style simplified license                             | doc/licenses/tools/text_tscii_license.txt                | Used by Qt Core                                    |
+| Text Codecs: Big5, Big5-HKSCS             | 2-clause BSD-style simplified license                             | doc/licenses/tools/text_big5_license.txt                 | Used by Qt Core                                    |
+| The Public Suffix List                    | Mozilla Public License 2.0                                        | doc/licenses/tools/public_suffix_list_license.txt        | Used by Qt Core                                    |
+| libpsl                                    | BSD 3-clause "New" or "Revised" License                           | doc/licenses/tools/libpsl_license.txt                    | Used by Qt Core                                    |
+| TinyCBOR                                  | MIT license                                                       | doc/licenses/tools/tinycbor_license.txt                  | Used by Qt Core                                    |
+| Unicode Character Database (UCD)          | Unicode License Agreement - Data Files and Software (2016)        | doc/licenses/tools/ucd_license.txt                       | Used by Qt Core                                    |
+| Unicode Common Locale Data Repo(CLDR)     | Unicode License Agreement - Data Files and Software (2016)        | doc/licenses/tools/cldr_license.txt                      | Used by Qt Core                                    |
+| extra-cmake-modules, version 5.84.0       | BSD-3-Clause                                                      | doc/licenses/tools/extra-cmake-modules_license.txt       | Used by Qt Core                                    |
+| forkfd                                    | MIT license                                                       | doc/licenses/tools/forkfd_license.txt                    | Used by Qt Core                                    |
+| ANGLE Library                             | 3-clause BSD-style license                                        | doc/licenses/tools/angle_license.txt                     | Used by Qt GUI                                     |
+| ANGLE: Array Bounds Clamper f. WebKit     | 2-clause BSD-style simplified license                             | doc/licenses/tools/angle_array_license.txt               | Used by Qt GUI                                     |
+| ANGLE: Systeminfo                         | 2-clause BSD-style simplified license                             | doc/licenses/tools/angle_sysinfo_license.txt             | Used by Qt GUI                                     |
+| ANGLE: trace_event                        | 3-clause BSD-style license                                        | doc/licenses/tools/angle_trace_event_license.txt         | Used by Qt GUI                                     |
+| Adobe Glyph List For New Fonts            | 3-clause BSD-style license                                        | doc/licenses/tools/adobe_glyph_list_license.txt          | Used by Qt GUI                                     |
+| Anti-aliasing rasterizer f. FreeType2     | Freetype Project License                                          | doc/licenses/tools/rasterizer_freetype2_license.txt      | Used by Qt GUI                                     |
+| Bitstream Vera Font                       | Bitstream Vera Font License                                       | doc/licenses/tools/bitstream_vera_font_license.txt       | Used by Qt GUI                                     |
+| Cocoa Platform Plugin                     | 3-clause BSD-style license                                        | doc/licenses/tools/cocoa_platform_plugin.txt             | Used by Qt GUI                                     |
+| DejaVu Fonts                              | Bitstream Vera Font License                                       | doc/licenses/tools/dejavu_fonts_license.txt              | Used by Qt GUI                                     |
+| Freetype 2 - BDF support                  | MIT license                                                       | doc/licenses/tools/freetype2_bdf_license.txt             | Used by Qt GUI                                     |
+| Freetype 2 - PCF support                  | MIT license                                                       | doc/licenses/tools/freetype2_pcf_license.txt             | Used by Qt GUI                                     |
+| Freetype 2 - zlib                         | zlib license                                                      | doc/licenses/tools/freetype2_zlib_license.txt            | Used by Qt GUI                                     |
+| Freetype 2                                | Freetype Project License                                          | doc/licenses/tools/freetype2_license.txt                 | Used by Qt GUI                                     |
+| HarfBuzz                                  | MIT license                                                       | doc/licenses/tools/harfbuzz_license.txt                  | Used by Qt GUI                                     |
+| HarfBuzz-NG                               | MIT license                                                       | doc/licenses/tools/harfbuzz_ng_license.txt               | Used by Qt GUI                                     |
+| IAccessible2 IDL Specification            | 3-clause BSD-style license                                        | doc/licenses/tools/iaccessible2_spec_license.txt         | Used by Qt GUI                                     |
+| LibJPEG-turbo                             | Independent JPEG Group License                                    | doc/licenses/tools/libjpeg_turbo_license.txt             | Used by Qt GUI                                     |
+| LibPNG                                    | libpng License                                                    | doc/licenses/tools/libpng_license.txt                    | Used by Qt GUI                                     |
+| MD4C, version 0.4.8                       | MIT License                                                       | doc/licenses/tools/md4c_license.txt                      | Used by Qt GUI                                     |
+| Native Style for Android                  | Apache License 2.0                                                | doc/licenses/tools/native_style_android_license.txt      | Used by Qt GUI                                     |
+| OpenGL ES 2 Headers                       | MIT license                                                       | doc/licenses/tools/opengl_es2_license.txt                | Used by Qt GUI                                     |
+| OpenGL Headers                            | MIT license                                                       | doc/licenses/tools/opengl_headers_license.txt            | Used by Qt GUI                                     |
+| Pixman                                    | MIT license                                                       | doc/licenses/tools/pixman_license.txt                    | Used by Qt GUI                                     |
+| Smooth Scaling Algorithm                  | 2-clause BSD-style simplified license                             | doc/licenses/tools/smooth_scaling_license.txt            | Used by Qt GUI                                     |
+| Vulkan API Registry                       | MIT license                                                       | doc/licenses/tools/vulcan_api_reg_license.txt            | Used by Qt GUI                                     |
+| Vulkan Memory Allocator, version 2.3.0    | MIT License                                                       | doc/licenses/tools/vulcan_mem_alloc_license.txt          | Used by Qt GUI                                     |
+| WebGradients                              | MIT license                                                       | doc/licenses/tools/webgradients_license.txt              | Used by Qt GUI                                     |
+| Wintab API                                | Custom license                                                    | doc/licenses/tools/wintab_api_license.txt                | Used by Qt GUI                                     |
+| X Server helper                           | X11 License                                                       | doc/licenses/tools/xserver_helper_license.txt            | Used by Qt GUI                                     |
+| XCB                                       | MIT license                                                       | doc/licenses/tools/xcb_license.txt                       | Used by Qt GUI                                     |
+| sRGB color profile icc file               | International Color Consortium License                            | doc/licenses/tools/srgb_profile_license.txt              | Used by Qt GUI                                     | 
+|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+
+The O3P example use the following additional third party libraries (in additon to those used by the O3P API):
+
+| Third Party package                       | License name                                                      | License file                                                | Comments                                           |
+|-------------------------------------------|-------------------------------------------------------------------|-------------------------------------------------------------|----------------------------------------------------|
+| realsense-example-helper_license.txt      | Apache License Version 2.0                                        | doc/licenses/examples/realsense-example-helper_license.txt  | Recording                                          |
+| glad_license.txt                          | MIT License                                                       | doc/licenses/examples/glad_license.txt                      | Recording                                          |
+| glfw_license.txt.txt                      | zlib License                                                      | doc/licenses/examples/glfw_license.txt                      | Recording                                          |
+| imgui_license.txt                         | MIT License                                                       | doc/licenses/examples/imgui_license.txt                     | Recording                                          |
+| stb_license.txt                           | bitmap font for 3D rendering license                              | doc/licenses/examples/stb.txt                               | Recording                                          |
+|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|

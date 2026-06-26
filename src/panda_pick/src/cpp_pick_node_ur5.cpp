@@ -1466,6 +1466,201 @@ bool executeUrscriptPtpPipeline(rclcpp::Node::SharedPtr node,
     return publishUrscriptProgram(node, topic_name, script.str(), wait_seconds);
 }
 
+
+//new mode disassemble_pick_place  
+bool executeDisassemblePickPlacePipeline(rclcpp::Node::SharedPtr node,
+                                         const std::string& topic_name,
+                                         const std::string& gripper_control_mode,
+                                         const std::string& pull_joints_text,
+                                         const std::string& drop_joints_text,
+                                         const std::string& home_joints_text,
+                                         const std::vector<PickPlaceTask>& tasks,
+                                         bool return_home,
+                                         double movej_acceleration,
+                                         double movej_velocity,
+                                         double movel_acceleration,
+                                         double movel_velocity,
+                                         double pick_lift_velocity,
+                                         double descend_acceleration,
+                                         double descend_velocity,
+                                         double place_descend_velocity,
+                                         double disassemble_extra_lift,
+                                         double disassemble_place_offset_x,
+                                         double disassemble_place_offset_y,
+                                         double disassemble_place_offset_z,
+                                         double gripper_socket_wait_seconds,
+                                         double gripper_socket_open_wait_seconds,
+                                         int gripper_socket_speed,
+                                         int gripper_socket_force,
+                                         int gripper_socket_release_position,
+                                         double gripper_socket_release_wait_seconds,
+                                         double place_settle_wait_seconds,
+                                         double wait_seconds) {
+    if (gripper_control_mode != "none" && gripper_control_mode != "robotiq_socket") {
+        RCLCPP_WARN(
+            node->get_logger(),
+            "disassemble_pick_place 只内联 none/robotiq_socket 夹爪模式；当前 gripper_control_mode=%s，本次会跳过夹爪动作。",
+            gripper_control_mode.c_str());
+    }
+
+    const bool use_robotiq_socket = gripper_control_mode == "robotiq_socket";
+    const auto pull_joints = parseJointList(pull_joints_text);
+    const auto drop_joints = parseJointList(drop_joints_text);
+    const auto home_joints = parseJointList(home_joints_text);
+
+    if (!pull_joints) {
+        RCLCPP_ERROR(node->get_logger(), "disassemble_pick_place 需要 urscript_pregrasp_joints=6个弧度值作为拔取姿态。");
+        return false;
+    }
+    if (!drop_joints) {
+        RCLCPP_ERROR(node->get_logger(), "disassemble_pick_place 需要 urscript_preplace_joints=6个弧度值作为放置姿态。");
+        return false;
+    }
+    if (!home_joints_text.empty() && !home_joints) {
+        RCLCPP_ERROR(node->get_logger(), "urscript_home_joints 格式错误，需要 6 个弧度值。");
+        return false;
+    }
+
+    std::ostringstream script;
+    script << "def ur5_disassemble_pick_place():\n";
+    script << "  textmsg(\"ur5 disassemble pick place start\")\n";
+    if (return_home) {
+        if (home_joints) {
+            script << "  home_joints = " << jointListToUrscript(*home_joints) << "\n";
+        } else {
+            script << "  home_joints = get_actual_joint_positions()\n";
+        }
+    }
+    if (use_robotiq_socket) {
+        appendRobotiqSocketSetup(script, gripper_socket_speed, gripper_socket_force);
+    }
+
+    for (std::size_t i = 0; i < tasks.size(); ++i) {
+        const PickPlaceTask& task = tasks[i];
+        const std::string index = std::to_string(i);
+        script << "  textmsg(\"disassemble task " << sanitizeUrscriptText(task.id) << " start\")\n";
+
+        std::vector<double> pick_joints = *pull_joints;
+        pick_joints[5] += task.pick.yaw;
+        script << "  movej(" << jointListToUrscript(pick_joints) << ", a="
+               << formatUrscriptNumber(movej_acceleration) << ", v="
+               << formatUrscriptNumber(movej_velocity) << ")\n";
+        script << "  dis_pick_" << index << " = get_actual_tcp_pose()\n";
+        script << "  dis_pick_" << index << "[0] = dis_pick_" << index << "[0] + "
+               << formatUrscriptNumber(task.pick.dx) << "\n";
+        script << "  dis_pick_" << index << "[1] = dis_pick_" << index << "[1] + "
+               << formatUrscriptNumber(task.pick.dy) << "\n";
+        script << "  dis_pick_" << index << "[2] = dis_pick_" << index << "[2] + "
+               << formatUrscriptNumber(task.pick.dz) << "\n";
+        script << "  movel(dis_pick_" << index << ", a="
+               << formatUrscriptNumber(movel_acceleration) << ", v="
+               << formatUrscriptNumber(movel_velocity) << ")\n";
+
+        if (use_robotiq_socket) {
+            appendRobotiqSocketMove(script, 0, gripper_socket_open_wait_seconds);
+        }
+
+        if (task.pick.descend > 0.0001) {
+            script << "  dis_grasp_" << index << " = p[dis_pick_" << index << "[0], dis_pick_" << index
+                   << "[1], dis_pick_" << index << "[2] - " << formatUrscriptNumber(task.pick.descend)
+                   << ", dis_pick_" << index << "[3], dis_pick_" << index << "[4], dis_pick_"
+                   << index << "[5]]\n";
+            script << "  movel(dis_grasp_" << index << ", a="
+                   << formatUrscriptNumber(descend_acceleration) << ", v="
+                   << formatUrscriptNumber(descend_velocity) << ")\n";
+        } else {
+            script << "  dis_grasp_" << index << " = dis_pick_" << index << "\n";
+        }
+
+        if (use_robotiq_socket) {
+            appendRobotiqSocketMove(script, 255, gripper_socket_wait_seconds);
+        }
+        script << "  sleep(0.3)\n";
+        script << "  movel(dis_pick_" << index << ", a="
+               << formatUrscriptNumber(movel_acceleration) << ", v="
+               << formatUrscriptNumber(pick_lift_velocity) << ")\n";
+        if (disassemble_extra_lift > 0.0001) {
+            script << "  dis_carry_" << index << " = p[dis_pick_" << index << "[0], dis_pick_" << index
+                   << "[1], dis_pick_" << index << "[2] + " << formatUrscriptNumber(disassemble_extra_lift)
+                   << ", dis_pick_" << index << "[3], dis_pick_" << index << "[4], dis_pick_"
+                   << index << "[5]]\n";
+            script << "  movel(dis_carry_" << index << ", a="
+                   << formatUrscriptNumber(movel_acceleration) << ", v="
+                   << formatUrscriptNumber(pick_lift_velocity) << ")\n";
+        }
+
+        std::vector<double> place_joints = *drop_joints;
+        place_joints[5] += task.place.yaw;
+        script << "  movej(" << jointListToUrscript(place_joints) << ", a="
+               << formatUrscriptNumber(movej_acceleration) << ", v="
+               << formatUrscriptNumber(movej_velocity) << ")\n";
+        script << "  dis_place_" << index << " = get_actual_tcp_pose()\n";
+        script << "  dis_place_" << index << "[0] = dis_place_" << index << "[0] + "
+               << formatUrscriptNumber(task.place.dx + disassemble_place_offset_x) << "\n";
+        script << "  dis_place_" << index << "[1] = dis_place_" << index << "[1] + "
+               << formatUrscriptNumber(task.place.dy + disassemble_place_offset_y) << "\n";
+        script << "  dis_place_" << index << "[2] = dis_place_" << index << "[2] + "
+               << formatUrscriptNumber(task.place.dz + disassemble_place_offset_z) << "\n";
+        script << "  movel(dis_place_" << index << ", a="
+               << formatUrscriptNumber(movel_acceleration) << ", v="
+               << formatUrscriptNumber(movel_velocity) << ")\n";
+
+        if (task.place.descend > 0.0001) {
+            script << "  dis_place_down_" << index << " = p[dis_place_" << index << "[0], dis_place_" << index
+                   << "[1], dis_place_" << index << "[2] - " << formatUrscriptNumber(task.place.descend)
+                   << ", dis_place_" << index << "[3], dis_place_" << index << "[4], dis_place_"
+                   << index << "[5]]\n";
+            script << "  movel(dis_place_down_" << index << ", a="
+                   << formatUrscriptNumber(descend_acceleration) << ", v="
+                   << formatUrscriptNumber(place_descend_velocity) << ")\n";
+        } else {
+            script << "  dis_place_down_" << index << " = dis_place_" << index << "\n";
+        }
+
+        script << "  sync()\n";
+        script << "  sleep(" << formatUrscriptNumber(std::max(0.0, place_settle_wait_seconds)) << ")\n";
+        if (use_robotiq_socket) {
+            appendRobotiqSocketMove(script, gripper_socket_release_position, gripper_socket_release_wait_seconds);
+            appendRobotiqSocketMove(script, 0, gripper_socket_open_wait_seconds);
+        }
+        script << "  movel(dis_place_" << index << ", a="
+               << formatUrscriptNumber(movel_acceleration) << ", v="
+               << formatUrscriptNumber(movel_velocity) << ")\n";
+        if (disassemble_extra_lift > 0.0001) {
+            script << "  dis_place_clear_" << index << " = p[dis_place_" << index << "[0], dis_place_" << index
+                   << "[1], dis_place_" << index << "[2] + " << formatUrscriptNumber(disassemble_extra_lift)
+                   << ", dis_place_" << index << "[3], dis_place_" << index << "[4], dis_place_"
+                   << index << "[5]]\n";
+            script << "  movel(dis_place_clear_" << index << ", a="
+                   << formatUrscriptNumber(movel_acceleration) << ", v="
+                   << formatUrscriptNumber(movel_velocity) << ")\n";
+        }
+        if (return_home) {
+            script << "  movej(home_joints, a="
+                   << formatUrscriptNumber(movej_acceleration) << ", v="
+                   << formatUrscriptNumber(movej_velocity) << ")\n";
+        }
+        script << "  textmsg(\"disassemble task " << sanitizeUrscriptText(task.id) << " done\")\n";
+    }
+
+    if (use_robotiq_socket) {
+        appendRobotiqSocketClose(script);
+    }
+    script << "  textmsg(\"ur5 disassemble pick place done\")\n";
+    script << "end\n";
+
+    RCLCPP_INFO(node->get_logger(), "Disassemble pull joints: %s", jointListToUrscript(*pull_joints).c_str());
+    RCLCPP_INFO(node->get_logger(), "Disassemble drop joints: %s", jointListToUrscript(*drop_joints).c_str());
+    {
+        std::ofstream dump("/tmp/last_urscript.txt", std::ios::trunc);
+        if (dump) {
+            dump << script.str();
+            RCLCPP_INFO(node->get_logger(), "完整拆卸 URScript 已写入 /tmp/last_urscript.txt");
+        }
+    }
+    return publishUrscriptProgram(node, topic_name, script.str(), wait_seconds);
+}
+
 int main(int argc, char** argv) {
     rclcpp::init(argc, argv);
     
@@ -1544,6 +1739,14 @@ int main(int argc, char** argv) {
         node->get_parameter_or<double>("urscript_place_wiggle_velocity", 0.012);
     const int urscript_place_wiggle_steps =
         node->get_parameter_or<int>("urscript_place_wiggle_steps", 12);
+    const double urscript_disassemble_extra_lift =
+        node->get_parameter_or<double>("urscript_disassemble_extra_lift", 0.0);
+    const double urscript_disassemble_place_offset_x =
+        node->get_parameter_or<double>("urscript_disassemble_place_offset_x", 0.0);
+    const double urscript_disassemble_place_offset_y =
+        node->get_parameter_or<double>("urscript_disassemble_place_offset_y", 0.0);
+    const double urscript_disassemble_place_offset_z =
+        node->get_parameter_or<double>("urscript_disassemble_place_offset_z", 0.0);
     const double urscript_place_lift_after_release =
         node->get_parameter_or<double>("urscript_place_lift_after_release", 0.0);
     const double urscript_place_slow_final_descend =
@@ -1784,10 +1987,48 @@ int main(int argc, char** argv) {
         return ok ? 0 : 1;
     }
 
+    if (motion_control_mode == "disassemble_pick_place") {
+        RCLCPP_INFO(
+            node->get_logger(),
+            "使用拆卸抓放：到拔取姿态 -> 闭合夹爪 -> 抬起 -> 到丢放姿态 -> 慢速下降 -> 松开。");
+        const bool ok = executeDisassemblePickPlacePipeline(
+            node,
+            gripper_urscript_topic,
+            gripper_control_mode,
+            urscript_pregrasp_joints,
+            urscript_preplace_joints,
+            urscript_home_joints,
+            pick_place_tasks,
+            joint_ptp_return_home,
+            urscript_movej_acceleration,
+            urscript_movej_velocity,
+            urscript_movel_acceleration,
+            urscript_movel_velocity,
+            urscript_pick_lift_velocity,
+            urscript_descend_acceleration,
+            urscript_descend_velocity,
+            urscript_place_descend_velocity,
+            urscript_disassemble_extra_lift,
+            urscript_disassemble_place_offset_x,
+            urscript_disassemble_place_offset_y,
+            urscript_disassemble_place_offset_z,
+            gripper_urscript_wait_seconds,
+            gripper_socket_open_wait_seconds,
+            gripper_socket_speed,
+            gripper_socket_force,
+            gripper_socket_release_position,
+            gripper_socket_release_wait_seconds,
+            urscript_place_settle_wait_seconds,
+            urscript_pipeline_wait_seconds);
+        rclcpp::shutdown();
+        spin_thread.join();
+        return ok ? 0 : 1;
+    }
+
     if (motion_control_mode != "moveit") {
         RCLCPP_ERROR(
             node->get_logger(),
-            "未知 motion_control_mode: %s。请使用 print_joints、print_pose、gripper_test、joint_ptp、joint_pick_place、urscript_ptp 或 moveit。",
+            "未知 motion_control_mode: %s。请使用 print_joints、print_pose、gripper_test、joint_ptp、joint_pick_place、disassemble_pick_place、urscript_ptp 或 moveit。",
             motion_control_mode.c_str());
         rclcpp::shutdown();
         spin_thread.join();
