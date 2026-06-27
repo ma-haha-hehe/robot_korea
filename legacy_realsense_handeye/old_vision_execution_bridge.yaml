@@ -22,12 +22,10 @@ handeye:
   # This must match UR5_OBSERVE_JOINTS in panda_pick/config/ur5_taught_joints.env.
   # The automatic pipeline moves to that home pose before triggering vision:
   #   ros2 launch panda_pick run_ur5.launch.py motion_control_mode:=print_pose ...
-  # 2026-06-26: 重测! 旧值是过期 observe 位(UR5_OBSERVE_JOINTS 改过没跟着更新),
-  # 导致 T_base_obj 整体转歪 -> x/y/yaw 全镜像。下面是当前 observe 位实测 print_pose。
   observe_T_base_tool:
-    - [0.744128371, 0.665280318, -0.060622329, 0.242629949]
-    - [0.665961581, -0.745903227, -0.011115210, 0.541887428]
-    - [-0.052613121, -0.032100999, -0.998098886, 0.154730102]
+    - [0.022277359, 0.998847464, 0.042514260, -0.098177644]
+    - [0.999075849, -0.023805683, 0.035787381, 0.636536557]
+    - [0.036758216, 0.041677722, -0.998454707, 0.410142312]
     - [0.000000000, 0.000000000, 0.000000000, 1.000000000]
 
   # Manual temporary extrinsic note:
@@ -40,26 +38,20 @@ handeye:
 
 reference:
   # TCP position when robot is at urscript_pregrasp_joints, before applying offsets.
-  # 2026-06-26: 重测! pregrasp=observe 同一位姿, 取当前实测 TCP(旧值是过期 pregrasp)。
-  pick_pre_base_xyz: [0.242646, 0.541928, 0.154775]
+  pick_pre_base_xyz: [-0.096749708, 0.636813201, 0.410617265]
   # TCP position when robot is at urscript_preplace_joints, before applying offsets.
-  # 2026-06-27: 旧值[0.290,...]过期(致place_delta超限). 用近preplace手摆TCP估计; 实测preplace后可再校准
-  place_pre_base_xyz: [-0.1254, 0.3891, 0.3051]
+  place_pre_base_xyz: [0.290575993, 0.474813149, 0.350253893]
 
 placement:
   # Base-frame coordinate of blueprint origin on the place area.
   # Usually teach this once by putting tool0 above the assembly origin.
-  # 2026-06-27: = 用户手摆的装配中心(origin本身, 落点=origin+place_plan+place_offset)
-  assembly_origin_base_xyz: [-0.1254, 0.3891, 0.3051]
+  assembly_origin_base_xyz: [0.290575993, 0.474813149, 0.350253893]
   # Optional extra correction for all placement positions.
   # Because execution_axis.flip_x/flip_y are true, increasing X/Y here moves
   # the generated final place offset right/forward on the current table.
   # 2026-05-26: X +0.005 m moves place 0.5 cm right; Y already +0.005 m
   # moves place 0.5 cm forward.
-  # 2026-06-27: Y +0.005 放置往前一点点 (0.02246 -> 0.02746)
-  # 2026-06-27: Y +0.002 放置再往前 2mm (0.02746 -> 0.02946)
-  # 2026-06-27: Y +0.001 放置再往前 1mm (0.02946 -> 0.03046)
-  place_offset_xyz: [0.033, 0.03046, 0.080]
+  place_offset_xyz: [0.033, 0.02246, 0.080]
 
 pick:
   # For first real tests keep z from the taught pose. Use camera x/y/yaw first.
@@ -67,27 +59,17 @@ pick:
   # Base-frame correction from robot tool0 reference to the real Robotiq fingertip
   # grasp center. Start at zero because your taught pregrasp already includes the
   # gripper geometry; tune in 5 mm steps after the camera extrinsic is sane.
-  # 2026-06-26: XY 归零(旧值是为旧错标定凑的); 保留 z=0.050 抓取高度(与相机xy无关, use_vision_z=false)。
-  # 2026-06-26: flip 修对后清零 xy 残余补偿(之前那个是在 flip 错关的镜像状态下测的, 无效)。保留 z=0.050。
-  # 2026-06-27: 撤回 base 系 Y 偏移(改用对象系长轴偏移 long_axis_offset_m)
-  pick_offset_xyz: [0.0, 0.0, 0.050]
-  # 沿物体长轴(绿轴/Y)平移抓取点(FoundationPose origin 偏离几何中心时用); 用户确认中心准 -> 归零
-  # 2026-06-27: 撤回(误差是基座系的, 不该用对象系修); 留接口备用
-  long_axis_offset_m: 0.0
+  pick_offset_xyz: [0.0, 0.010, 0.050]
   # Final grasp height = generated pre-grasp height - descend.
   # 2026-05-26: increased from 0.090 to 0.140 to lower the grasp 5.0 cm.
-  # 2026-06-26: 0.179 -> 0.129 抬高抓取 5cm(实测偏低 5cm)。
-  descend: 0.129   #0.179
+  descend: 0.179   #0.183
   # Keep the whole grasp descent at the normal descend speed.
   slow_final_descend: 0.000
 
 place:
   # Final place height = generated pre-place height - descend.
   # 2026-05-26: increased from 0.145 to 0.155 to place 1.0 cm lower.
-  # 2026-06-27: +0.04 放置再多降 4cm (0.1615 -> 0.2015)
-  # 2026-06-27: 再 +0.02 放置多降 2cm (0.2015 -> 0.2215)
-  # 2026-06-27: -0.01 放置高 1cm (0.2215 -> 0.2115)
-  descend: 0.2115 #0.2215
+  descend: 0.1615 #0.1612
   # Use normal descend speed first, then extremely slow speed + wiggle for the last bit.
   # 2026-06-19: 0.02 -> 0.016 so the normal-speed descent is a bit longer and the
   # slow/wiggle phase starts slightly later/deeper (total descend unchanged).
@@ -95,29 +77,22 @@ place:
 
 yaw:
   # In joint_pick_place this becomes wrist_3 relative rotation.
-  # 2026-06-26: 用 FoundationPose 朝向。注意: 视觉必须在 observe 位拍(pipeline会先回observe),
-  # 否则 observe_T_base_tool 对不上、算出的 base 系 yaw 才会"乱跳"(那是采集位姿不对, 非FP问题)。
   use_vision_yaw: true
-  # 2026-06-27: 关掉 grasp_spin —— vision_yaw 已改取绿轴(Y), 直接对准长边, 不需再叠加90°
-  use_planner_grasp_spin: false
-  pick_yaw_offset_deg: -46.02  # 2026-06-27: 两点标定(绿轴取负后) 解出 b; 点1/点2 均吻合(误差~2°)
+  use_planner_grasp_spin: true
+  pick_yaw_offset_deg: 0.0
   use_planner_blueprint_yaw: true
-  place_yaw_offset_deg: 5.5  # 2026-06-27: place夹爪歪~5.5° -> 摆正(手摆正确wrist 1.7187 vs preplace 1.815, +5.5°)
+  place_yaw_offset_deg: 0.0
 
 execution_axis:
   # Temporary field-frame correction: robot left/right currently moves opposite
   # to the perceived/planned X direction, and front/back is also reversed.
-  # 2026-06-26: 恢复 true! flip 是用来把转换脚本算的 base_link 系 dx/dy 转成
-  # URScript 执行用的 base 系(两者差 180°)。execution 端 get_actual_tcp_pose()+dx/dy 在 base 系,
-  # 故 base_link 的 dx/dy 必须取反 = flip。(之前误关导致对角镜像。)
   flip_x: true
   flip_y: true
   # Final base-frame correction after the flip_x/flip_y mapping.
   # The previous +Y test moved the grasp point backward on the real table, so
   # the current correction uses -Y to move the grasp point forward.
   # 2026-05-26: adjusted Y from -0.030 to -0.040 to move the grasp 1.0 cm forward.
-  # 2026-06-26: 归零, 重新标定相机后从干净状态实测重调(旧值是为旧错标定凑的)。
-  final_pick_offset_xyz: [0.0, 0.0, 0.0]
+  final_pick_offset_xyz: [0.02, -0.040, 0.0]
 
 safety:
   max_xy_offset: 0.15

@@ -6,7 +6,7 @@ source install/setup.bash
 ros2 run my_robot_vision run_auto_pick_pipeline.py \
   --product-yaml src/panda_pick/src/final_product_2x4x2_orange_top.yaml \
   --async-next-vision --start-index 0 --max-tasks 3 \
-  --gripper-mode robotiq_socket --gripper-speed 155 --gripper-force 145 --gripper-wait 2.0 \
+  --gripper-mode robotiq_socket --gripper-speed 50 --gripper-force 145 --gripper-wait 2.0 \
   --gripper-pregrasp-position 128 \
   --gripper-release-position 120 --gripper-release-wait 0.5 \
   --movej-velocity 1.10 --movej-acceleration 2.0 \

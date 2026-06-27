@@ -84,6 +84,12 @@ def yaw_from_matrix_deg(transform: np.ndarray) -> float:
     return math.degrees(math.atan2(transform[1, 0], transform[0, 0]))
 
 
+def yaw_from_matrix_y_deg(transform: np.ndarray) -> float:
+    """物体 Y 轴(FoundationPose 显示的绿轴)在基座 XY 平面的方位角。
+    用户确认: 夹爪平行于绿轴 = 抓长边。"""
+    return math.degrees(math.atan2(transform[1, 1], transform[0, 1]))
+
+
 def rpy_from_matrix_deg(transform: np.ndarray) -> List[float]:
     rot = transform[:3, :3]
     sy = math.sqrt(rot[0, 0] * rot[0, 0] + rot[1, 0] * rot[1, 0])
@@ -327,6 +333,16 @@ def build_tasks(config: Dict[str, Any],
             obj_xyz = obj_xyz.copy()
             obj_xyz[2] = pick_ref[2]
 
+        # 2026-06-27: 沿物体长轴(Y/绿轴)平移抓取点(FoundationPose origin 不在 brick 几何中心时).
+        # 对象系偏移, 跟着积木朝向走, 任意角度都成立(不像 base 系 pick_offset)。
+        long_off = float(config.get("pick", {}).get("long_axis_offset_m", 0.0))
+        if long_off and obj.get("T_base_obj") is not None:
+            yaxis = np.asarray(obj["T_base_obj"], dtype=float)[:2, 1]
+            n = np.linalg.norm(yaxis)
+            if n > 1e-9:
+                obj_xyz = obj_xyz.copy()
+                obj_xyz[:2] = obj_xyz[:2] + long_off * (yaxis / n)
+
         pick_delta = obj_xyz - pick_ref + pick_offset
 
         place_plan = np.asarray(task.get("place", {}).get("pos", [0.0, 0.0, 0.0]), dtype=float)
@@ -348,9 +364,11 @@ def build_tasks(config: Dict[str, Any],
             place_delta[1] *= -1.0
         pick_delta = pick_delta + final_pick_offset
 
-        vision_yaw = normalize_lego_yaw_deg(yaw_from_matrix_deg(obj["T_base_obj"]))
+        # 2026-06-27: 用绿轴(Y)对齐长边; pick_yaw 归一到 [-90,90](2x4 180°对称)走最短路径, 杜绝315°绕远
+        # 2026-06-27: 绿轴取负 —— 两点标定实测 wrist 相对 brick 反向(斜率a≈-1), 故 vision_yaw = -绿轴方位角
+        vision_yaw = normalize_lego_yaw_deg(-yaw_from_matrix_y_deg(obj["T_base_obj"]))
         grasp_spin = float(task.get("grasp_spin", 0.0)) if use_planner_grasp_spin else 0.0
-        pick_yaw = normalize_angle_deg((vision_yaw if use_vision_yaw else 0.0) + grasp_spin + pick_yaw_offset)
+        pick_yaw = normalize_lego_yaw_deg((vision_yaw if use_vision_yaw else 0.0) + grasp_spin + pick_yaw_offset)
 
         blueprint_yaw = float(task.get("blueprint_yaw", 0.0))
         place_yaw_from_plan = blueprint_yaw_to_deg(blueprint_yaw) if use_planner_blueprint_yaw else 0.0

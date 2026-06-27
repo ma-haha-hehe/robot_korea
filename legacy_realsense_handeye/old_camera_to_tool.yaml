@@ -1,0 +1,44 @@
+T_tool_camera:
+- - 0.02976553150425576
+  - -0.9964129308980259
+  - -0.07921669188671872
+  - 0.03
+- - 0.9990602501863375
+  - 0.032155180840016895
+  - -0.029063049440115722
+  - 0.0
+- - 0.031506025326625275
+  - -0.0782771709015597
+  - 0.996433668080202
+  - 0.03
+- - 0.0
+  - 0.0
+  - 0.0
+  - 1.0
+camera_matrix:
+- - 570.980112193796
+  - 0.0
+  - 292.219296933095
+- - 0.0
+  - 559.6923376116649
+  - 297.0606370543878
+- - 0.0
+  - 0.0
+  - 1.0
+dist_coeffs:
+- -0.0022479275924404372
+- 1.4735871306593127
+- 0.02737990614827652
+- -0.028918335335303434
+- -2.7758779251933836
+diagnostics:
+  used_samples:
+  - /home/i6user/Desktop/robot_lego/calibration_images/img_001.jpg
+  - /home/i6user/Desktop/robot_lego/calibration_images/img_002.jpg
+  - /home/i6user/Desktop/robot_lego/calibration_images/img_003.jpg
+  - /home/i6user/Desktop/robot_lego/calibration_images/img_004.jpg
+  - /home/i6user/Desktop/robot_lego/calibration_images/img_005.jpg
+  base_target_translation_std_m:
+  - 0.012077993937100615
+  - 0.01366968968932026
+  - 0.01730654151625191
