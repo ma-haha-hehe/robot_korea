@@ -197,7 +197,7 @@ def stop_vision_service(docker_cmd):
     docker_exec(docker_cmd, stop_cmd, check=False)
 
 
-def ensure_vision_service(docker_cmd, target, *, frozen_observation=False):
+def ensure_vision_service(docker_cmd, target, *, frozen_observation=False, show_windows=False):
     run(f"{docker_cmd} start {DOCKER_CONTAINER}", check=False)
     run(f"{docker_cmd} cp {shlex.quote(str(VISION_BRIDGE_HOST))} {DOCKER_CONTAINER}:/vision_code/vision_node_test1_5_bridge.py")
     run(f"{docker_cmd} cp {shlex.quote(str(PLAN_HOST))} {DOCKER_CONTAINER}:{PLAN_DOCKER}")
@@ -213,6 +213,7 @@ def ensure_vision_service(docker_cmd, target, *, frozen_observation=False):
         f"TARGET_FILE={shlex.quote(TARGET_DOCKER)} "
         f"OUTPUT_FILE={shlex.quote(VISION_OUTPUT_DOCKER)} "
         f"VISION_FROZEN_OBSERVATION={'1' if frozen_observation else '0'} "
+        f"VISION_SHOW_WINDOWS={'1' if show_windows else '0'} "
         "/opt/conda/envs/my/bin/python vision_node_test1_5_bridge.py "
         ">/shared_data/vision_bridge.log 2>&1 < /dev/null & "
         f"echo $! > {shlex.quote(VISION_PID_DOCKER)}; "
@@ -270,7 +271,7 @@ def wait_for_vision_output(docker_cmd, timeout, *, timing_metric="vision_wait_s"
                     fields["target"] = target
                 print_timing(timing_metric, elapsed, **fields)
             return elapsed
-        time.sleep(2.0)
+        time.sleep(0.3)  # 2026-06-30: 2.0->0.3 少空等(视觉好了更快被发现)
 
     print(capture(f"{docker_cmd} exec {DOCKER_CONTAINER} bash -lc 'tail -80 /shared_data/vision_bridge.log'", check=False))
     raise TimeoutError(f"vision output not ready after {timeout} seconds")
@@ -395,7 +396,7 @@ def execute_pick_place(
         "task_max_descend:=0.30 "
         'urscript_pregrasp_joints:="$UR5_PREGRASP_JOINTS" '
         'urscript_preplace_joints:="$UR5_PREPLACE_JOINTS" '
-        'urscript_home_joints:="$UR5_OBSERVE_JOINTS" '
+        'urscript_home_joints:="$UR5_HOME_JOINTS" '
         f"joint_ptp_return_home:={return_home_text} "
         f"urscript_movej_acceleration:={float(movej_acceleration):.3f} "
         f"urscript_movej_velocity:={float(movej_velocity):.3f} "
@@ -430,7 +431,7 @@ def execute_pick_place(
     if any(marker in output for marker in failure_markers):
         raise RuntimeError("robot execution launch reported an error; see log above")
     print_timing("robot_execution_time_s", elapsed, return_home=return_home_text)
-    print("[AUTO] execution complete; URScript home pose is UR5_OBSERVE_JOINTS")
+    print("[AUTO] execution complete; URScript home pose is UR5_HOME_JOINTS")
     return elapsed
 
 
@@ -448,7 +449,7 @@ def run_async_next_vision(args, rounds):
         move_to_observe_pose()
 
     write_plan_tasks(selected_tasks)
-    ensure_vision_service(args.docker_cmd, rounds[0]["target"], frozen_observation=True)
+    ensure_vision_service(args.docker_cmd, rounds[0]["target"], frozen_observation=True, show_windows=args.show_windows)
 
     cache_paths = {}
     first_target = rounds[0]["target"]
@@ -565,6 +566,8 @@ def main():
                         help="compute the next target from the frozen observe frame while the robot executes the current task")
     parser.add_argument("--dry-run", action="store_true",
                         help="generate pick_place_task.yaml but do not execute robot")
+    parser.add_argument("--show-windows", action="store_true",
+                        help="pop up the vision bridge debug windows (Detection Logic / 6D Pose) via X11; needs DISPLAY + container X11 access")
     parser.add_argument("--gripper-mode", default="robotiq_socket",
                         choices=["none", "robotiq_socket", "urscript"])
     parser.add_argument("--gripper-speed", type=int, default=180,
@@ -673,7 +676,7 @@ def main():
             write_plan(target, item["place"], item["grasp_spin"], item["blueprint_yaw"])
         if not args.skip_observe:
             move_to_observe_pose()
-        ensure_vision_service(args.docker_cmd, target)
+        ensure_vision_service(args.docker_cmd, target, show_windows=args.show_windows)
         trigger_and_wait_vision(args.docker_cmd, target, args.vision_timeout)
         copy_and_convert_vision(args.docker_cmd)
         execute_pick_place(

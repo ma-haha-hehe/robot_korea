@@ -63,7 +63,7 @@ USED_REGIONS_DEBUG_IMAGE_FILE = os.environ.get(
     "/shared_data/vision_used_regions.jpg",
 )
 
-ACC_SECONDS = float(os.environ.get("VISION_ACC_SECONDS", "4.0"))
+ACC_SECONDS = float(os.environ.get("VISION_ACC_SECONDS", "1.5"))  # 2026-06-30: 4.0->1.5 提速perception
 DETECTION_THRESHOLD = float(os.environ.get("VISION_DETECTION_THRESHOLD", "0.15"))
 RATIO_TOLERANCE = float(os.environ.get("VISION_RATIO_TOLERANCE", "0.35"))
 COLOR_MIN_FRACTION = float(os.environ.get("VISION_COLOR_MIN_FRACTION", "0.08"))
@@ -536,7 +536,7 @@ class RobotVisionBridge:
 
         if not candidates:
             cv2.imshow("Detection Logic", viz)
-            cv2.waitKey(500)
+            cv2.waitKey(1)
             return None, viz
 
         score, mask, box, ratio, color_fraction, label, used_overlap = max(candidates, key=lambda item: item[0])
@@ -557,7 +557,7 @@ class RobotVisionBridge:
             2,
         )
         cv2.imshow("Detection Logic", viz)
-        cv2.waitKey(500)
+        cv2.waitKey(1)
         return mask, viz
 
     def visualize_result(self, image, transform):
