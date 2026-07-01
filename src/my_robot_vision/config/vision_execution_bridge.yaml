@@ -24,13 +24,18 @@ handeye:
   #   ros2 launch panda_pick run_ur5.launch.py motion_control_mode:=print_pose ...
   # 2026-06-26: 重测! 旧值是过期 observe 位(UR5_OBSERVE_JOINTS 改过没跟着更新),
   # 导致 T_base_obj 整体转歪 -> x/y/yaw 全镜像。下面是当前 observe 位实测 print_pose。
-  # 2026-06-30: 新观察(拍照)位实测 print_pose, 对应 UR5_OBSERVE_JOINTS=-1.071338,...
+  # 2026-07-01: 新观察(拍照)位实测 print_pose, 对应 UR5_OBSERVE_JOINTS=0.253100,...
   #   (observe 与 home 已拆分: home=UR5_HOME_JOINTS 另设; 此矩阵必须是拍照位的 TCP)
   observe_T_base_tool:
-    - [-0.721466195, 0.692070190, 0.022921193, -0.084805442]
-    - [0.692434635, 0.721273229, 0.017297553, 0.388210777]
-    - [-0.004561322, 0.028351028, -0.999587622, 0.429149737]
+    - [-0.998725422, -0.050459412, -0.001173964, -0.472804851]
+    - [-0.050452372, 0.998711842, -0.005405155, -0.009967251]
+    - [0.001445193, -0.005339037, -0.999984703, 0.498730557]
     - [0.000000000, 0.000000000, 0.000000000, 1.000000000]
+  # 2026-06-30 旧观察位(已弃用, 对应 UR5_OBSERVE_JOINTS=-1.071338):
+  # - [-0.721466195, 0.692070190, 0.022921193, -0.084805442]
+  # - [0.692434635, 0.721273229, 0.017297553, 0.388210777]
+  # - [-0.004561322, 0.028351028, -0.999587622, 0.429149737]
+  # - [0.000000000, 0.000000000, 0.000000000, 1.000000000]
   # 2026-06-26 旧观察位(已弃用):
   # - [0.744128371, 0.665280318, -0.060622329, 0.242629949]
   # - [0.665961581, -0.745903227, -0.011115210, 0.541887428]
@@ -48,21 +53,23 @@ handeye:
 reference:
   # TCP position when robot is at urscript_pregrasp_joints, before applying offsets.
   # 2026-06-26: 重测! pregrasp=observe 同一位姿, 取当前实测 TCP(旧值是过期 pregrasp)。
-  # 2026-06-30 方案A: pregrasp=observe(正对积木), 取 observe TCP; descend(高度)待深度标定后再调
-  pick_pre_base_xyz: [-0.084805, 0.388211, 0.429149]
+  # 2026-07-01 方案A: pregrasp=observe(=新观察位), 取 observe TCP; descend(高度)待深度标定后再调
+  pick_pre_base_xyz: [-0.472805, -0.009967, 0.498731]
+  # 旧值(2026-06-30 observe): [-0.084805, 0.388211, 0.429149]
   # 旧值(=旧jiazi pregrasp, 已弃用): [0.242646, 0.541928, 0.154775]
   # TCP position when robot is at urscript_preplace_joints, before applying offsets.
-  # 2026-06-30: 新preplace位实测 print_pose (对应 UR5_PREPLACE_JOINTS=0.116749,...)
-  place_pre_base_xyz: [-0.432748, 0.060326, 0.429157]
-  # 历史: [-0.401583,0.093340,0.429171](preplace=0.042952旧) / [-0.1254,0.3891,0.3051](更早估计)
+  # 2026-07-01: 新preplace位实测 print_pose (对应 UR5_PREPLACE_JOINTS=1.467152,..., xy=装配中心)
+  place_pre_base_xyz: [-0.200846, 0.073377, 0.540999]  # 2026-07-01 用户新preplace(FK自关节3.331347,...); 旧[-0.157768,-0.461238,0.450376]
+  # 历史: [-0.158453,-0.460457,0.437833] / [-0.432748,0.060326,0.429157] / [-0.1254,0.3891,0.3051]
 
 placement:
   # Base-frame coordinate of blueprint origin on the place area.
   # Usually teach this once by putting tool0 above the assembly origin.
   # 2026-06-27: = 用户手摆的装配中心(origin本身, 落点=origin+place_plan+place_offset)
   # 2026-06-30: 暂时设成 = preplace TCP(临时, 待用真装配原点重设)
-  assembly_origin_base_xyz: [-0.432748, 0.060326, 0.429157]
-  # 历史: [-0.401583,0.093340,0.429171] / [-0.1254,0.3891,0.3051]
+  # 2026-07-01: = 新preplace TCP。用户确认 preplace xy = 装配中心原点, 高度由 place.descend 补偿。
+  assembly_origin_base_xyz: [-0.200846, 0.073377, 0.540999]  # 2026-07-01 用户新preplace; 旧[-0.157768,-0.461238,0.450376]
+  # 历史: [-0.158453,-0.460457,0.437833] / [-0.432748,0.060326,0.429157] / [-0.1254,0.3891,0.3051]
   # 2026-06-30: 装配网格绕 base Z 的朝向角(度)。装配板斜着摆时填这个,
   # 蓝图 place.pos 会先绕 Z 旋转 assembly_yaw_deg 再加到 assembly_origin。
   # 0 = 网格与 base 轴平行(旧行为)。+ 逆时针(右手系, 绕 +Z)。
@@ -76,7 +83,9 @@ placement:
   # 2026-06-27: Y +0.005 放置往前一点点 (0.02246 -> 0.02746)
   # 2026-06-27: Y +0.002 放置再往前 2mm (0.02746 -> 0.02946)
   # 2026-06-27: Y +0.001 放置再往前 1mm (0.02946 -> 0.03046)
-  place_offset_xyz: [0.033, 0.03046, 0.080]
+  # 2026-07-01: 水平偏移归零, 让 product 落在装配区中心(=assembly_origin/preplace 正下方); z=0.080 保留(高度)。
+  place_offset_xyz: [0.0, 0.0, 0.080]
+  # 旧值(旧台面水平微调): [0.033, 0.03046, 0.080]
 
 pick:
   # For first real tests keep z from the taught pose. Use camera x/y/yaw first.
@@ -88,7 +97,9 @@ pick:
   # 2026-06-26: flip 修对后清零 xy 残余补偿(之前那个是在 flip 错关的镜像状态下测的, 无效)。保留 z=0.050。
   # 2026-06-27: 撤回 base 系 Y 偏移(改用对象系长轴偏移 long_axis_offset_m)
   # 2026-06-30: 两点真值标定(P1误差[-10.6,-0.5]mm, P2[-12.5,-1.8]mm, 一致=恒定偏移) -> 取平均补 xy
-  pick_offset_xyz: [-0.0116, -0.0012, 0.050]
+  # 2026-07-01: 2x2 两点标定(误差base [-5.57,3.66]/[-7.56,1.03]mm 一致) -> 补[+6.57,-2.35]mm。z不动。
+  pick_offset_xyz: [-0.0050, -0.0036, 0.050]
+  # 旧值: [-0.0116, -0.0012, 0.050]
   # 沿物体长轴(绿轴/Y)平移抓取点(FoundationPose origin 偏离几何中心时用); 用户确认中心准 -> 归零
   # 2026-06-27: 撤回(误差是基座系的, 不该用对象系修); 留接口备用
   long_axis_offset_m: 0.0
@@ -98,7 +109,17 @@ pick:
   # 2026-06-30: 0.129 -> 0.159 抓取再低 3cm。
   # 2026-06-30: 0.159 -> 0.162 抓取再低 3mm。
   # 2026-06-30: 0.162 -> 0.165 抓取再低 3mm。
-  descend: 0.165   #0.162
+  # 2026-07-01: 保守首跑! 0.165 -> 0.135 抬高 3cm(停高一点先看xy/朝向)。
+  #   注意: 新pregrasp/observe TCP z=0.4987, 比旧0.4291高~7cm, 加这3cm => 比旧抓取点高~10cm,
+  #   会明显停在积木上方(不会真抓到), 看准 xy/yaw 后再逐步加大 descend 下探。
+  # 2026-07-01: 用户看后 0.135 -> 0.165 抓取再低 3cm。
+  # 2026-07-01: 0.165 -> 0.215 抓取再低 5cm(无夹爪版)。
+  # 2026-07-01: 0.215 -> 0.255 再低 4cm(用户坚持; 注意撞台面/protective stop 风险, 手放急停旁)。
+  # 2026-07-01: 0.255 -> 0.30 再加深(无夹爪末端变短, 需更深; 上限已放开到0.80)。
+  # 2026-07-01: 0.30 -> 0.29 抓取抬高 1cm。
+  # 2026-07-01: 0.29 -> 0.27 抓取再抬高 2cm。
+  # 2026-07-01: 0.27 -> 0.25 抓取再抬高 2cm。
+  descend: 0.25   #0.27
   # Keep the whole grasp descent at the normal descend speed.
   slow_final_descend: 0.000
 
@@ -109,11 +130,17 @@ place:
   # 2026-06-27: 再 +0.02 放置多降 2cm (0.2015 -> 0.2215)
   # 2026-06-27: -0.01 放置高 1cm (0.2215 -> 0.2115)
   # 2026-06-30: -0.02 放置高 2cm (0.2115 -> 0.1915)
-  descend: 0.1915 #0.2115
+  # 2026-06-30: +0.002 放置低 2mm (0.1915 -> 0.1935)
+  # 2026-06-30: +0.002 放置再低 2mm (0.1935 -> 0.1955)
+  # 2026-07-01: 保守首跑! 0.1955 -> 0.165 放置停高 3cm(先看落点xy/朝向), 看准后再加大。
+  # 2026-07-01: 用户看后 0.165 -> 0.265 放置再低 10cm。
+  # 2026-07-01: 0.265 -> 0.315 放置再低 5cm。
+  # 2026-07-01: 0.315 -> 0.325 放置再低 1cm。
+  descend: 0.325 #0.315
   # Use normal descend speed first, then extremely slow speed + wiggle for the last bit.
   # 2026-06-19: 0.02 -> 0.016 so the normal-speed descent is a bit longer and the
   # slow/wiggle phase starts slightly later/deeper (total descend unchanged).
-  slow_final_descend: 0.016
+  slow_final_descend: 0.0   # 2026-07-01: 无夹爪空放去掉2mm/s慢速段, 让place全程正常速→静止检测不再误判打断(旧值0.016)
 
 yaw:
   # In joint_pick_place this becomes wrist_3 relative rotation.
@@ -122,9 +149,14 @@ yaw:
   use_vision_yaw: true
   # 2026-06-27: 关掉 grasp_spin —— vision_yaw 已改取绿轴(Y), 直接对准长边, 不需再叠加90°
   use_planner_grasp_spin: false
-  pick_yaw_offset_deg: 43.98  # 2026-06-30: -46.02 +90 (之前抓短边, 转90°改抓长边)。原值 -46.02(两点标定)
+  pick_yaw_offset_deg: -92.0  # 2026-07-01 两点真值标定(恢复负号后, 斜率-1): A(v-43.68→r-45.11) B(v-0.12→r-95.17), 残差±3.25°。作为缺省/回退值。
+  # 2026-07-01: 每种积木 yaw 偏移不同(方形2x2 vs 长条2x4), 按 task.type 覆盖上面的全局值。
+  # brick_4x2 = 白/蓝/绿等 2x4(两点标定 -92); brick_2x2 = 橙/黄/蓝 2x2(真值标定 -70.37)。
+  pick_yaw_offset_by_type:
+    brick_4x2: -92.0
+    brick_2x2: -88.37  # 2026-07-01 两点标定(Δ-17.28/-18.72°一致): -70.37-18.0。旧单点-70.37是坏测量。
   use_planner_blueprint_yaw: true
-  place_yaw_offset_deg: 5.5  # 2026-06-27: place夹爪歪~5.5° -> 摆正(手摆正确wrist 1.7187 vs preplace 1.815, +5.5°)
+  place_yaw_offset_deg: 0.0  # 2026-07-01: 新preplace(=装配中心)夹爪朝向已完全正确, 不再额外旋转。旧5.5是给更早preplace配置标的, 已失效。
 
 execution_axis:
   # Temporary field-frame correction: robot left/right currently moves opposite
@@ -142,8 +174,10 @@ execution_axis:
   final_pick_offset_xyz: [0.0, 0.0, 0.0]
 
 safety:
-  max_xy_offset: 0.15
+  # 2026-06-30: 0.15->0.18 放宽(积木离observe略远时dx/dy会刚过0.15; 18cm movel安全)
+  # 2026-07-01: 0.18->0.25 放宽(新observe位TCP离积木~20cm, dx=0.201刚过0.18)。
+  max_xy_offset: 10.0   # 2026-07-01 用户要求取消安全限制(旧0.25)
   # The five-block bridge product reaches planner z=0.0576 plus place_offset z=0.080,
   # so the generated place dz can reach about 0.1376 m.
-  max_z_offset: 0.15
-  max_descend: 0.8
+  max_z_offset: 10.0   # 2026-07-01 用户要求取消安全限制(旧0.15)
+  max_descend: 10.0   # 2026-07-01 用户要求取消安全限制(旧0.8)

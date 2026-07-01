@@ -309,6 +309,9 @@ def build_tasks(config: Dict[str, Any],
     use_planner_grasp_spin = bool(yaw_cfg.get("use_planner_grasp_spin", True))
     use_planner_blueprint_yaw = bool(yaw_cfg.get("use_planner_blueprint_yaw", True))
     pick_yaw_offset = float(yaw_cfg.get("pick_yaw_offset_deg", 0.0))
+    # 2026-07-01: 每种积木绿轴相对抓取面不同(2x2方形 vs 2x4长条), yaw偏移天生不同。
+    # pick_yaw_offset_by_type 按 task 的 type 覆盖全局 pick_yaw_offset_deg; 缺省回退全局。
+    pick_yaw_offset_by_type = yaw_cfg.get("pick_yaw_offset_by_type", {}) or {}
     place_yaw_offset = float(yaw_cfg.get("place_yaw_offset_deg", 0.0))
 
     safety = config.get("safety", {})
@@ -348,6 +351,17 @@ def build_tasks(config: Dict[str, Any],
         place_plan = np.asarray(task.get("place", {}).get("pos", [0.0, 0.0, 0.0]), dtype=float)
         if place_plan.shape != (3,):
             raise ValueError(f"task {task.get('name', order)} place.pos must be 3 values")
+        # 装配网格相对 base 系绕 Z 转了 assembly_yaw_deg(装配板斜着摆)。
+        # 蓝图 place.pos 是在网格系里描述的, 必须先绕 Z 旋转再加到 base 系的 assembly_origin,
+        # 否则蓝图里的"一排"会在桌上变成斜线。z 不受影响。
+        assembly_yaw = float(config.get("placement", {}).get("assembly_yaw_deg", 0.0))
+        if assembly_yaw:
+            th = math.radians(assembly_yaw)
+            c, s = math.cos(th), math.sin(th)
+            px, py = float(place_plan[0]), float(place_plan[1])
+            place_plan = place_plan.copy()
+            place_plan[0] = c * px - s * py
+            place_plan[1] = s * px + c * py
         place_xyz = assembly_origin + place_plan + place_offset
         place_delta = place_xyz - place_ref
         raw_pick_delta = pick_delta.copy()
@@ -366,9 +380,14 @@ def build_tasks(config: Dict[str, Any],
 
         # 2026-06-27: 用绿轴(Y)对齐长边; pick_yaw 归一到 [-90,90](2x4 180°对称)走最短路径, 杜绝315°绕远
         # 2026-06-27: 绿轴取负 —— 两点标定实测 wrist 相对 brick 反向(斜率a≈-1), 故 vision_yaw = -绿轴方位角
+        # 2026-07-01: 新observe位重做两点真值标定, 斜率实测 -1.149(≈-1) -> 恢复负号。
+        #   (之前"去负号"是误判: 单点标定假设斜率+1算出错误offset; 两点暴露斜率其实是-1。)
         vision_yaw = normalize_lego_yaw_deg(-yaw_from_matrix_y_deg(obj["T_base_obj"]))
         grasp_spin = float(task.get("grasp_spin", 0.0)) if use_planner_grasp_spin else 0.0
-        pick_yaw = normalize_lego_yaw_deg((vision_yaw if use_vision_yaw else 0.0) + grasp_spin + pick_yaw_offset)
+        # 按积木类型选 yaw 偏移(2x2/2x4 不同); 找不到类型则用全局 pick_yaw_offset。
+        brick_type = task.get("type")
+        task_pick_yaw_offset = float(pick_yaw_offset_by_type.get(brick_type, pick_yaw_offset))
+        pick_yaw = normalize_lego_yaw_deg((vision_yaw if use_vision_yaw else 0.0) + grasp_spin + task_pick_yaw_offset)
 
         blueprint_yaw = float(task.get("blueprint_yaw", 0.0))
         place_yaw_from_plan = blueprint_yaw_to_deg(blueprint_yaw) if use_planner_blueprint_yaw else 0.0

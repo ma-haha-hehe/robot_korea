@@ -1,18 +1,17 @@
 #!/bin/bash
-# 无夹爪版本 (2026-07-01): --gripper-mode none 完全禁用夹爪, 去掉所有其它 --gripper-* 参数
-# 想恢复"有夹爪"版本: bash run_pick_gripper.sh  (或 cp run_pick_gripper.sh run_pick.sh)
+# e-stop 产品: 黄2x4底 + 红2x2顶层居中。半合抓取 + wiggle + 闭环等待 + 视觉窗口。
 cd /home/i6user/Desktop/robot_lego
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 ros2 run my_robot_vision run_auto_pick_pipeline.py \
-  --product-yaml src/panda_pick/src/final_product_white_blue_orange.yaml \
-  --async-next-vision --start-index 0 --max-tasks 3 \
+  --product-yaml src/panda_pick/src/final_product_estop.yaml \
+  --async-next-vision --start-index 0 --max-tasks 2 \
   --show-windows \
-  --gripper-mode none \
+  --gripper-mode robotiq_socket --gripper-speed 50 --gripper-force 145 --gripper-wait 2.0 \
   --movej-velocity 1.10 --movej-acceleration 2.0 \
   --movel-velocity 0.40 --movel-acceleration 1.2 \
   --pick-lift-velocity 0.32 \
   --pick-approach-movej-velocity 0.60 --pick-approach-movel-velocity 0.18 \
-  --pipeline-wait 70.0 --done-still-seconds 12.0 --place-descend-velocity 0.002 \
+  --pipeline-wait 50.0 --done-still-seconds 3.5 --place-descend-velocity 0.002 \
   --place-wiggle-xy-amplitude 0.0006 --place-wiggle-velocity 0.012 --place-wiggle-steps 12 \
   --vision-timeout 180

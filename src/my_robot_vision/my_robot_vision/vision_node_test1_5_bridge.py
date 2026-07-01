@@ -63,7 +63,7 @@ USED_REGIONS_DEBUG_IMAGE_FILE = os.environ.get(
     "/shared_data/vision_used_regions.jpg",
 )
 
-ACC_SECONDS = float(os.environ.get("VISION_ACC_SECONDS", "1.5"))  # 2026-06-30: 4.0->1.5 提速perception
+ACC_SECONDS = float(os.environ.get("VISION_ACC_SECONDS", "4.0"))  # 2026-06-30: 退回4.0(1.5会让FoundationPose位姿没收敛好,坐标轴乱)
 DETECTION_THRESHOLD = float(os.environ.get("VISION_DETECTION_THRESHOLD", "0.15"))
 RATIO_TOLERANCE = float(os.environ.get("VISION_RATIO_TOLERANCE", "0.35"))
 COLOR_MIN_FRACTION = float(os.environ.get("VISION_COLOR_MIN_FRACTION", "0.08"))

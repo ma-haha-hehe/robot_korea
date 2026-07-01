@@ -1104,6 +1104,104 @@ bool printCurrentPoseForCalibration(rclcpp::Node::SharedPtr node,
     return true;
 }
 
+// ===== 斜抓(tilt)实验模式: 与主线 joint_pick_place 完全分离 =====
+// 读 pick_place_task_tilt.yaml(tilt_pick: grasp_xyz_base/pre_xyz_base/grasp_rotvec_base),
+// 沿物体 z 轴方向接近并下探抓取。只做 pick(+回 home), 不做 place。
+bool executeTiltPickPipeline(rclcpp::Node::SharedPtr node,
+                             const std::string& topic_name,
+                             const std::string& gripper_control_mode,
+                             const std::string& task_file,
+                             const std::string& home_joints_text,
+                             int gripper_socket_speed,
+                             int gripper_socket_force,
+                             double gripper_socket_wait_seconds,
+                             double movej_acceleration,
+                             double movej_velocity,
+                             double movel_acceleration,
+                             double movel_velocity,
+                             double pipeline_wait_seconds,
+                             bool stop_at_pre) {
+    YAML::Node root;
+    try {
+        root = YAML::LoadFile(task_file);
+    } catch (const std::exception& e) {
+        RCLCPP_ERROR(node->get_logger(), "tilt: 读取 task_file 失败: %s (%s)", task_file.c_str(), e.what());
+        return false;
+    }
+    const YAML::Node tp = root["tilt_pick"];
+    if (!tp) {
+        RCLCPP_ERROR(node->get_logger(), "tilt: task_file 缺少 tilt_pick: 段");
+        return false;
+    }
+    auto vec3 = [](const YAML::Node& n) {
+        std::vector<double> v;
+        if (n) { for (std::size_t i = 0; i < n.size(); ++i) v.push_back(n[i].as<double>()); }
+        return v;
+    };
+    std::vector<double> grasp = vec3(tp["grasp_xyz_base"]);
+    std::vector<double> pre = vec3(tp["pre_xyz_base"]);
+    std::vector<double> rv = vec3(tp["grasp_rotvec_base"]);
+    if (grasp.size() != 3 || pre.size() != 3 || rv.size() != 3) {
+        RCLCPP_ERROR(node->get_logger(), "tilt: grasp_xyz_base/pre_xyz_base/grasp_rotvec_base 必须各3个数");
+        return false;
+    }
+    const bool use_socket = gripper_control_mode == "robotiq_socket";
+
+    auto pstr = [&](const std::vector<double>& p) {
+        std::ostringstream o;
+        o << "p[" << formatUrscriptNumber(p[0]) << ", " << formatUrscriptNumber(p[1]) << ", "
+          << formatUrscriptNumber(p[2]) << ", " << formatUrscriptNumber(rv[0]) << ", "
+          << formatUrscriptNumber(rv[1]) << ", " << formatUrscriptNumber(rv[2]) << "]";
+        return o.str();
+    };
+
+    std::ostringstream script;
+    script << "def tilt_pick():\n";
+    if (use_socket) {
+        appendRobotiqSocketSetup(script, gripper_socket_speed, gripper_socket_force);
+    }
+    script << "  pre_pose = " << pstr(pre) << "\n";
+    script << "  grasp_pose = " << pstr(grasp) << "\n";
+    if (use_socket) {
+        appendRobotiqSocketMove(script, 0, gripper_socket_wait_seconds);  // 张开
+    }
+    // 用逆解到斜姿态 pre, 然后沿接近轴直线下探到 grasp(pre/grasp 仅差 standoff*接近轴, movel直线即沿斜轴)
+    script << "  q_pre = get_inverse_kin(pre_pose, qnear=get_actual_joint_positions())\n";
+    script << "  movej(q_pre, a=" << formatUrscriptNumber(movej_acceleration)
+           << ", v=" << formatUrscriptNumber(movej_velocity) << ")\n";
+    script << "  sleep(0.3)\n";
+    if (stop_at_pre) {
+        // 只到"观察高度的倾斜姿态"就停, 供肉眼确认倾斜方向(不下探/不闭爪)。
+        script << "  textmsg(\"tilt: 已到 pre(观察高度+倾斜), stop_at_pre=on, 不下探\")\n";
+    } else {
+        script << "  movel(grasp_pose, a=" << formatUrscriptNumber(movel_acceleration)
+               << ", v=" << formatUrscriptNumber(movel_velocity) << ")\n";  // 沿斜轴下探
+        if (use_socket) {
+            appendRobotiqSocketMove(script, 255, gripper_socket_wait_seconds);  // 闭合
+        }
+        script << "  sleep(0.5)\n";
+        script << "  movel(pre_pose, a=" << formatUrscriptNumber(movel_acceleration)
+               << ", v=" << formatUrscriptNumber(movel_velocity) << ")\n";  // 沿斜轴抬回
+        const auto home = parseJointList(home_joints_text);
+        if (home) {
+            script << "  movej(" << jointListToUrscript(*home) << ", a="
+                   << formatUrscriptNumber(movej_acceleration) << ", v="
+                   << formatUrscriptNumber(movej_velocity) << ")\n";
+        }
+        script << "  textmsg(\"tilt pick done\")\n";
+    }
+    script << "end\n";
+
+    RCLCPP_INFO(node->get_logger(),
+                "tilt: grasp=[%.4f, %.4f, %.4f] rotvec=[%.4f, %.4f, %.4f]",
+                grasp[0], grasp[1], grasp[2], rv[0], rv[1], rv[2]);
+    if (!publishUrscriptProgram(node, topic_name, script.str(), pipeline_wait_seconds)) {
+        return false;
+    }
+    waitForRobotProgramComplete(node, pipeline_wait_seconds);
+    return true;
+}
+
 bool executeUrscriptPtpPipeline(rclcpp::Node::SharedPtr node,
                                 const std::string& topic_name,
                                 const std::string& gripper_control_mode,
@@ -1847,6 +1945,33 @@ int main(int argc, char** argv) {
             gripper_socket_speed,
             gripper_socket_force,
             15.0);
+        rclcpp::shutdown();
+        spin_thread.join();
+        return ok ? 0 : 1;
+    }
+
+    // 斜抓(tilt)实验模式: 独立分派, 在 loadPickPlaceTasks 之前(tilt 用不同 yaml 格式)。
+    if (motion_control_mode == "joint_pick_place_tilt") {
+        const bool tilt_stop_at_pre =
+            node->get_parameter_or<bool>("tilt_stop_at_pre", false);
+        RCLCPP_INFO(node->get_logger(),
+                    "斜抓(tilt)模式: 沿物体 z 轴接近+下探抓取(仅pick)。stop_at_pre=%s",
+                    tilt_stop_at_pre ? "true" : "false");
+        const bool ok = executeTiltPickPipeline(
+            node,
+            gripper_urscript_topic,
+            gripper_control_mode,
+            task_file,
+            urscript_home_joints,
+            gripper_socket_speed,
+            gripper_socket_force,
+            gripper_socket_open_wait_seconds,
+            urscript_movej_acceleration,
+            urscript_movej_velocity,
+            urscript_movel_acceleration,
+            urscript_movel_velocity,
+            urscript_pipeline_wait_seconds,
+            tilt_stop_at_pre);
         rclcpp::shutdown();
         spin_thread.join();
         return ok ? 0 : 1;

@@ -391,9 +391,9 @@ def execute_pick_place(
         f"gripper_socket_release_wait_seconds:={float(gripper_release_wait):.3f} "
         f"gripper_urscript_wait_seconds:={float(gripper_wait):.3f} "
         f"task_file:={shlex.quote(str(TASK_FILE))} "
-        "task_max_xy_offset:=0.15 "
-        "task_max_z_offset:=0.15 "
-        "task_max_descend:=0.30 "
+        "task_max_xy_offset:=10.0 "  # 2026-07-01 用户要求取消安全限制(旧0.25)
+        "task_max_z_offset:=10.0 "   # 旧0.15
+        "task_max_descend:=10.0 "    # 旧0.40->0.80->取消
         'urscript_pregrasp_joints:="$UR5_PREGRASP_JOINTS" '
         'urscript_preplace_joints:="$UR5_PREPLACE_JOINTS" '
         'urscript_home_joints:="$UR5_HOME_JOINTS" '

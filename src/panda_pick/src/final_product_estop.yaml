@@ -1,0 +1,24 @@
+# "e-stop" product: yellow 2x4 base + red 2x2 centered on top.
+#
+# Blocks (bottom -> top):
+#   - one yellow 2x4 brick : base layer
+#   - one red    2x2 brick : centered on top of the 2x4
+#
+# Coordinates are placement offsets relative to
+# placement.assembly_origin_base_xyz in vision_execution_bridge.yaml.
+# The red 2x2 sits centered on the yellow 2x4 (pos xy = 0), one brick higher.
+
+blocks:
+  - name: "yellow_2x4_base"
+    type: "brick_4x2"
+    color: "yellow"
+    vision_label: "yellow 2x4 brick."
+    pos: [0.0000, 0.0000, 0.0000]
+    rotation: [0, 0, 0]
+
+  - name: "red_2x2_top_center"
+    type: "brick_2x2"
+    color: "red"
+    vision_label: "red 2x2 brick."
+    pos: [0.0000, 0.0000, 0.0192]
+    rotation: [0, 0, 0]
