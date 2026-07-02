@@ -337,6 +337,12 @@ def execute_pick_place(
     gripper_pregrasp_position,
     gripper_release_position,
     gripper_release_wait,
+    onrobot_rg_model,
+    onrobot_open_width_mm,
+    onrobot_close_width_mm,
+    onrobot_pregrasp_width_mm,
+    onrobot_release_width_mm,
+    onrobot_force_n,
     movej_velocity,
     movej_acceleration,
     movel_velocity,
@@ -390,6 +396,12 @@ def execute_pick_place(
         f"gripper_socket_release_position:={gripper_release_position} "
         f"gripper_socket_release_wait_seconds:={float(gripper_release_wait):.3f} "
         f"gripper_urscript_wait_seconds:={float(gripper_wait):.3f} "
+        f"onrobot_rg_model:={shlex.quote(str(onrobot_rg_model))} "
+        f"onrobot_rg_open_width_mm:={int(onrobot_open_width_mm)} "
+        f"onrobot_rg_close_width_mm:={int(onrobot_close_width_mm)} "
+        f"onrobot_rg_pregrasp_width_mm:={int(onrobot_pregrasp_width_mm)} "
+        f"onrobot_rg_release_width_mm:={int(onrobot_release_width_mm)} "
+        f"onrobot_rg_force_n:={int(onrobot_force_n)} "
         f"task_file:={shlex.quote(str(TASK_FILE))} "
         "task_max_xy_offset:=10.0 "  # 2026-07-01 用户要求取消安全限制(旧0.25)
         "task_max_z_offset:=10.0 "   # 旧0.15
@@ -484,6 +496,12 @@ def run_async_next_vision(args, rounds):
             args.gripper_pregrasp_position,
             args.gripper_release_position,
             args.gripper_release_wait,
+            args.onrobot_rg_model,
+            args.onrobot_open_width_mm,
+            args.onrobot_close_width_mm,
+            args.onrobot_pregrasp_width_mm,
+            args.onrobot_release_width_mm,
+            args.onrobot_force_n,
             args.movej_velocity,
             args.movej_acceleration,
             args.movel_velocity,
@@ -569,7 +587,7 @@ def main():
     parser.add_argument("--show-windows", action="store_true",
                         help="pop up the vision bridge debug windows (Detection Logic / 6D Pose) via X11; needs DISPLAY + container X11 access")
     parser.add_argument("--gripper-mode", default="robotiq_socket",
-                        choices=["none", "robotiq_socket", "urscript"])
+                        choices=["none", "robotiq_socket", "urscript", "onrobot_rg", "onrobot_io"])
     parser.add_argument("--gripper-speed", type=int, default=180,
                         help="Robotiq socket SPE value, 0-255")
     parser.add_argument("--gripper-force", type=int, default=80,
@@ -583,6 +601,18 @@ def main():
                         help="partial Robotiq POS after placing, before lifting; 255 is closed, 0 is fully open")
     parser.add_argument("--gripper-release-wait", type=float, default=0.5,
                         help="seconds to wait after the partial release command before lifting")
+    parser.add_argument("--onrobot-rg-model", default="rg2", choices=["rg2", "rg6"],
+                        help="OnRobot RG model when --gripper-mode onrobot_rg")
+    parser.add_argument("--onrobot-open-width-mm", type=int, default=90,
+                        help="OnRobot RG open target width in mm")
+    parser.add_argument("--onrobot-close-width-mm", type=int, default=12,
+                        help="OnRobot RG close target width in mm; set below object width so force grip happens")
+    parser.add_argument("--onrobot-pregrasp-width-mm", type=int, default=90,
+                        help="OnRobot RG target width before descending onto the object")
+    parser.add_argument("--onrobot-release-width-mm", type=int, default=45,
+                        help="OnRobot RG partial release width before lifting away at place")
+    parser.add_argument("--onrobot-force-n", type=int, default=20,
+                        help="OnRobot RG grip force in N")
     parser.add_argument("--movej-velocity", type=float, default=0.60,
                         help="UR movej speed for large joint moves, including transfer from one placed block to the next task")
     parser.add_argument("--movej-acceleration", type=float, default=1.5,
@@ -688,6 +718,12 @@ def main():
             args.gripper_pregrasp_position,
             args.gripper_release_position,
             args.gripper_release_wait,
+            args.onrobot_rg_model,
+            args.onrobot_open_width_mm,
+            args.onrobot_close_width_mm,
+            args.onrobot_pregrasp_width_mm,
+            args.onrobot_release_width_mm,
+            args.onrobot_force_n,
             args.movej_velocity,
             args.movej_acceleration,
             args.movel_velocity,

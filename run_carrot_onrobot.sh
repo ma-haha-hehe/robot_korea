@@ -1,15 +1,17 @@
 #!/bin/bash
-# 无夹爪版本 (2026-07-01): --gripper-mode none 完全禁用夹爪, 去掉所有其它 --gripper-* 参数
-# 想恢复"有夹爪"版本: bash run_pick_gripper.sh  (或 cp run_pick_gripper.sh run_pick.sh)
+# carrot 新夹爪版 (OnRobot, onrobot_io = 工具口 pin16 开合: 0.0开/1.0关)。
+# 产品: 黄2x2 + 黄2x2 + 绿2x2 (3块), 装配点=装配区原点。
+# 前提: UR 远程模式、已上电无保护停止、ur_robot_driver 在跑(不开 rviz)。
+# ⚠️ descend 现为无夹爪深值(抓0.25/放0.325), 装夹爪偏深有撞台风险: 首跑手放急停旁, 或让我先调保守。
 cd /home/i6user/Desktop/robot_lego
 export FASTRTPS_DEFAULT_PROFILES_FILE=/home/i6user/Desktop/robot_lego/fastdds_udp_only.xml  # 禁SHM走UDP修sequence-size崩溃
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 ros2 run my_robot_vision run_auto_pick_pipeline.py \
-  --product-yaml src/panda_pick/src/final_product_white_blue_orange.yaml \
+  --product-yaml src/panda_pick/src/final_product_carrot.yaml \
   --async-next-vision --start-index 0 --max-tasks 3 \
   --show-windows \
-  --gripper-mode none \
+  --gripper-mode onrobot_io \
   --movej-velocity 1.10 --movej-acceleration 2.0 \
   --movel-velocity 0.40 --movel-acceleration 1.2 \
   --pick-lift-velocity 0.32 \

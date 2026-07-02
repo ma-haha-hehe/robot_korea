@@ -603,10 +603,13 @@ class RobotVisionBridge:
             print("[VISION] no valid candidate mask")
             return None
         # 把高清 mask 鱼眼投影回【深度帧 240x180】, 给 FoundationPose(深度密集帧)
+        # 2026-07-02: 小积木(2x2)投到低分辨率深度帧像素太少而放弃 -> 投影前把高清 mask 膨胀,
+        #   提高深度帧覆盖(检测框可信, 只是分辨率悬殊)。膨胀25px≈深度帧~2px余量。
+        mask_hi_proj = cv2.dilate(mask_hi.astype(np.uint8), np.ones((25, 25), np.uint8), iterations=1)
         uc, vc, valid = build_depth_to_hi_map(depth, self.cam_params, hi.shape[1], hi.shape[0])
-        mask = sample_hi_to_depth(mask_hi.astype(np.uint8), uc, vc, valid) > 0
-        if int(mask.sum()) < 10:
-            print("[VISION] mask 投影到深度帧后像素太少, 放弃")
+        mask = sample_hi_to_depth(mask_hi_proj, uc, vc, valid) > 0
+        if int(mask.sum()) < 6:
+            print("[VISION] mask 投影到深度帧后像素太少, 放弃(已膨胀仍不足)")
             return None
 
         pose_samples = []
@@ -632,7 +635,13 @@ class RobotVisionBridge:
             else:
                 cv2.putText(debug_img, "FoundationPose returned no pose", (10, 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-            cv2.imshow("6D Pose Tracking", debug_img)
+            # 2026-07-02: FoundationPose 结果画在 240x180 深度帧上, 太小看不清 ->
+            #   放大到 960 宽显示(≈960x720, 和 Detection Logic 一个量级)。
+            _ph, _pw = debug_img.shape[:2]
+            _pose_big = cv2.resize(
+                debug_img, (960, max(1, int(round(960 * _ph / _pw)))),
+                interpolation=cv2.INTER_NEAREST)
+            cv2.imshow("6D Pose Tracking", _pose_big)
             cv2.waitKey(1)
 
         if last_debug is not None:

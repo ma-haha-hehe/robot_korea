@@ -60,6 +60,13 @@ def normalize_lego_yaw_deg(angle: float) -> float:
     return (float(angle) + 90.0) % 180.0 - 90.0
 
 
+def normalize_square_yaw_deg(angle: float) -> float:
+    """Normalize yaw for SQUARE parts (2x2) with 90 deg grasp symmetry -> [-45,45).
+    2026-07-02: 2x2 方形抓取 90° 对称(夹哪对面都一样), FoundationPose 朝向常差 90°(歧义),
+    折叠到 [-45,45] 消除歧义, 让抓取朝向一致(不再时不时歪一大截)。"""
+    return (float(angle) + 45.0) % 90.0 - 45.0
+
+
 def blueprint_yaw_to_deg(value: float) -> float:
     """Accept planner yaw in radians or degrees.
 
@@ -387,7 +394,11 @@ def build_tasks(config: Dict[str, Any],
         # 按积木类型选 yaw 偏移(2x2/2x4 不同); 找不到类型则用全局 pick_yaw_offset。
         brick_type = task.get("type")
         task_pick_yaw_offset = float(pick_yaw_offset_by_type.get(brick_type, pick_yaw_offset))
-        pick_yaw = normalize_lego_yaw_deg((vision_yaw if use_vision_yaw else 0.0) + grasp_spin + task_pick_yaw_offset)
+        raw_pick_yaw = (vision_yaw if use_vision_yaw else 0.0) + grasp_spin + task_pick_yaw_offset
+        if brick_type == "brick_2x2":
+            pick_yaw = normalize_square_yaw_deg(raw_pick_yaw)  # 方形2x2: 90°折叠消歧义
+        else:
+            pick_yaw = normalize_lego_yaw_deg(raw_pick_yaw)
 
         blueprint_yaw = float(task.get("blueprint_yaw", 0.0))
         place_yaw_from_plan = blueprint_yaw_to_deg(blueprint_yaw) if use_planner_blueprint_yaw else 0.0

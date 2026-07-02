@@ -1,35 +1,8 @@
 tasksh:
-- name: yellow_2x4_base
-  type: brick_4x2
-  color: yellow
-  vision_label: yellow 2x4 brick.
-  grasp_spin: 90
-  blueprint_yaw: 0.0
-  pick:
-    pos:
-    - 0.5
-    - 0.0
-    - 0.015
-    orientation:
-    - 0.7071067811865476
-    - 0.7071067811865475
-    - 4.329780281177466e-17
-    - 4.329780281177467e-17
-  place:
-    pos:
-    - 0.0
-    - 0.0
-    - 0.0
-    orientation:
-    - 0.7071067811865476
-    - 0.7071067811865475
-    - 4.329780281177466e-17
-    - 4.329780281177467e-17
-  id: 0
-- name: red_2x2_top_center
+- name: green_2x2_top
   type: brick_2x2
-  color: red
-  vision_label: red 2x2 brick.
+  color: green
+  vision_label: green 2x2 brick.
   grasp_spin: 90
   blueprint_yaw: 0.0
   pick:
@@ -46,10 +19,10 @@ tasksh:
     pos:
     - 0.0
     - 0.0
-    - 0.0192
+    - 0.0384
     orientation:
     - 0.7071067811865476
     - 0.7071067811865475
     - 4.329780281177466e-17
     - 4.329780281177467e-17
-  id: 1
+  id: 2

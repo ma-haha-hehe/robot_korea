@@ -59,7 +59,7 @@ reference:
   # 旧值(=旧jiazi pregrasp, 已弃用): [0.242646, 0.541928, 0.154775]
   # TCP position when robot is at urscript_preplace_joints, before applying offsets.
   # 2026-07-01: 新preplace位实测 print_pose (对应 UR5_PREPLACE_JOINTS=1.467152,..., xy=装配中心)
-  place_pre_base_xyz: [-0.200846, 0.073377, 0.540999]  # 2026-07-01 用户新preplace(FK自关节3.331347,...); 旧[-0.157768,-0.461238,0.450376]
+  place_pre_base_xyz: [-0.157768, -0.461238, 0.450376]  # 2026-07-02 正左方preplace(FK自关节1.467152); 后方的[-0.200846,0.073377,0.540999]
   # 历史: [-0.158453,-0.460457,0.437833] / [-0.432748,0.060326,0.429157] / [-0.1254,0.3891,0.3051]
 
 placement:
@@ -68,7 +68,7 @@ placement:
   # 2026-06-27: = 用户手摆的装配中心(origin本身, 落点=origin+place_plan+place_offset)
   # 2026-06-30: 暂时设成 = preplace TCP(临时, 待用真装配原点重设)
   # 2026-07-01: = 新preplace TCP。用户确认 preplace xy = 装配中心原点, 高度由 place.descend 补偿。
-  assembly_origin_base_xyz: [-0.200846, 0.073377, 0.540999]  # 2026-07-01 用户新preplace; 旧[-0.157768,-0.461238,0.450376]
+  assembly_origin_base_xyz: [-0.157768, -0.461238, 0.450376]  # 2026-07-02 正左方preplace; 后方的[-0.200846,0.073377,0.540999]
   # 历史: [-0.158453,-0.460457,0.437833] / [-0.432748,0.060326,0.429157] / [-0.1254,0.3891,0.3051]
   # 2026-06-30: 装配网格绕 base Z 的朝向角(度)。装配板斜着摆时填这个,
   # 蓝图 place.pos 会先绕 Z 旋转 assembly_yaw_deg 再加到 assembly_origin。
@@ -119,7 +119,9 @@ pick:
   # 2026-07-01: 0.30 -> 0.29 抓取抬高 1cm。
   # 2026-07-01: 0.29 -> 0.27 抓取再抬高 2cm。
   # 2026-07-01: 0.27 -> 0.25 抓取再抬高 2cm。
-  descend: 0.25   #0.27
+  # 2026-07-02: 换 OnRobot RG2 时曾改 0.10(保守); 现用户先跑无夹爪, 切回无夹爪深值 0.25。
+  #   (以后跑 RG2/run_pick_onrobot.sh 前, 再把抓/放 descend 改回 0.10 保守首跑)
+  descend: 0.22   # 2026-07-02 抓取低2mm(0.20->0.22)
   # Keep the whole grasp descent at the normal descend speed.
   slow_final_descend: 0.000
 
@@ -136,11 +138,12 @@ place:
   # 2026-07-01: 用户看后 0.165 -> 0.265 放置再低 10cm。
   # 2026-07-01: 0.265 -> 0.315 放置再低 5cm。
   # 2026-07-01: 0.315 -> 0.325 放置再低 1cm。
-  descend: 0.325 #0.315
+  # 2026-07-02: 换 RG2 时曾改 0.10; 现用户先跑无夹爪, 切回无夹爪深值 0.325。(跑 RG2 前再改回 0.10)
+  descend: 0.367 # 2026-07-02 放置低2mm(0.365->0.367)
   # Use normal descend speed first, then extremely slow speed + wiggle for the last bit.
   # 2026-06-19: 0.02 -> 0.016 so the normal-speed descent is a bit longer and the
   # slow/wiggle phase starts slightly later/deeper (total descend unchanged).
-  slow_final_descend: 0.0   # 2026-07-01: 无夹爪空放去掉2mm/s慢速段, 让place全程正常速→静止检测不再误判打断(旧值0.016)
+  slow_final_descend: 0.01   # 2026-07-02: 放置最后1cm 超慢速(place_descend_velocity=2mm/s, 约5s); done-still=12s>5s 不会误判
 
 yaw:
   # In joint_pick_place this becomes wrist_3 relative rotation.
@@ -149,14 +152,14 @@ yaw:
   use_vision_yaw: true
   # 2026-06-27: 关掉 grasp_spin —— vision_yaw 已改取绿轴(Y), 直接对准长边, 不需再叠加90°
   use_planner_grasp_spin: false
-  pick_yaw_offset_deg: -92.0  # 2026-07-01 两点真值标定(恢复负号后, 斜率-1): A(v-43.68→r-45.11) B(v-0.12→r-95.17), 残差±3.25°。作为缺省/回退值。
+  pick_yaw_offset_deg: -92.0  # 2026-07-02 撤销错误的+45, 恢复原两点标定值 -92。
   # 2026-07-01: 每种积木 yaw 偏移不同(方形2x2 vs 长条2x4), 按 task.type 覆盖上面的全局值。
   # brick_4x2 = 白/蓝/绿等 2x4(两点标定 -92); brick_2x2 = 橙/黄/蓝 2x2(真值标定 -70.37)。
   pick_yaw_offset_by_type:
-    brick_4x2: -92.0
-    brick_2x2: -88.37  # 2026-07-01 两点标定(Δ-17.28/-18.72°一致): -70.37-18.0。旧单点-70.37是坏测量。
+    brick_4x2: -92.0    # 2026-07-02 撤销错误的+45, 恢复原两点标定值 -92
+    brick_2x2: -43.37   # 2026-07-02 加90°归一化后, +45°把方形抓取从对角转到对边(-88.37+45)
   use_planner_blueprint_yaw: true
-  place_yaw_offset_deg: 0.0  # 2026-07-01: 新preplace(=装配中心)夹爪朝向已完全正确, 不再额外旋转。旧5.5是给更早preplace配置标的, 已失效。
+  place_yaw_offset_deg: 44.87  # 2026-07-02: 按你手摆的正确放置朝向标定(wrist_3 命令 0.6396 - preplace -0.1436 = +0.7832rad=+44.87°)
 
 execution_axis:
   # Temporary field-frame correction: robot left/right currently moves opposite

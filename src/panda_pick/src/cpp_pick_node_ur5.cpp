@@ -10,6 +10,7 @@
 #include <std_msgs/msg/string.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
+#include <ur_msgs/srv/set_io.hpp>  // 2026-07-02: OnRobot 夹爪走 set_io 服务(pin16)开合
 #include <tf2/LinearMath/Matrix3x3.h>
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/LinearMath/Vector3.h>
@@ -19,6 +20,7 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <cctype>
 #include <cmath>
 #include <fstream>
 #include <future>
@@ -58,6 +60,15 @@ bool publishUrscriptProgram(rclcpp::Node::SharedPtr node,
                             const std::string& topic_name,
                             const std::string& program,
                             double wait_seconds);
+
+struct OnRobotRgConfig;
+
+bool driveGripperOnRobotRg(rclcpp::Node::SharedPtr node,
+                           const std::string& topic_name,
+                           const OnRobotRgConfig& config,
+                           int width_mm,
+                           int force_n,
+                           double wait_seconds);
 
 template <typename FutureT>
 bool waitForFuture(rclcpp::Node::SharedPtr node, FutureT& future, std::chrono::seconds timeout, const std::string& what) {
@@ -236,11 +247,15 @@ bool driveGripper(rclcpp::Node::SharedPtr node,
                   const std::string& action_name,
                   const std::string& io_service_name,
                   const std::string& urscript_topic,
+                  const OnRobotRgConfig& onrobot_rg_config,
                   int open_pin,
                   int close_pin,
                   double open_position,
                   double close_position,
                   double position,
+                  int onrobot_rg_open_width_mm,
+                  int onrobot_rg_close_width_mm,
+                  int onrobot_rg_force_n,
                   double max_effort,
                   double io_pulse_seconds,
                   bool io_latching,
@@ -273,6 +288,18 @@ bool driveGripper(rclcpp::Node::SharedPtr node,
         return driveGripperUrscript(node, urscript_topic, open, urscript_wait_seconds);
     }
 
+    if (mode == "onrobot_rg") {
+        const double midpoint = (open_position + close_position) * 0.5;
+        const bool open = position <= midpoint;
+        return driveGripperOnRobotRg(
+            node,
+            urscript_topic,
+            onrobot_rg_config,
+            open ? onrobot_rg_open_width_mm : onrobot_rg_close_width_mm,
+            onrobot_rg_force_n,
+            urscript_wait_seconds);
+    }
+
     if (mode == "robotiq_socket") {
         RCLCPP_ERROR(
             node->get_logger(),
@@ -280,7 +307,10 @@ bool driveGripper(rclcpp::Node::SharedPtr node,
         return false;
     }
 
-    RCLCPP_ERROR(node->get_logger(), "未知夹爪控制模式: %s。请使用 none、action、io、urscript 或 robotiq_socket。", mode.c_str());
+    RCLCPP_ERROR(
+        node->get_logger(),
+        "未知夹爪控制模式: %s。请使用 none、action、io、urscript、robotiq_socket 或 onrobot_rg。",
+        mode.c_str());
     return false;
 }
 
@@ -514,6 +544,203 @@ std::string sanitizeUrscriptText(std::string text) {
     return text;
 }
 
+struct OnRobotRgConfig {
+    std::string model = "rg2";
+    int max_width_mm = 110;
+    int max_force_n = 40;
+    int encode_force_divide = 2;
+    int encode_force_factor = 111;
+};
+
+std::string normalizeOnRobotModel(std::string model) {
+    std::transform(model.begin(), model.end(), model.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    if (model == "rg6") {
+        return "rg6";
+    }
+    return "rg2";
+}
+
+OnRobotRgConfig makeOnRobotRgConfig(const std::string& model_text) {
+    OnRobotRgConfig config;
+    config.model = normalizeOnRobotModel(model_text);
+    if (config.model == "rg6") {
+        config.max_width_mm = 160;
+        config.max_force_n = 120;
+        config.encode_force_divide = 5;
+        config.encode_force_factor = 161;
+    }
+    return config;
+}
+
+int clampOnRobotWidth(int width_mm, const OnRobotRgConfig& config) {
+    return std::clamp(width_mm, 0, config.max_width_mm);
+}
+
+int clampOnRobotForce(int force_n, const OnRobotRgConfig& config) {
+    return std::clamp(force_n, 0, config.max_force_n);
+}
+
+int onRobotRgCommandValue(int width_mm,
+                          int force_n,
+                          const OnRobotRgConfig& config,
+                          bool slave = false,
+                          bool depth_compensate = false) {
+    width_mm = clampOnRobotWidth(width_mm, config);
+    force_n = clampOnRobotForce(force_n, config);
+
+    int value = width_mm * 4;
+    value += (force_n / config.encode_force_divide) * 4 * config.encode_force_factor;
+    if (slave) {
+        value += 16384;
+    }
+    if (depth_compensate) {
+        value += 32768;
+    }
+    return value;
+}
+
+void appendOnRobotRgHelpers(std::ostringstream& script) {
+    script << "  def onrobot_rg_wait(seconds):\n";
+    script << "    local sync_cnt = 0\n";
+    script << "    local sync_target = floor(seconds / 0.008)\n";
+    script << "    while sync_cnt < sync_target:\n";
+    script << "      sync()\n";
+    script << "      sync_cnt = sync_cnt + 1\n";
+    script << "    end\n";
+    script << "  end\n";
+
+    script << "  def onrobot_rg_bit(input):\n";
+    script << "    local i = 0\n";
+    script << "    local output = 0\n";
+    script << "    while i < 17:\n";
+    script << "      set_digital_out(8, True)\n";
+    script << "      if input >= 65536:\n";
+    script << "        input = input - 65536\n";
+    script << "        set_digital_out(9, False)\n";
+    script << "      else:\n";
+    script << "        set_digital_out(9, True)\n";
+    script << "      end\n";
+    script << "      if get_digital_in(8):\n";
+    script << "        output = 1\n";
+    script << "      end\n";
+    script << "      sync()\n";
+    script << "      set_digital_out(8, False)\n";
+    script << "      sync()\n";
+    script << "      input = input * 2\n";
+    script << "      i = i + 1\n";
+    script << "    end\n";
+    script << "    return output\n";
+    script << "  end\n";
+
+    script << "  def onrobot_rg_powerup():\n";
+    script << "    textmsg(\"OnRobot RG powerup\")\n";
+    script << "    set_tool_voltage(0)\n";
+    script << "    onrobot_rg_wait(2.0)\n";
+    script << "    set_digital_out(8, False)\n";
+    script << "    set_digital_out(9, False)\n";
+    script << "    local pulse = 0\n";
+    script << "    while pulse < 4:\n";
+    script << "      set_tool_voltage(24)\n";
+    script << "      onrobot_rg_wait(0.032)\n";
+    script << "      set_tool_voltage(0)\n";
+    script << "      onrobot_rg_wait(0.064)\n";
+    script << "      pulse = pulse + 1\n";
+    script << "    end\n";
+    script << "    set_tool_voltage(24)\n";
+    script << "    local timeout = 0\n";
+    script << "    while get_digital_in(8) == False:\n";
+    script << "      timeout = timeout + 1\n";
+    script << "      sync()\n";
+    script << "      if timeout > 250:\n";
+    script << "        textmsg(\"OnRobot RG not responding on DI8\")\n";
+    script << "        return False\n";
+    script << "      end\n";
+    script << "    end\n";
+    script << "    timeout = 0\n";
+    script << "    while get_digital_in(9):\n";
+    script << "      timeout = timeout + 1\n";
+    script << "      sync()\n";
+    script << "      if timeout > 250:\n";
+    script << "        textmsg(\"OnRobot RG not ready on DI9\")\n";
+    script << "        return False\n";
+    script << "      end\n";
+    script << "    end\n";
+    script << "    return True\n";
+    script << "  end\n";
+
+    script << "  def onrobot_rg_wait_motion(max_seconds):\n";
+    script << "    local timeout = 0\n";
+    script << "    while get_digital_in(9) == True:\n";
+    script << "      timeout = timeout + 1\n";
+    script << "      sync()\n";
+    script << "      if timeout > 20:\n";
+    script << "        break\n";
+    script << "      end\n";
+    script << "    end\n";
+    script << "    timeout = 0\n";
+    script << "    local timeout_limit = floor(max_seconds / 0.008)\n";
+    script << "    while get_digital_in(9) == False:\n";
+    script << "      timeout = timeout + 1\n";
+    script << "      sync()\n";
+    script << "      if timeout > timeout_limit:\n";
+    script << "        break\n";
+    script << "      end\n";
+    script << "    end\n";
+    script << "  end\n";
+}
+
+void appendOnRobotRgMove(std::ostringstream& script,
+                         const OnRobotRgConfig& config,
+                         int width_mm,
+                         int force_n,
+                         double wait_seconds,
+                         const std::string& label) {
+    width_mm = clampOnRobotWidth(width_mm, config);
+    force_n = clampOnRobotForce(force_n, config);
+    const int command = onRobotRgCommandValue(width_mm, force_n, config);
+    script << "  if (onrobot_rg_ready):\n";
+    script << "    textmsg(\"OnRobot RG " << label << " width="
+           << width_mm << " force=" << force_n << "\")\n";
+    script << "    onrobot_rg_bit(" << command << ")\n";
+    script << "    onrobot_rg_wait_motion("
+           << formatUrscriptNumber(std::max(0.0, wait_seconds)) << ")\n";
+    script << "  end\n";
+}
+
+// 2026-07-02: OnRobot 夹爪的"单数字输出"控制。用户实测:
+//   ros2 service call /io_and_status_controller/set_io ur_msgs/srv/SetIO "fun:1 pin:16 state:X"
+//   pin 16 = UR tool digital out 0; state 0.0=开(张开), 1.0=关(闭合抓取)。
+// 在 URScript 内用 set_tool_digital_out(0, bool) 等价触发, 时序=抓/放到位点, 后接 sleep 给夹爪动作时间。
+void appendIoGripperMove(std::ostringstream& script,
+                         int tool_dout_index,
+                         bool close_state,
+                         double wait_seconds,
+                         const std::string& label) {
+    script << "  textmsg(\"IO gripper " << label << ": tool_out " << tool_dout_index
+           << "=" << (close_state ? "1(close)" : "0(open)") << "\")\n";
+    script << "  set_tool_digital_out(" << tool_dout_index << ", "
+           << (close_state ? "True" : "False") << ")\n";
+    script << "  sleep(" << formatUrscriptNumber(std::max(0.0, wait_seconds)) << ")\n";
+}
+
+bool driveGripperOnRobotRg(rclcpp::Node::SharedPtr node,
+                           const std::string& topic_name,
+                           const OnRobotRgConfig& config,
+                           int width_mm,
+                           int force_n,
+                           double wait_seconds) {
+    std::ostringstream script;
+    script << "def onrobot_rg_cmd():\n";
+    appendOnRobotRgHelpers(script);
+    script << "  onrobot_rg_ready = onrobot_rg_powerup()\n";
+    appendOnRobotRgMove(script, config, width_mm, force_n, wait_seconds, "move");
+    script << "end\n";
+
+    return publishUrscriptProgram(node, topic_name, script.str(), std::max(4.0, wait_seconds + 3.0));
+}
+
 void appendRobotiqSocketSetVar(std::ostringstream& script,
                                const std::string& indent,
                                const std::string& name,
@@ -645,6 +872,37 @@ bool executeRobotiqSocketTest(rclcpp::Node::SharedPtr node,
         "发送 Robotiq socket 测试：open -> close -> open，speed=%d, force=%d",
         std::clamp(gripper_socket_speed, 0, 255),
         std::clamp(gripper_socket_force, 0, 255));
+    return publishUrscriptProgram(node, topic_name, script.str(), wait_seconds);
+}
+
+bool executeOnRobotRgTest(rclcpp::Node::SharedPtr node,
+                          const std::string& topic_name,
+                          const OnRobotRgConfig& config,
+                          int open_width_mm,
+                          int close_width_mm,
+                          int force_n,
+                          double move_wait_seconds,
+                          double wait_seconds) {
+    std::ostringstream script;
+    script << "def onrobot_rg_test():\n";
+    appendOnRobotRgHelpers(script);
+    script << "  textmsg(\"OnRobot RG test start\")\n";
+    script << "  onrobot_rg_ready = onrobot_rg_powerup()\n";
+    appendOnRobotRgMove(script, config, open_width_mm, force_n, move_wait_seconds, "open");
+    script << "  sleep(0.5)\n";
+    appendOnRobotRgMove(script, config, close_width_mm, force_n, move_wait_seconds, "close");
+    script << "  sleep(0.5)\n";
+    appendOnRobotRgMove(script, config, open_width_mm, force_n, move_wait_seconds, "open again");
+    script << "  textmsg(\"OnRobot RG test done\")\n";
+    script << "end\n";
+
+    RCLCPP_INFO(
+        node->get_logger(),
+        "发送 OnRobot RG 测试：model=%s, open=%dmm, close=%dmm, force=%dN",
+        config.model.c_str(),
+        clampOnRobotWidth(open_width_mm, config),
+        clampOnRobotWidth(close_width_mm, config),
+        clampOnRobotForce(force_n, config));
     return publishUrscriptProgram(node, topic_name, script.str(), wait_seconds);
 }
 
@@ -913,10 +1171,23 @@ bool publishUrscriptProgram(rclcpp::Node::SharedPtr node,
                             const std::string& program,
                             double wait_seconds) {
     auto publisher = node->create_publisher<std_msgs::msg::String>(topic_name, rclcpp::QoS(1));
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-    if (publisher->get_subscription_count() == 0) {
-        RCLCPP_WARN(node->get_logger(), "URScript topic 没有订阅者: %s", topic_name.c_str());
+    // 2026-07-02: 等到驱动的 urscript_interface 被发现(订阅者出现)再发。
+    //   之前固定只等 0.5s, 新起的节点在当前 DDS 环境下常常 0.5s 内没发现驱动 ->
+    //   脚本发给"空气"、机器人收不到 -> 臂间歇性不动。改成最多等 10s 直到出现订阅者。
+    {
+        using namespace std::chrono;
+        const auto t0 = steady_clock::now();
+        while (publisher->get_subscription_count() == 0 &&
+               duration<double>(steady_clock::now() - t0).count() < 10.0) {
+            std::this_thread::sleep_for(milliseconds(50));
+        }
+        if (publisher->get_subscription_count() == 0) {
+            RCLCPP_WARN(node->get_logger(),
+                "URScript topic 10s 内仍无订阅者: %s (脚本可能发不到机器人, 臂不会动)", topic_name.c_str());
+        } else {
+            RCLCPP_INFO(node->get_logger(), "URScript 订阅者已发现, 准备发送。");
+            std::this_thread::sleep_for(milliseconds(300));  // 连接建立稳一下
+        }
     }
 
     std_msgs::msg::String msg;
@@ -1238,19 +1509,33 @@ bool executeUrscriptPtpPipeline(rclcpp::Node::SharedPtr node,
                                 int gripper_socket_force,
                                 int gripper_socket_release_position,
                                 double gripper_socket_release_wait_seconds,
+                                const OnRobotRgConfig& onrobot_rg_config,
+                                int onrobot_rg_open_width_mm,
+                                int onrobot_rg_close_width_mm,
+                                int onrobot_rg_pregrasp_width_mm,
+                                int onrobot_rg_release_width_mm,
+                                int onrobot_rg_force_n,
                                 double place_settle_wait_seconds,
                                 double wait_seconds) {
     if (gripper_control_mode != "none" &&
         gripper_control_mode != "urscript" &&
-        gripper_control_mode != "robotiq_socket") {
+        gripper_control_mode != "robotiq_socket" &&
+        gripper_control_mode != "onrobot_rg" &&
+        gripper_control_mode != "onrobot_io") {
         RCLCPP_WARN(
             node->get_logger(),
-            "URScript pipeline 只会内联 none/urscript/robotiq_socket 夹爪模式；当前 gripper_control_mode=%s，本次会跳过夹爪动作。",
+            "URScript pipeline 只会内联 none/urscript/robotiq_socket/onrobot_rg/onrobot_io 夹爪模式；当前 gripper_control_mode=%s，本次会跳过夹爪动作。",
             gripper_control_mode.c_str());
     }
 
     const bool use_robotiq_urscript = gripper_control_mode == "urscript";
     const bool use_robotiq_socket = gripper_control_mode == "robotiq_socket";
+    const bool use_onrobot_rg = gripper_control_mode == "onrobot_rg";
+    const bool use_onrobot_io = gripper_control_mode == "onrobot_io";
+    const int io_gripper_tool_dout =
+        std::clamp(node->get_parameter_or<int>("io_gripper_tool_dout", 0), 0, 1);  // pin16=tool DO 0
+    const double io_gripper_wait_seconds =
+        std::max(0.0, node->get_parameter_or<double>("io_gripper_wait_seconds", 1.0));
     // 抓取前的"半闭合"位置：0=完全张开(原行为)，255=完全闭合。下降前先合到此位置，
     // 下降到位后再完全闭合(255)。用于"先半合→下降→全合"的抓取时序。
     const int gripper_socket_pregrasp_position =
@@ -1299,6 +1584,9 @@ bool executeUrscriptPtpPipeline(rclcpp::Node::SharedPtr node,
         script << "  rq_activate_and_wait()\n";
     } else if (use_robotiq_socket) {
         appendRobotiqSocketSetup(script, gripper_socket_speed, gripper_socket_force);
+    } else if (use_onrobot_rg) {
+        appendOnRobotRgHelpers(script);
+        script << "  onrobot_rg_ready = onrobot_rg_powerup()\n";
     }
     for (std::size_t i = 0; i < tasks.size(); ++i) {
         const PickPlaceTask& task = tasks[i];
@@ -1352,6 +1640,16 @@ bool executeUrscriptPtpPipeline(rclcpp::Node::SharedPtr node,
                 gripper_socket_pregrasp_position,
                 gripper_socket_pregrasp_position > 0 ? gripper_socket_pregrasp_wait_seconds
                                                      : gripper_socket_open_wait_seconds);
+        } else if (use_onrobot_rg) {
+            appendOnRobotRgMove(
+                script,
+                onrobot_rg_config,
+                onrobot_rg_pregrasp_width_mm,
+                onrobot_rg_force_n,
+                gripper_socket_open_wait_seconds,
+                "pregrasp");
+        } else if (use_onrobot_io) {
+            appendIoGripperMove(script, io_gripper_tool_dout, false, io_gripper_wait_seconds, "pregrasp open");
         }
         script << "  sleep(0.2)\n";
         if (pick_slow_final_descend > 0.0001 && pick_fast_descend > 0.0001) {
@@ -1377,6 +1675,16 @@ bool executeUrscriptPtpPipeline(rclcpp::Node::SharedPtr node,
             script << "  rq_close_and_wait()\n";
         } else if (use_robotiq_socket) {
             appendRobotiqSocketMove(script, 255, gripper_socket_wait_seconds);
+        } else if (use_onrobot_rg) {
+            appendOnRobotRgMove(
+                script,
+                onrobot_rg_config,
+                onrobot_rg_close_width_mm,
+                onrobot_rg_force_n,
+                gripper_socket_wait_seconds,
+                "close");
+        } else if (use_onrobot_io) {
+            appendIoGripperMove(script, io_gripper_tool_dout, true, io_gripper_wait_seconds, "grasp close");
         }
         script << "  sleep(0.5)\n";
         script << "  movel(pick_pre_" << index << ", a="
@@ -1510,6 +1818,16 @@ bool executeUrscriptPtpPipeline(rclcpp::Node::SharedPtr node,
         script << "  sleep(" << formatUrscriptNumber(std::max(0.0, place_settle_wait_seconds)) << ")\n";
         if (use_robotiq_socket) {
             appendRobotiqSocketMove(script, gripper_socket_release_position, gripper_socket_release_wait_seconds);
+        } else if (use_onrobot_rg) {
+            appendOnRobotRgMove(
+                script,
+                onrobot_rg_config,
+                onrobot_rg_release_width_mm,
+                onrobot_rg_force_n,
+                gripper_socket_release_wait_seconds,
+                "release");
+        } else if (use_onrobot_io) {
+            appendIoGripperMove(script, io_gripper_tool_dout, false, io_gripper_wait_seconds, "place release");
         }
         const double release_lift = place_lift_after_release > 0.0001
             ? std::clamp(place_lift_after_release, 0.0, place_descend)
@@ -1527,6 +1845,16 @@ bool executeUrscriptPtpPipeline(rclcpp::Node::SharedPtr node,
             script << "  rq_open_and_wait()\n";
         } else if (use_robotiq_socket) {
             appendRobotiqSocketMove(script, 0, gripper_socket_open_wait_seconds);
+        } else if (use_onrobot_rg) {
+            appendOnRobotRgMove(
+                script,
+                onrobot_rg_config,
+                onrobot_rg_open_width_mm,
+                onrobot_rg_force_n,
+                gripper_socket_open_wait_seconds,
+                "open");
+        } else if (use_onrobot_io) {
+            appendIoGripperMove(script, io_gripper_tool_dout, false, io_gripper_wait_seconds, "open");
         }
         if (return_home) {
             script << "  movej(home_joints, a="
@@ -1592,16 +1920,24 @@ bool executeDisassemblePickPlacePipeline(rclcpp::Node::SharedPtr node,
                                          int gripper_socket_force,
                                          int gripper_socket_release_position,
                                          double gripper_socket_release_wait_seconds,
+                                         const OnRobotRgConfig& onrobot_rg_config,
+                                         int onrobot_rg_open_width_mm,
+                                         int onrobot_rg_close_width_mm,
+                                         int onrobot_rg_release_width_mm,
+                                         int onrobot_rg_force_n,
                                          double place_settle_wait_seconds,
                                          double wait_seconds) {
-    if (gripper_control_mode != "none" && gripper_control_mode != "robotiq_socket") {
+    if (gripper_control_mode != "none" &&
+        gripper_control_mode != "robotiq_socket" &&
+        gripper_control_mode != "onrobot_rg") {
         RCLCPP_WARN(
             node->get_logger(),
-            "disassemble_pick_place 只内联 none/robotiq_socket 夹爪模式；当前 gripper_control_mode=%s，本次会跳过夹爪动作。",
+            "disassemble_pick_place 只内联 none/robotiq_socket/onrobot_rg 夹爪模式；当前 gripper_control_mode=%s，本次会跳过夹爪动作。",
             gripper_control_mode.c_str());
     }
 
     const bool use_robotiq_socket = gripper_control_mode == "robotiq_socket";
+    const bool use_onrobot_rg = gripper_control_mode == "onrobot_rg";
     const auto pull_joints = parseJointList(pull_joints_text);
     const auto drop_joints = parseJointList(drop_joints_text);
     const auto home_joints = parseJointList(home_joints_text);
@@ -1631,6 +1967,9 @@ bool executeDisassemblePickPlacePipeline(rclcpp::Node::SharedPtr node,
     }
     if (use_robotiq_socket) {
         appendRobotiqSocketSetup(script, gripper_socket_speed, gripper_socket_force);
+    } else if (use_onrobot_rg) {
+        appendOnRobotRgHelpers(script);
+        script << "  onrobot_rg_ready = onrobot_rg_powerup()\n";
     }
 
     for (std::size_t i = 0; i < tasks.size(); ++i) {
@@ -1656,6 +1995,14 @@ bool executeDisassemblePickPlacePipeline(rclcpp::Node::SharedPtr node,
 
         if (use_robotiq_socket) {
             appendRobotiqSocketMove(script, 0, gripper_socket_open_wait_seconds);
+        } else if (use_onrobot_rg) {
+            appendOnRobotRgMove(
+                script,
+                onrobot_rg_config,
+                onrobot_rg_open_width_mm,
+                onrobot_rg_force_n,
+                gripper_socket_open_wait_seconds,
+                "open");
         }
 
         if (task.pick.descend > 0.0001) {
@@ -1672,6 +2019,14 @@ bool executeDisassemblePickPlacePipeline(rclcpp::Node::SharedPtr node,
 
         if (use_robotiq_socket) {
             appendRobotiqSocketMove(script, 255, gripper_socket_wait_seconds);
+        } else if (use_onrobot_rg) {
+            appendOnRobotRgMove(
+                script,
+                onrobot_rg_config,
+                onrobot_rg_close_width_mm,
+                onrobot_rg_force_n,
+                gripper_socket_wait_seconds,
+                "close");
         }
         script << "  sleep(0.3)\n";
         script << "  movel(dis_pick_" << index << ", a="
@@ -1720,6 +2075,21 @@ bool executeDisassemblePickPlacePipeline(rclcpp::Node::SharedPtr node,
         if (use_robotiq_socket) {
             appendRobotiqSocketMove(script, gripper_socket_release_position, gripper_socket_release_wait_seconds);
             appendRobotiqSocketMove(script, 0, gripper_socket_open_wait_seconds);
+        } else if (use_onrobot_rg) {
+            appendOnRobotRgMove(
+                script,
+                onrobot_rg_config,
+                onrobot_rg_release_width_mm,
+                onrobot_rg_force_n,
+                gripper_socket_release_wait_seconds,
+                "release");
+            appendOnRobotRgMove(
+                script,
+                onrobot_rg_config,
+                onrobot_rg_open_width_mm,
+                onrobot_rg_force_n,
+                gripper_socket_open_wait_seconds,
+                "open");
         }
         script << "  movel(dis_place_" << index << ", a="
                << formatUrscriptNumber(movel_acceleration) << ", v="
@@ -1805,6 +2175,21 @@ int main(int argc, char** argv) {
         std::clamp(node->get_parameter_or<int>("gripper_socket_release_position", 140), 0, 255);
     const double gripper_socket_release_wait_seconds =
         node->get_parameter_or<double>("gripper_socket_release_wait_seconds", 0.5);
+    const std::string onrobot_rg_model =
+        node->get_parameter_or<std::string>("onrobot_rg_model", "rg2");
+    const OnRobotRgConfig onrobot_rg_config = makeOnRobotRgConfig(onrobot_rg_model);
+    const int onrobot_rg_open_width_mm =
+        clampOnRobotWidth(node->get_parameter_or<int>("onrobot_rg_open_width_mm", 90), onrobot_rg_config);
+    const int onrobot_rg_close_width_mm =
+        clampOnRobotWidth(node->get_parameter_or<int>("onrobot_rg_close_width_mm", 12), onrobot_rg_config);
+    const int onrobot_rg_pregrasp_width_mm =
+        clampOnRobotWidth(
+            node->get_parameter_or<int>("onrobot_rg_pregrasp_width_mm", onrobot_rg_open_width_mm),
+            onrobot_rg_config);
+    const int onrobot_rg_release_width_mm =
+        clampOnRobotWidth(node->get_parameter_or<int>("onrobot_rg_release_width_mm", 45), onrobot_rg_config);
+    const int onrobot_rg_force_n =
+        clampOnRobotForce(node->get_parameter_or<int>("onrobot_rg_force_n", 20), onrobot_rg_config);
     const std::string motion_control_mode =
         node->get_parameter_or<std::string>("motion_control_mode", "joint_pick_place");
     const double urscript_movej_acceleration =
@@ -1905,46 +2290,79 @@ int main(int argc, char** argv) {
     executor.add_node(node);
     std::thread spin_thread([&executor]() { executor.spin(); });
 
-    // 3. 实例化 MoveGroup
-    moveit::planning_interface::MoveGroupInterface arm(node, PLANNING_GROUP);
-    [[maybe_unused]] moveit::planning_interface::PlanningSceneInterface psi;
-    if (!arm.setEndEffectorLink("tool0")) {
-        RCLCPP_WARN(node->get_logger(), "无法将末端 link 设置为 tool0，将使用 MoveIt 默认末端 link。");
+    // 3. 按需实例化 MoveGroup(MoveIt)。2026-07-02: URScript 抓放模式根本不用 MoveIt,
+    //    而无条件构造 MoveGroupInterface 会去连 move_group / 订阅 /tf, 在 DDS 环境不佳时会刷
+    //    "sequence size exceeds remaining buffer" 卡死、URScript 发不出去→臂不动。只在真正需要
+    //    MoveIt 的模式(print_pose/print_joints/moveit 及 use_current_pose_as_pregrasp)才构造。
+    const bool need_moveit = !(
+        (motion_control_mode == "gripper_test" ||
+         motion_control_mode == "joint_pick_place_tilt" ||
+         motion_control_mode == "joint_ptp" ||
+         motion_control_mode == "joint_pick_place" ||
+         motion_control_mode == "urscript_ptp" ||
+         motion_control_mode == "urscript" ||
+         motion_control_mode == "onrobot_io" ||
+         motion_control_mode == "disassemble_pick_place")
+        && !use_current_pose_as_pregrasp);
+    std::unique_ptr<moveit::planning_interface::MoveGroupInterface> arm_ptr;
+    [[maybe_unused]] std::unique_ptr<moveit::planning_interface::PlanningSceneInterface> psi_ptr;
+    if (need_moveit) {
+        arm_ptr = std::make_unique<moveit::planning_interface::MoveGroupInterface>(node, PLANNING_GROUP);
+        psi_ptr = std::make_unique<moveit::planning_interface::PlanningSceneInterface>();
+        if (!arm_ptr->setEndEffectorLink("tool0")) {
+            RCLCPP_WARN(node->get_logger(), "无法将末端 link 设置为 tool0，将使用 MoveIt 默认末端 link。");
+        }
+        // 安全限制
+        arm_ptr->setPlanningTime(15.0);
+        arm_ptr->setMaxVelocityScalingFactor(0.15); // 15% 速度测试
+        arm_ptr->setMaxAccelerationScalingFactor(0.1);
+
+        RCLCPP_INFO(node->get_logger(), "等待 2 秒以同步参数服务器...");
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+
+        RCLCPP_INFO(node->get_logger(), "Planning frame: %s", arm_ptr->getPlanningFrame().c_str());
+        RCLCPP_INFO(node->get_logger(), "End effector link: %s", arm_ptr->getEndEffectorLink().c_str());
+    } else {
+        RCLCPP_INFO(node->get_logger(),
+            "URScript 模式(%s): 跳过 MoveIt 初始化(不连 move_group / 不订阅 /tf), 规避 DDS sequence-size 卡死。",
+            motion_control_mode.c_str());
     }
 
-    // 安全限制
-    arm.setPlanningTime(15.0);
-    arm.setMaxVelocityScalingFactor(0.15); // 15% 速度测试
-    arm.setMaxAccelerationScalingFactor(0.1);
-
-    RCLCPP_INFO(node->get_logger(), "等待 2 秒以同步参数服务器...");
-    std::this_thread::sleep_for(std::chrono::seconds(2));
-
-    RCLCPP_INFO(node->get_logger(), "Planning frame: %s", arm.getPlanningFrame().c_str());
-    RCLCPP_INFO(node->get_logger(), "End effector link: %s", arm.getEndEffectorLink().c_str());
-
     if (motion_control_mode == "print_joints") {
-        const bool ok = printCurrentJointsForUrscript(node, arm);
+        const bool ok = printCurrentJointsForUrscript(node, *arm_ptr);
         rclcpp::shutdown();
         spin_thread.join();
         return ok ? 0 : 1;
     }
 
     if (motion_control_mode == "print_pose") {
-        const bool ok = printCurrentPoseForCalibration(node, arm);
+        const bool ok = printCurrentPoseForCalibration(node, *arm_ptr);
         rclcpp::shutdown();
         spin_thread.join();
         return ok ? 0 : 1;
     }
 
     if (motion_control_mode == "gripper_test") {
-        const bool ok = executeRobotiqSocketTest(
-            node,
-            gripper_urscript_topic,
-            gripper_urscript_wait_seconds,
-            gripper_socket_speed,
-            gripper_socket_force,
-            15.0);
+        bool ok = false;
+        if (gripper_control_mode == "onrobot_rg") {
+            ok = executeOnRobotRgTest(
+                node,
+                gripper_urscript_topic,
+                onrobot_rg_config,
+                onrobot_rg_open_width_mm,
+                onrobot_rg_close_width_mm,
+                onrobot_rg_force_n,
+                gripper_urscript_wait_seconds,
+                18.0);
+        } else {
+            ok = executeRobotiqSocketTest(
+                node,
+                gripper_urscript_topic,
+                gripper_urscript_wait_seconds,
+                gripper_socket_speed,
+                gripper_socket_force,
+                15.0);
+        }
         rclcpp::shutdown();
         spin_thread.join();
         return ok ? 0 : 1;
@@ -2003,7 +2421,7 @@ int main(int argc, char** argv) {
 
     geometry_msgs::msg::Pose pregrasp_pose;
     if (use_current_pose_as_pregrasp) {
-        pregrasp_pose = arm.getCurrentPose().pose;
+        pregrasp_pose = arm_ptr->getCurrentPose().pose;
         grasp_pose = pregrasp_pose;
         grasp_pose.position.z -= fixed_grasp_hover;
         RCLCPP_INFO(
@@ -2105,6 +2523,12 @@ int main(int argc, char** argv) {
             gripper_socket_force,
             gripper_socket_release_position,
             gripper_socket_release_wait_seconds,
+            onrobot_rg_config,
+            onrobot_rg_open_width_mm,
+            onrobot_rg_close_width_mm,
+            onrobot_rg_pregrasp_width_mm,
+            onrobot_rg_release_width_mm,
+            onrobot_rg_force_n,
             urscript_place_settle_wait_seconds,
             urscript_pipeline_wait_seconds);
         rclcpp::shutdown();
@@ -2143,6 +2567,11 @@ int main(int argc, char** argv) {
             gripper_socket_force,
             gripper_socket_release_position,
             gripper_socket_release_wait_seconds,
+            onrobot_rg_config,
+            onrobot_rg_open_width_mm,
+            onrobot_rg_close_width_mm,
+            onrobot_rg_release_width_mm,
+            onrobot_rg_force_n,
             urscript_place_settle_wait_seconds,
             urscript_pipeline_wait_seconds);
         rclcpp::shutdown();
@@ -2163,7 +2592,7 @@ int main(int argc, char** argv) {
     if (use_current_pose_as_pregrasp) {
         RCLCPP_INFO(node->get_logger(), "1. 当前已经在 pregrasp，跳过全局 pose 规划。");
     } else {
-        if (!moveToPose(node, arm, pregrasp_pose, "1. 移动到 pregrasp")) {
+        if (!moveToPose(node, *arm_ptr, pregrasp_pose, "1. 移动到 pregrasp")) {
             rclcpp::shutdown();
             spin_thread.join();
             return 1;
@@ -2177,11 +2606,15 @@ int main(int argc, char** argv) {
         gripper_action_name,
         gripper_io_service_name,
         gripper_urscript_topic,
+        onrobot_rg_config,
         gripper_io_open_pin,
         gripper_io_close_pin,
         gripper_open_position,
         gripper_close_position,
         gripper_open_position,
+        onrobot_rg_open_width_mm,
+        onrobot_rg_close_width_mm,
+        onrobot_rg_force_n,
         gripper_max_effort,
         gripper_io_pulse_seconds,
         gripper_io_latching,
@@ -2189,8 +2622,8 @@ int main(int argc, char** argv) {
 
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
     const bool descent_ok = use_cartesian_descent ?
-        moveLinearZ(node, arm, -fixed_grasp_hover, "2. 从 pregrasp 垂直下降到 grasp") :
-        moveOffsetPose(node, arm, 0.0, 0.0, -fixed_grasp_hover, "2. 从 pregrasp 下降到 grasp");
+        moveLinearZ(node, *arm_ptr, -fixed_grasp_hover, "2. 从 pregrasp 垂直下降到 grasp") :
+        moveOffsetPose(node, *arm_ptr, 0.0, 0.0, -fixed_grasp_hover, "2. 从 pregrasp 下降到 grasp");
     if (!descent_ok) {
         rclcpp::shutdown();
         spin_thread.join();
@@ -2204,11 +2637,15 @@ int main(int argc, char** argv) {
         gripper_action_name,
         gripper_io_service_name,
         gripper_urscript_topic,
+        onrobot_rg_config,
         gripper_io_open_pin,
         gripper_io_close_pin,
         gripper_open_position,
         gripper_close_position,
         gripper_close_position,
+        onrobot_rg_open_width_mm,
+        onrobot_rg_close_width_mm,
+        onrobot_rg_force_n,
         gripper_max_effort,
         gripper_io_pulse_seconds,
         gripper_io_latching,
@@ -2216,8 +2653,8 @@ int main(int argc, char** argv) {
 
     std::this_thread::sleep_for(std::chrono::milliseconds(800));
     const bool lift_ok = use_cartesian_descent ?
-        moveLinearZ(node, arm, fixed_grasp_hover, "3. 抓取后垂直抬起") :
-        moveOffsetPose(node, arm, 0.0, 0.0, fixed_grasp_hover, "3. 抓取后抬起");
+        moveLinearZ(node, *arm_ptr, fixed_grasp_hover, "3. 抓取后垂直抬起") :
+        moveOffsetPose(node, *arm_ptr, 0.0, 0.0, fixed_grasp_hover, "3. 抓取后抬起");
     if (!lift_ok) {
         rclcpp::shutdown();
         spin_thread.join();
@@ -2225,7 +2662,7 @@ int main(int argc, char** argv) {
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
-    if (!moveToPose(node, arm, preplace_pose, "4. 移动到 preplace")) {
+    if (!moveToPose(node, *arm_ptr, preplace_pose, "4. 移动到 preplace")) {
         rclcpp::shutdown();
         spin_thread.join();
         return 1;
@@ -2233,8 +2670,8 @@ int main(int argc, char** argv) {
 
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
     const bool place_down_ok = use_cartesian_descent ?
-        moveLinearZ(node, arm, -fixed_place_hover, "5. 从 preplace 垂直下降到 place") :
-        moveOffsetPose(node, arm, 0.0, 0.0, -fixed_place_hover, "5. 从 preplace 下降到 place");
+        moveLinearZ(node, *arm_ptr, -fixed_place_hover, "5. 从 preplace 垂直下降到 place") :
+        moveOffsetPose(node, *arm_ptr, 0.0, 0.0, -fixed_place_hover, "5. 从 preplace 下降到 place");
     if (!place_down_ok) {
         rclcpp::shutdown();
         spin_thread.join();
@@ -2248,11 +2685,15 @@ int main(int argc, char** argv) {
         gripper_action_name,
         gripper_io_service_name,
         gripper_urscript_topic,
+        onrobot_rg_config,
         gripper_io_open_pin,
         gripper_io_close_pin,
         gripper_open_position,
         gripper_close_position,
         gripper_open_position,
+        onrobot_rg_open_width_mm,
+        onrobot_rg_close_width_mm,
+        onrobot_rg_force_n,
         gripper_max_effort,
         gripper_io_pulse_seconds,
         gripper_io_latching,
@@ -2260,8 +2701,8 @@ int main(int argc, char** argv) {
 
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
     const bool place_up_ok = use_cartesian_descent ?
-        moveLinearZ(node, arm, fixed_place_hover, "6. 放置后垂直抬回 preplace") :
-        moveOffsetPose(node, arm, 0.0, 0.0, fixed_place_hover, "6. 放置后抬回 preplace");
+        moveLinearZ(node, *arm_ptr, fixed_place_hover, "6. 放置后垂直抬回 preplace") :
+        moveOffsetPose(node, *arm_ptr, 0.0, 0.0, fixed_place_hover, "6. 放置后抬回 preplace");
     if (!place_up_ok) {
         rclcpp::shutdown();
         spin_thread.join();

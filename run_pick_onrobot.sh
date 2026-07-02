@@ -1,6 +1,12 @@
 #!/bin/bash
-# 无夹爪版本 (2026-07-01): --gripper-mode none 完全禁用夹爪, 去掉所有其它 --gripper-* 参数
-# 想恢复"有夹爪"版本: bash run_pick_gripper.sh  (或 cp run_pick_gripper.sh run_pick.sh)
+# OnRobot RG2 版 (2026-07-02): 完全照昨晚 run_pick.sh 的参数, 只把夹爪从 none 换成 onrobot_rg。
+# RG2 单线缆插 UR 工具口(无 Compute Box), 走工具口 I/O 控制(cpp 里 onrobot_rg 模式)。
+# 前提: UR 远程模式、已上电无保护停止、ur_robot_driver 在跑。
+# 先单独测夹爪能动: python3 gripper.py activate && python3 gripper.py open && python3 gripper.py close
+#
+# ⚠️ descend 提醒: 当前 vision_execution_bridge.yaml 的 descend 还是"无夹爪"深值(抓0.25/放0.325)。
+#    装上 RG2(末端变长)后这个深度会偏深、有撞台面风险。首跑请手放急停旁,
+#    或让我先把 descend 调保守(停在上方)看准 RG2 停位再逐步下探。
 cd /home/i6user/Desktop/robot_lego
 export FASTRTPS_DEFAULT_PROFILES_FILE=/home/i6user/Desktop/robot_lego/fastdds_udp_only.xml  # 禁SHM走UDP修sequence-size崩溃
 source /opt/ros/humble/setup.bash
@@ -9,7 +15,7 @@ ros2 run my_robot_vision run_auto_pick_pipeline.py \
   --product-yaml src/panda_pick/src/final_product_white_blue_orange.yaml \
   --async-next-vision --start-index 0 --max-tasks 3 \
   --show-windows \
-  --gripper-mode none \
+  --gripper-mode onrobot_io \
   --movej-velocity 1.10 --movej-acceleration 2.0 \
   --movel-velocity 0.40 --movel-acceleration 1.2 \
   --pick-lift-velocity 0.32 \

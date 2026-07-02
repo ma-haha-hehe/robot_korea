@@ -26,6 +26,12 @@ def generate_launch_description():
     gripper_socket_force = LaunchConfiguration("gripper_socket_force")
     gripper_socket_release_position = LaunchConfiguration("gripper_socket_release_position")
     gripper_socket_release_wait_seconds = LaunchConfiguration("gripper_socket_release_wait_seconds")
+    onrobot_rg_model = LaunchConfiguration("onrobot_rg_model")
+    onrobot_rg_open_width_mm = LaunchConfiguration("onrobot_rg_open_width_mm")
+    onrobot_rg_close_width_mm = LaunchConfiguration("onrobot_rg_close_width_mm")
+    onrobot_rg_pregrasp_width_mm = LaunchConfiguration("onrobot_rg_pregrasp_width_mm")
+    onrobot_rg_release_width_mm = LaunchConfiguration("onrobot_rg_release_width_mm")
+    onrobot_rg_force_n = LaunchConfiguration("onrobot_rg_force_n")
     motion_control_mode = LaunchConfiguration("motion_control_mode")
     urscript_movej_acceleration = LaunchConfiguration("urscript_movej_acceleration")
     urscript_movej_velocity = LaunchConfiguration("urscript_movej_velocity")
@@ -206,6 +212,20 @@ def generate_launch_description():
                 "gripper_socket_release_wait_seconds": ParameterValue(
                     gripper_socket_release_wait_seconds, value_type=float
                 ),
+                "onrobot_rg_model": onrobot_rg_model,
+                "onrobot_rg_open_width_mm": ParameterValue(
+                    onrobot_rg_open_width_mm, value_type=int
+                ),
+                "onrobot_rg_close_width_mm": ParameterValue(
+                    onrobot_rg_close_width_mm, value_type=int
+                ),
+                "onrobot_rg_pregrasp_width_mm": ParameterValue(
+                    onrobot_rg_pregrasp_width_mm, value_type=int
+                ),
+                "onrobot_rg_release_width_mm": ParameterValue(
+                    onrobot_rg_release_width_mm, value_type=int
+                ),
+                "onrobot_rg_force_n": ParameterValue(onrobot_rg_force_n, value_type=int),
                 "motion_control_mode": motion_control_mode,
                 "urscript_movej_acceleration": ParameterValue(
                     urscript_movej_acceleration, value_type=float
@@ -326,6 +346,12 @@ def generate_launch_description():
         DeclareLaunchArgument("urscript_done_still_seconds", default_value="5.0"),
         DeclareLaunchArgument("gripper_socket_release_position", default_value="140"),
         DeclareLaunchArgument("gripper_socket_release_wait_seconds", default_value="0.5"),
+        DeclareLaunchArgument("onrobot_rg_model", default_value="rg2"),
+        DeclareLaunchArgument("onrobot_rg_open_width_mm", default_value="90"),
+        DeclareLaunchArgument("onrobot_rg_close_width_mm", default_value="12"),
+        DeclareLaunchArgument("onrobot_rg_pregrasp_width_mm", default_value="90"),
+        DeclareLaunchArgument("onrobot_rg_release_width_mm", default_value="45"),
+        DeclareLaunchArgument("onrobot_rg_force_n", default_value="20"),
         DeclareLaunchArgument("motion_control_mode", default_value="joint_pick_place"),
         DeclareLaunchArgument("urscript_movej_acceleration", default_value="2.0"),
         DeclareLaunchArgument("urscript_movej_velocity", default_value="1.2"),
