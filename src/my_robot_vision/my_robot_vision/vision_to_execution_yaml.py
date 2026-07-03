@@ -1,16 +1,38 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
-"""Bridge planner/vision output to the current UR5 execution YAML.
+"""【视觉桥】把 规划器蓝图 + 视觉识别结果 换算成 cpp 执行节点要的 pick_place_task.yaml。
 
-The execution node expects small offsets relative to taught joint poses.
-This script reads:
-  - planner output: panda_pick/src/plan.yaml
-  - vision output:  T_base_obj / center_base_xyz from FoundationPose
-  - bridge config:  reference taught TCP positions and safety limits
+在哪里被调用:
+    run_auto_pick_pipeline.py 的 convert_vision_output() 每块调一次(装配流水线第4步)。
+    命令行也可单独跑(见 main / --config --plan --vision --output)。
 
-and writes:
-  - panda_pick/config/pick_place_task.yaml
+起什么作用(核心思想):
+    cpp 执行节点【不吃绝对坐标】, 只吃"相对示教位姿的小偏移 dx/dy/dz/yaw"。本脚本负责
+    把"视觉在相机系看到的物体位姿"经手眼标定换算到 base 系, 再减去示教参考 TCP, 得到偏移。
+
+读入:
+    - plan(规划器蓝图):  要抓什么物体、放到蓝图的哪个格子(place.pos / yaw)
+    - vision(视觉输出):  T_cam_obj 或 T_base_obj / center_base_xyz(来自 FoundationPose)
+    - config(bridge配置 vision_execution_bridge.yaml):
+        手眼: observe_T_base_tool(观察位 TCP)、camera_to_tool(相机→工具外参)
+        参考: pick/place 示教位的 TCP(减它得偏移)
+        安全: safety.max_xy_offset / max_z_offset / max_descend(check_offset 用)
+写出:
+    - pick_place_task.yaml: 每块的 pick/place {dx,dy,dz,yaw_deg,descend,...}
+
+抓取点换算链: T_base_obj = observe_T_base_tool @ T_tool_camera @ T_cam_obj(prefer_handeye),
+             dx/dy = T_base_obj 的 xy - pick 参考 TCP 的 xy(受 execution_axis.flip 翻转)。
+
+主要函数速查:
+    load_yaml/require_xyz/optional_xyz     读配置
+    *_yaw_deg / *_from_matrix_*            角度与旋转矩阵互转(算 yaw/rpy/四元数)
+    handeye_base_object_transform()        手眼换算: 相机系物体 -> base 系
+    collect_vision_objects()               从视觉输出里取出所有识别到的物体
+    choose_vision_object()/name_score()    按名字给蓝图任务匹配对应的视觉物体
+    check_offset()                         安全检查: 偏移/下降超限就报错拦住(你改过的那个)
+    build_tasks()                          主逻辑: 逐块算 pick/place 偏移, 组成任务列表
+    main()                                 读参数 -> build_tasks -> 写 pick_place_task.yaml
 """
 
 import argparse
@@ -273,6 +295,10 @@ def check_offset(label: str,
                  max_xy: float,
                  max_z: float,
                  max_descend: float) -> None:
+    """安全闸门: 视觉/蓝图算出的偏移或下降超过配置上限就直接报错拦住, 防止机械臂乱撞。
+    max_xy/max_z/max_descend 来自 config 的 safety 段(vision_execution_bridge.yaml)。
+    dx/dy 超限常见于视觉把物体认到边缘 -> 别急着放大上限, 先看是不是识别偏了。
+    注: cpp 里还有第二道同样的检查(task_max_xy_offset), 两处要一起放宽才生效。"""
     if abs(offset[0]) > max_xy or abs(offset[1]) > max_xy:
         raise ValueError(
             f"{label} dx/dy={offset[:2].tolist()} 超过安全限制 {max_xy:.3f} m。"
@@ -291,6 +317,11 @@ def build_tasks(config: Dict[str, Any],
                 plan: Dict[str, Any],
                 vision: Dict[str, Any],
                 task_limit: Optional[int]) -> Dict[str, Any]:
+    """主逻辑: 逐块把 蓝图任务 + 匹配到的视觉物体 换算成 pick/place 偏移任务。
+    步骤: 读参考示教TCP/安全/翻转配置 -> 对每块蓝图任务:
+          选对应视觉物体(choose_vision_object) -> 手眼换算到 base 系 ->
+          减参考TCP得 dx/dy(dz/yaw 视配置来自视觉或固定) -> check_offset 安全检查 ->
+          组成 {pick, place} 追加到 output_tasks。返回 {tasks: [...]} 写进 pick_place_task.yaml。"""
     planner_tasks = plan.get("tasksh", plan.get("tasks", []))
     if not isinstance(planner_tasks, list) or not planner_tasks:
         raise ValueError("planner file must contain tasksh: or tasks: list")

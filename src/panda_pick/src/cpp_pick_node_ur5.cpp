@@ -912,7 +912,8 @@ bool validateTaskOffset(rclcpp::Node::SharedPtr node,
                         const std::string& label,
                         double max_xy_offset,
                         double max_z_offset,
-                        double max_descend) {
+                        double max_descend,
+                        bool allow_zero_descend = false) {
     if (std::abs(offset.dx) > max_xy_offset || std::abs(offset.dy) > max_xy_offset) {
         RCLCPP_ERROR(
             node->get_logger(),
@@ -931,13 +932,16 @@ bool validateTaskOffset(rclcpp::Node::SharedPtr node,
             max_z_offset);
         return false;
     }
-    if (offset.descend <= 0.0 || offset.descend > max_descend) {
+    if (offset.descend < 0.0 ||
+        (!allow_zero_descend && offset.descend <= 0.0) ||
+        offset.descend > max_descend) {
         RCLCPP_ERROR(
             node->get_logger(),
-            "任务 %s 的 %s descend=%.3f 不合法，必须在 (0, %.3f] m。",
+            "任务 %s 的 %s descend=%.3f 不合法，必须在 %s %.3f] m。",
             task.id.c_str(),
             label.c_str(),
             offset.descend,
+            allow_zero_descend ? "[0," : "(0,",
             max_descend);
         return false;
     }
@@ -953,7 +957,8 @@ bool loadPickPlaceTasks(rclcpp::Node::SharedPtr node,
                         double max_xy_offset,
                         double max_z_offset,
                         double max_descend,
-                        std::vector<PickPlaceTask>& tasks) {
+                        std::vector<PickPlaceTask>& tasks,
+                        bool allow_zero_pick_descend = false) {
     tasks.clear();
     if (task_file.empty()) {
         PickPlaceTask task;
@@ -1006,7 +1011,7 @@ bool loadPickPlaceTasks(rclcpp::Node::SharedPtr node,
         task.place.descend = readYamlDouble(place, "descend", default_place_descend);
         task.place.slow_final_descend = readYamlDouble(place, "slow_final_descend", default_place_slow_final_descend);
 
-        if (!validateTaskOffset(node, task, task.pick, "pick", max_xy_offset, max_z_offset, max_descend) ||
+        if (!validateTaskOffset(node, task, task.pick, "pick", max_xy_offset, max_z_offset, max_descend, allow_zero_pick_descend) ||
             !validateTaskOffset(node, task, task.place, "place", max_xy_offset, max_z_offset, max_descend)) {
             return false;
         }
@@ -1473,6 +1478,35 @@ bool executeTiltPickPipeline(rclcpp::Node::SharedPtr node,
     return true;
 }
 
+// ============================================================================
+// 【装配执行函数】executeUrscriptPtpPipeline  (主线 joint_pick_place / urscript 抓放)
+// ----------------------------------------------------------------------------
+// 在哪里被调用: main() 里当 motion_control_mode == "joint_pick_place" 或 "urscript" 时。
+//   命令链: run_carrot_onrobot.sh / run_estop_onrobot.sh / run_pick_onrobot.sh
+//           -> run_auto_pick_pipeline.py (装配总控: 回observe位->触发视觉->调bridge)
+//           -> vision_to_execution_yaml.py (视觉结果 -> pick_place_task.yaml 偏移)
+//           -> run_ur5.launch.py -> 本 cpp 节点 -> 本函数。
+//
+// 起什么作用: 把"逐块抓取积木 + 放到蓝图对应位置"的完整动作拼成一段 URScript,
+//   发到 /urscript_interface/script_command 由 UR 驱动执行。
+//
+// 与拆卸的区别: 抓取点【不是写死示教】, 而是"示教 pregrasp 位 + 视觉算出的 dx/dy/dz/yaw
+//   小偏移"(tasks 来自 pick_place_task.yaml, 由视觉 bridge 生成)。放置点同理 = 示教
+//   preplace 位 + 蓝图偏移。
+//
+// 每块 task 的动作时序:
+//   movej 到 pregrasp 示教关节位 -> 叠加 pick 偏移(dx/dy/dz/yaw) movel 到抓取正上方
+//   -> 开爪 -> 下降(pick_fast_descend 正常速 + pick_slow_final_descend 慢速末段) 到积木
+//   -> 闭合抓紧 -> 抬起
+//   -> movej 到 preplace 示教关节位 -> 叠加 place 偏移 movel 到放置正上方
+//   -> 下降(fast + 慢速末段 + 可选 wiggle 微抖对位) -> 松爪放下 -> 抬起 -> (可选)回 home
+//
+// 关键参数:
+//   pregrasp/grasp/preplace/place_pose = 位姿式接口(pregrasp_joints 为空时用, 走 IK)
+//   pregrasp_joints_text/preplace_joints_text = 示教关节角接口(优先, 更稳, 现用这条)
+//   tasks = 每块 pick/place 的 dx/dy/dz/yaw/descend(视觉+蓝图生成)
+//   place_wiggle_* = 放置末段微抖参数(帮积木卡进凸点); keep_gripper_closed=放置不松爪
+// ============================================================================
 bool executeUrscriptPtpPipeline(rclcpp::Node::SharedPtr node,
                                 const std::string& topic_name,
                                 const std::string& gripper_control_mode,
@@ -1536,6 +1570,13 @@ bool executeUrscriptPtpPipeline(rclcpp::Node::SharedPtr node,
         std::clamp(node->get_parameter_or<int>("io_gripper_tool_dout", 0), 0, 1);  // pin16=tool DO 0
     const double io_gripper_wait_seconds =
         std::max(0.0, node->get_parameter_or<double>("io_gripper_wait_seconds", 1.0));
+    // 2026-07-02: keep_gripper_closed=true 时, 放置点【不松开/不张开】, 夹爪一直夹紧(手臂照常抬起离开)。
+    const bool keep_gripper_closed =
+        node->get_parameter_or<bool>("keep_gripper_closed", false);
+    // 2026-07-03: place 前段(非慢速末段)的下降速度, 只影响放置、不碰 pick(pick 仍用 descend_velocity)。
+    //   默认0 = 回退到 descend_velocity。末段仍走 place_descend_velocity 慢速+wiggle。
+    const double place_fast_descend_velocity =
+        node->get_parameter_or<double>("urscript_place_fast_descend_velocity", 0.0);
     // 抓取前的"半闭合"位置：0=完全张开(原行为)，255=完全闭合。下降前先合到此位置，
     // 下降到位后再完全闭合(255)。用于"先半合→下降→全合"的抓取时序。
     const int gripper_socket_pregrasp_position =
@@ -1588,9 +1629,11 @@ bool executeUrscriptPtpPipeline(rclcpp::Node::SharedPtr node,
         appendOnRobotRgHelpers(script);
         script << "  onrobot_rg_ready = onrobot_rg_powerup()\n";
     }
+    // ===== 逐块装配主循环: 循环次数 = tasks.size() = 蓝图块数(carrot 3 / estop 2) =====
     for (std::size_t i = 0; i < tasks.size(); ++i) {
         const PickPlaceTask& task = tasks[i];
         const std::string index = std::to_string(i);
+        // 把总下降拆成"正常速 + 慢速末段": descend=总下降, slow_final=末段慢速那部分。
         const double pick_descend = task.pick.descend > 0.0 ? task.pick.descend : grasp_hover;
         const double pick_slow_final_descend =
             std::clamp(task.pick.slow_final_descend, 0.0, pick_descend);
@@ -1601,6 +1644,8 @@ bool executeUrscriptPtpPipeline(rclcpp::Node::SharedPtr node,
         const double place_fast_descend = place_descend - place_slow_final_descend;
 
         script << "  textmsg(\"task " << sanitizeUrscriptText(task.id) << " start\")\n";
+        // --- 阶段1: movej 到抓取接近位。优先用示教关节角 pregrasp_joints(更稳);
+        //           没有则用 pregrasp 位姿做逆解 get_inverse_kin。yaw 加本块 pick.yaw。 ---
         if (pregrasp_joints) {
             std::vector<double> pick_joints = *pregrasp_joints;
             pick_joints[5] += task.pick.yaw;
@@ -1617,6 +1662,7 @@ bool executeUrscriptPtpPipeline(rclcpp::Node::SharedPtr node,
                    << formatUrscriptNumber(pick_approach_movej_velocity) << ")\n";
         }
 
+        // --- 阶段2: 在接近位 TCP 上叠加视觉算出的 dx/dy/dz 偏移, movel 平移到积木正上方。 ---
         script << "  pick_pre_" << index << "[0] = pick_pre_" << index << "[0] + "
                << formatUrscriptNumber(task.pick.dx) << "\n";
         script << "  pick_pre_" << index << "[1] = pick_pre_" << index << "[1] + "
@@ -1652,6 +1698,8 @@ bool executeUrscriptPtpPipeline(rclcpp::Node::SharedPtr node,
             appendIoGripperMove(script, io_gripper_tool_dout, false, io_gripper_wait_seconds, "pregrasp open");
         }
         script << "  sleep(0.2)\n";
+        // --- 阶段3: 下降到积木。分两段: 先 pick_fast_descend 正常速, 再 pick_slow_final_descend
+        //           慢速末段(有慢段时末段用 place_descend_velocity)。到位后闭合抓紧。 ---
         if (pick_slow_final_descend > 0.0001 && pick_fast_descend > 0.0001) {
             script << "  pick_slow_start_" << index << " = p[pick_pre_" << index
                    << "[0], pick_pre_" << index << "[1], pick_pre_" << index << "[2] - "
@@ -1686,11 +1734,13 @@ bool executeUrscriptPtpPipeline(rclcpp::Node::SharedPtr node,
         } else if (use_onrobot_io) {
             appendIoGripperMove(script, io_gripper_tool_dout, true, io_gripper_wait_seconds, "grasp close");
         }
-        script << "  sleep(0.5)\n";
+        script << "  sleep(0.5)\n";  // 装配抓取闭合后停顿(还原为原值0.5)
+        // --- 阶段4: 抓紧后抬回接近位高度(pick_pre), 把积木提起。 ---
         script << "  movel(pick_pre_" << index << ", a="
                << formatUrscriptNumber(movel_acceleration) << ", v="
                << formatUrscriptNumber(pick_lift_velocity) << ")\n";
 
+        // --- 阶段5: movej 到放置接近位(preplace 示教关节角优先, 否则 preplace 位姿逆解)。 ---
         if (preplace_joints) {
             std::vector<double> place_joints = *preplace_joints;
             place_joints[5] += task.place.yaw;
@@ -1707,6 +1757,7 @@ bool executeUrscriptPtpPipeline(rclcpp::Node::SharedPtr node,
                    << formatUrscriptNumber(movej_velocity) << ")\n";
         }
 
+        // --- 阶段6: 叠加 place 偏移(蓝图位置)平移到放置正上方, 再下降放下。 ---
         script << "  place_pre_" << index << "[0] = place_pre_" << index << "[0] + "
                << formatUrscriptNumber(task.place.dx) << "\n";
         script << "  place_pre_" << index << "[1] = place_pre_" << index << "[1] + "
@@ -1729,12 +1780,15 @@ bool executeUrscriptPtpPipeline(rclcpp::Node::SharedPtr node,
                    << index << "[5]]\n";
             script << "  movel(place_slow_start_" << index << ", a="
                    << formatUrscriptNumber(descend_acceleration) << ", v="
-                   << formatUrscriptNumber(descend_velocity) << ")\n";
+                   << formatUrscriptNumber(place_fast_descend_velocity > 1e-6
+                                          ? place_fast_descend_velocity : descend_velocity) << ")\n";
         }
         script << "  place_down_" << index << " = p[place_pre_" << index << "[0], place_pre_" << index
                << "[1], place_pre_" << index << "[2] - " << formatUrscriptNumber(place_descend)
                << ", place_pre_" << index << "[3], place_pre_" << index << "[4], place_pre_"
                << index << "[5]]\n";
+        // place_wiggle: 放置末段一边极慢下降一边 xy 微抖(speedl 八相循环),
+        //   帮积木凸点对进下面的孔; 需 slow_final_descend>2mm 且 steps>=4 才启用。
         const bool use_place_wiggle =
             place_wiggle_enabled && place_slow_final_descend > 0.002 && place_wiggle_steps >= 4;
         if (use_place_wiggle) {
@@ -1816,7 +1870,11 @@ bool executeUrscriptPtpPipeline(rclcpp::Node::SharedPtr node,
                << formatUrscriptNumber(place_descend_velocity) << ")\n";
         script << "  sync()\n";
         script << "  sleep(" << formatUrscriptNumber(std::max(0.0, place_settle_wait_seconds)) << ")\n";
-        if (use_robotiq_socket) {
+        // --- 阶段7: 松爪放下(keep_gripper_closed=true 则不松, 只抬臂) -> 抬起离开
+        //           -> 完全张开 -> (可选)movej 回 home, 进入下一块。 ---
+        if (keep_gripper_closed) {
+            script << "  textmsg(\"keep_gripper_closed: 放置点不松开, 夹爪保持夹紧\")\n";
+        } else if (use_robotiq_socket) {
             appendRobotiqSocketMove(script, gripper_socket_release_position, gripper_socket_release_wait_seconds);
         } else if (use_onrobot_rg) {
             appendOnRobotRgMove(
@@ -1841,7 +1899,9 @@ bool executeUrscriptPtpPipeline(rclcpp::Node::SharedPtr node,
                << formatUrscriptNumber(movel_acceleration) << ", v="
                << formatUrscriptNumber(movel_velocity) << ")\n";
         script << "  sync()\n";
-        if (use_robotiq_urscript) {
+        if (keep_gripper_closed) {
+            // 保持夹紧: 不张开
+        } else if (use_robotiq_urscript) {
             script << "  rq_open_and_wait()\n";
         } else if (use_robotiq_socket) {
             appendRobotiqSocketMove(script, 0, gripper_socket_open_wait_seconds);
@@ -1853,9 +1913,8 @@ bool executeUrscriptPtpPipeline(rclcpp::Node::SharedPtr node,
                 onrobot_rg_force_n,
                 gripper_socket_open_wait_seconds,
                 "open");
-        } else if (use_onrobot_io) {
-            appendIoGripperMove(script, io_gripper_tool_dout, false, io_gripper_wait_seconds, "open");
         }
+        // 2026-07-03: onrobot_io 已在 place release 处开爪(升起前), 升起后不再重复开爪, 去掉冗余 sleep。
         if (return_home) {
             script << "  movej(home_joints, a="
                    << formatUrscriptNumber(movej_acceleration) << ", v="
@@ -1893,7 +1952,41 @@ bool executeUrscriptPtpPipeline(rclcpp::Node::SharedPtr node,
 }
 
 
-//new mode disassemble_pick_place  
+// ============================================================================
+// 【拆卸执行函数】executeDisassemblePickPlacePipeline
+// ----------------------------------------------------------------------------
+// 在哪里被调用: main() 里当 motion_control_mode == "disassemble_pick_place" 时。
+//   命令链: run_carrot_disassemble.sh / run_estop_disassemble.sh
+//           -> disassembly_arm_pull.sh (串好所有 launch 参数, 每块调一次)
+//           -> run_ur5.launch.py -> 本 cpp 节点 -> 本函数。
+//
+// 起什么作用: 把"拆一块积木"的完整动作【拼成一段 URScript 文本】, 通过话题
+//   /urscript_interface/script_command 发给 UR 驱动执行。本函数不直接控制电机,
+//   只生成脚本字符串(见结尾 publishUrscriptProgram)。
+//
+// 整体动作时序(从上到下读):
+//   ┌ 前置动作 prestep (只第一块 do_prestep=true 时跑一次):
+//   │   movej 到固定起始位 -> 开爪 -> 竖直下降 prestep_descend(默认0.143) 慢速
+//   │   -> 闭合抓住"预置物" -> 抬 5cm -> movej 到拆卸初始(拔取)位
+//   │   -> (i==0) 下降0.11 -> 松爪把预置物放下 -> 抬回原位
+//   │   * estop 用 PRESTEP_DESCEND=0.165 让这段抓取更深; carrot 用默认0.143。
+//   └ 逐块循环 (tasks.size() 次 = 组数, carrot 3 / estop 2):
+//       movej 到拔取姿态(pull_joints, yaw 可加 task 偏移)
+//       -> 开爪 -> 下降 pick.descend 到积木 -> 闭合抓紧 -> sleep 抓稳
+//       -> 竖直抬起(+可选 extra_lift) 把积木拔出
+//       -> movej 到丢放姿态(drop_joints) -> 平移 place 偏移(逐块 base +X 递增)
+//       -> 下降 place.descend -> 松爪丢下 -> 抬起 -> (可选)回 home
+//
+// 关键参数:
+//   pull_joints_text  = 拔取姿态(示教关节角, DIS_PULL_TOP_JOINTS)
+//   drop_joints_text  = 丢放姿态(示教关节角, DIS_DROP_JOINTS = 装配 observe 位)
+//   home_joints_text  = 每块放完返回的 home(DIS_HOME_JOINTS)
+//   tasks             = 每块的 pick/place 偏移(来自 disassembly_task.yaml)
+//   disassemble_place_offset_x/y/z = 逐块丢放位的额外平移(base +X 递增靠它)
+// 注意: prestep 里那些 movej 起始位/0.143/0.11 是历史上写死的值(不是 task 参数),
+//   要改前置动作深度请用 launch 参数 urscript_disassemble_prestep_descend。
+// ============================================================================
+//new mode disassemble_pick_place
 bool executeDisassemblePickPlacePipeline(rclcpp::Node::SharedPtr node,
                                          const std::string& topic_name,
                                          const std::string& gripper_control_mode,
@@ -1914,6 +2007,8 @@ bool executeDisassemblePickPlacePipeline(rclcpp::Node::SharedPtr node,
                                          double disassemble_place_offset_x,
                                          double disassemble_place_offset_y,
                                          double disassemble_place_offset_z,
+                                         int io_gripper_tool_dout,
+                                         double io_gripper_wait_seconds,
                                          double gripper_socket_wait_seconds,
                                          double gripper_socket_open_wait_seconds,
                                          int gripper_socket_speed,
@@ -1929,15 +2024,17 @@ bool executeDisassemblePickPlacePipeline(rclcpp::Node::SharedPtr node,
                                          double wait_seconds) {
     if (gripper_control_mode != "none" &&
         gripper_control_mode != "robotiq_socket" &&
-        gripper_control_mode != "onrobot_rg") {
+        gripper_control_mode != "onrobot_rg" &&
+        gripper_control_mode != "onrobot_io") {
         RCLCPP_WARN(
             node->get_logger(),
-            "disassemble_pick_place 只内联 none/robotiq_socket/onrobot_rg 夹爪模式；当前 gripper_control_mode=%s，本次会跳过夹爪动作。",
+            "disassemble_pick_place 只内联 none/robotiq_socket/onrobot_rg/onrobot_io 夹爪模式；当前 gripper_control_mode=%s，本次会跳过夹爪动作。",
             gripper_control_mode.c_str());
     }
 
     const bool use_robotiq_socket = gripper_control_mode == "robotiq_socket";
     const bool use_onrobot_rg = gripper_control_mode == "onrobot_rg";
+    const bool use_onrobot_io = gripper_control_mode == "onrobot_io";
     const auto pull_joints = parseJointList(pull_joints_text);
     const auto drop_joints = parseJointList(drop_joints_text);
     const auto home_joints = parseJointList(home_joints_text);
@@ -1972,19 +2069,108 @@ bool executeDisassemblePickPlacePipeline(rclcpp::Node::SharedPtr node,
         script << "  onrobot_rg_ready = onrobot_rg_powerup()\n";
     }
 
+    // 2026-07-03: 前置动作 —— 先 movej 到【固定起始位姿】(=实测当前关节, 不管启动时在哪都先到这)
+    //   -> 开爪 -> 竖直向下14.3cm(慢速) -> 闭合。拆卸是每块单独启动一次节点, 故用参数
+    //   urscript_disassemble_prestep gate: shell 只在第一块传 true, 否则每块都会重复执行。
+    const bool do_prestep =
+        node->get_parameter_or<bool>("urscript_disassemble_prestep", false);
+    // 2026-07-03: 抓取点(及前置释放点) base系 x 偏移, 默认0; estop 传0.01(抓取x+1cm), carrot不受影响。
+    const double disassemble_pick_offset_x =
+        node->get_parameter_or<double>("urscript_disassemble_pick_offset_x", 0.0);
+    // 2026-07-03: 前置动作【下降抓】的下降距离, 默认0.143(carrot不变); estop脚本传更大值下探更深。
+    const double disassemble_prestep_descend =
+        node->get_parameter_or<double>("urscript_disassemble_prestep_descend", 0.143);
+    // 2026-07-03: 拔取点(=前置横移落地点 + 每块抓取点)在 base x 的整体平移, 默认0。
+    //   落到 pull_joints 后 movel 平移这么多, 之后 dis_rel(释放)/dis_pick(抓取)都基于移后位。
+    //   两产品由 disassembly_arm_pull.sh 统一传 -0.005(往 x 减 5mm)。
+    const double disassemble_pull_offset_x =
+        node->get_parameter_or<double>("urscript_disassemble_pull_offset_x", 0.0);
+    // ===== 阶段0: 前置动作(只第一块 do_prestep=true 时执行一次) =====
+    //   把开机前预置在固定位的物体先抓起再放到拆卸初始位, 保证后续每块几何一致。
+    if (do_prestep) {
+    script << "  textmsg(\"disassemble prestep: goto fixed start -> open -> descend -> close\")\n";
+    script << "  movej([1.465593, -1.563375, -1.798574, -1.353568, 1.578371, -2.478005], a="
+           << formatUrscriptNumber(movej_acceleration) << ", v="
+           << formatUrscriptNumber(movej_velocity) << ")\n";
+    if (use_robotiq_socket) {
+        appendRobotiqSocketMove(script, 0, gripper_socket_open_wait_seconds);
+    } else if (use_onrobot_rg) {
+        appendOnRobotRgMove(script, onrobot_rg_config, onrobot_rg_open_width_mm,
+                            onrobot_rg_force_n, gripper_socket_open_wait_seconds, "prestep open");
+    } else if (use_onrobot_io) {
+        appendIoGripperMove(script, io_gripper_tool_dout, false, io_gripper_wait_seconds, "prestep open");
+    }
+    script << "  dis_prestep = get_actual_tcp_pose()\n";
+    script << "  dis_prestep_down = p[dis_prestep[0], dis_prestep[1], dis_prestep[2] - "
+           << formatUrscriptNumber(disassemble_prestep_descend)
+           << ", dis_prestep[3], dis_prestep[4], dis_prestep[5]]\n";
+    script << "  movel(dis_prestep_down, a=" << formatUrscriptNumber(descend_acceleration)
+           << ", v=" << formatUrscriptNumber(place_descend_velocity) << ")\n";  // 慢速 place_descend_velocity(0.02)
+    if (use_robotiq_socket) {
+        appendRobotiqSocketMove(script, 255, gripper_socket_wait_seconds);
+    } else if (use_onrobot_rg) {
+        appendOnRobotRgMove(script, onrobot_rg_config, onrobot_rg_close_width_mm,
+                            onrobot_rg_force_n, gripper_socket_wait_seconds, "prestep close");
+    } else if (use_onrobot_io) {
+        appendIoGripperMove(script, io_gripper_tool_dout, true, io_gripper_wait_seconds, "prestep close");
+    }
+    script << "  sleep(1.5)\n";  // 抓稳
+    // 2026-07-03: 抓取闭合后上抬5cm, 再继续移动到拆卸初始位置。
+    script << "  dis_prestep_up = p[dis_prestep_down[0], dis_prestep_down[1], dis_prestep_down[2] + "
+           << formatUrscriptNumber(0.05)
+           << ", dis_prestep_down[3], dis_prestep_down[4], dis_prestep_down[5]]\n";
+    script << "  movel(dis_prestep_up, a=" << formatUrscriptNumber(movel_acceleration)
+           << ", v=" << formatUrscriptNumber(movel_velocity) << ")\n";
+    }  // if (do_prestep)
+
+    // ===== 逐块拆卸主循环: 循环次数 = tasks.size() = 组数(carrot 3 / estop 2) =====
     for (std::size_t i = 0; i < tasks.size(); ++i) {
         const PickPlaceTask& task = tasks[i];
         const std::string index = std::to_string(i);
         script << "  textmsg(\"disassemble task " << sanitizeUrscriptText(task.id) << " start\")\n";
 
+        // --- 阶段1: movej 到拔取姿态(所有块共用同一示教关节角 pull_joints;
+        //           yaw 可按本块 task.pick.yaw 微调第6轴)。 ---
         std::vector<double> pick_joints = *pull_joints;
         pick_joints[5] += task.pick.yaw;
         script << "  movej(" << jointListToUrscript(pick_joints) << ", a="
                << formatUrscriptNumber(movej_acceleration) << ", v="
                << formatUrscriptNumber(movej_velocity) << ")\n";
+        // 2026-07-03: 落地后在 base x 整体平移(拔取点 -5mm 等)。放在这里 -> 之后 dis_rel(前置释放)
+        //   和 dis_pick(每块抓取)读到的 TCP 都是移后位, 一处生效全跟着移。
+        if (disassemble_pull_offset_x > 1e-6 || disassemble_pull_offset_x < -1e-6) {
+            script << "  dis_pull_shift_" << index << " = get_actual_tcp_pose()\n";
+            script << "  dis_pull_shift_" << index << "[0] = dis_pull_shift_" << index << "[0] + "
+                   << formatUrscriptNumber(disassemble_pull_offset_x) << "\n";
+            script << "  movel(dis_pull_shift_" << index << ", a=" << formatUrscriptNumber(movel_acceleration)
+                   << ", v=" << formatUrscriptNumber(movel_velocity) << ")\n";
+        }
+        if (do_prestep && i == 0) {
+            // 2026-07-03: 到达【原拆卸初始位置】后(只第一块前一次): 下降3cm -> 放开夹爪(卸下前置抓取的物体)
+            //   -> 抬回原位, 再继续原本逐块拆卸(抬回保证后续抓取几何不变)。
+            script << "  dis_rel = get_actual_tcp_pose()\n";   // 原始示教点 B(保持不动: 抬回和后续抓取都用它)
+            // 2026-07-03: 释放落点 A = 示教点 B 的 (x+pick_offset_x, y-5mm), 再下降10cm。
+            //   偏移/y-5mm 只进落点 A; dis_rel(=B) 不改, 故抬回点和后面的示教/抓取点零改动(A、B 差5mm)。
+            script << "  dis_rel_down = p[dis_rel[0] + " << formatUrscriptNumber(disassemble_pick_offset_x)
+                   << ", dis_rel[1] - " << formatUrscriptNumber(0.005)
+                   << ", dis_rel[2] - " << formatUrscriptNumber(0.11)
+                   << ", dis_rel[3], dis_rel[4], dis_rel[5]]\n";
+            script << "  movel(dis_rel_down, a=" << formatUrscriptNumber(descend_acceleration)
+                   << ", v=" << formatUrscriptNumber(place_descend_velocity) << ")\n";
+            if (use_robotiq_socket) {
+                appendRobotiqSocketMove(script, 0, gripper_socket_open_wait_seconds);
+            } else if (use_onrobot_rg) {
+                appendOnRobotRgMove(script, onrobot_rg_config, onrobot_rg_open_width_mm,
+                                    onrobot_rg_force_n, gripper_socket_open_wait_seconds, "prestep release");
+            } else if (use_onrobot_io) {
+                appendIoGripperMove(script, io_gripper_tool_dout, false, io_gripper_wait_seconds, "prestep release");
+            }
+            script << "  movel(dis_rel, a=" << formatUrscriptNumber(movel_acceleration)
+                   << ", v=" << formatUrscriptNumber(movel_velocity) << ")\n";
+        }
         script << "  dis_pick_" << index << " = get_actual_tcp_pose()\n";
         script << "  dis_pick_" << index << "[0] = dis_pick_" << index << "[0] + "
-               << formatUrscriptNumber(task.pick.dx) << "\n";
+               << formatUrscriptNumber(task.pick.dx + disassemble_pick_offset_x) << "\n";
         script << "  dis_pick_" << index << "[1] = dis_pick_" << index << "[1] + "
                << formatUrscriptNumber(task.pick.dy) << "\n";
         script << "  dis_pick_" << index << "[2] = dis_pick_" << index << "[2] + "
@@ -2003,8 +2189,11 @@ bool executeDisassemblePickPlacePipeline(rclcpp::Node::SharedPtr node,
                 onrobot_rg_force_n,
                 gripper_socket_open_wait_seconds,
                 "open");
+        } else if (use_onrobot_io) {
+            appendIoGripperMove(script, io_gripper_tool_dout, false, io_gripper_wait_seconds, "pregrasp open");
         }
 
+        // --- 阶段2: 竖直下降 pick.descend 够到这块积木(descend=0 则原地抓, 拆卸允许)。 ---
         if (task.pick.descend > 0.0001) {
             script << "  dis_grasp_" << index << " = p[dis_pick_" << index << "[0], dis_pick_" << index
                    << "[1], dis_pick_" << index << "[2] - " << formatUrscriptNumber(task.pick.descend)
@@ -2027,8 +2216,11 @@ bool executeDisassemblePickPlacePipeline(rclcpp::Node::SharedPtr node,
                 onrobot_rg_force_n,
                 gripper_socket_wait_seconds,
                 "close");
+        } else if (use_onrobot_io) {
+            appendIoGripperMove(script, io_gripper_tool_dout, true, io_gripper_wait_seconds, "grasp close");
         }
-        script << "  sleep(0.3)\n";
+        script << "  sleep(2.5)\n";  // 2026-07-02: 拆卸抓紧后多等到夹稳再抬(与装配一致)
+        // --- 阶段3: 抓紧后竖直抬起(先回到 dis_pick 高度, 再可选多抬 extra_lift)把积木拔出。 ---
         script << "  movel(dis_pick_" << index << ", a="
                << formatUrscriptNumber(movel_acceleration) << ", v="
                << formatUrscriptNumber(pick_lift_velocity) << ")\n";
@@ -2042,6 +2234,8 @@ bool executeDisassemblePickPlacePipeline(rclcpp::Node::SharedPtr node,
                    << formatUrscriptNumber(pick_lift_velocity) << ")\n";
         }
 
+        // --- 阶段4: movej 到丢放姿态(drop_joints), 再按 place 偏移平移到本块的丢放点。
+        //           逐块 base +X 递增就是靠 disassemble_place_offset_x(每块 +8cm)。 ---
         std::vector<double> place_joints = *drop_joints;
         place_joints[5] += task.place.yaw;
         script << "  movej(" << jointListToUrscript(place_joints) << ", a="
@@ -2058,20 +2252,24 @@ bool executeDisassemblePickPlacePipeline(rclcpp::Node::SharedPtr node,
                << formatUrscriptNumber(movel_acceleration) << ", v="
                << formatUrscriptNumber(movel_velocity) << ")\n";
 
+        // --- 阶段5: 在丢放点上方下降 place.descend, 到位后松爪丢下积木。 ---
         if (task.place.descend > 0.0001) {
             script << "  dis_place_down_" << index << " = p[dis_place_" << index << "[0], dis_place_" << index
                    << "[1], dis_place_" << index << "[2] - " << formatUrscriptNumber(task.place.descend)
                    << ", dis_place_" << index << "[3], dis_place_" << index << "[4], dis_place_"
                    << index << "[5]]\n";
+            // 2026-07-03: 拆卸放置下降改用正常速度(descend_velocity), 去掉慢速段(原 place_descend_velocity)。
             script << "  movel(dis_place_down_" << index << ", a="
                    << formatUrscriptNumber(descend_acceleration) << ", v="
-                   << formatUrscriptNumber(place_descend_velocity) << ")\n";
+                   << formatUrscriptNumber(descend_velocity) << ")\n";
         } else {
             script << "  dis_place_down_" << index << " = dis_place_" << index << "\n";
         }
 
         script << "  sync()\n";
         script << "  sleep(" << formatUrscriptNumber(std::max(0.0, place_settle_wait_seconds)) << ")\n";
+        // --- 阶段6: 松爪释放 -> 抬起离开(+可选 extra_lift 让开) -> (可选)movej 回 home,
+        //           然后进入下一块循环。 ---
         if (use_robotiq_socket) {
             appendRobotiqSocketMove(script, gripper_socket_release_position, gripper_socket_release_wait_seconds);
             appendRobotiqSocketMove(script, 0, gripper_socket_open_wait_seconds);
@@ -2090,6 +2288,8 @@ bool executeDisassemblePickPlacePipeline(rclcpp::Node::SharedPtr node,
                 onrobot_rg_force_n,
                 gripper_socket_open_wait_seconds,
                 "open");
+        } else if (use_onrobot_io) {
+            appendIoGripperMove(script, io_gripper_tool_dout, false, io_gripper_wait_seconds, "place release");
         }
         script << "  movel(dis_place_" << index << ", a="
                << formatUrscriptNumber(movel_acceleration) << ", v="
@@ -2230,6 +2430,10 @@ int main(int argc, char** argv) {
         node->get_parameter_or<double>("urscript_disassemble_place_offset_y", 0.0);
     const double urscript_disassemble_place_offset_z =
         node->get_parameter_or<double>("urscript_disassemble_place_offset_z", 0.0);
+    const int io_gripper_tool_dout =
+        std::clamp(node->get_parameter_or<int>("io_gripper_tool_dout", 0), 0, 1);  // pin16=tool DO 0
+    const double io_gripper_wait_seconds =
+        std::max(0.0, node->get_parameter_or<double>("io_gripper_wait_seconds", 1.0));
     const double urscript_place_lift_after_release =
         node->get_parameter_or<double>("urscript_place_lift_after_release", 0.0);
     const double urscript_place_slow_final_descend =
@@ -2328,6 +2532,16 @@ int main(int argc, char** argv) {
             motion_control_mode.c_str());
     }
 
+    // ========================================================================
+    // 【模式分发】main 根据 motion_control_mode 参数(launch 传入)选一条流程执行:
+    //   print_joints / print_pose  = 标定工具: 打印当前关节角/TCP 位姿(示教用)
+    //   gripper_test               = 只测夹爪开合
+    //   joint_pick_place / urscript = 【装配主流程】-> executeUrscriptPtpPipeline
+    //   joint_pick_place_tilt      = 斜抓实验(与主线分离)
+    //   disassemble_pick_place     = 【拆卸主流程】-> executeDisassemblePickPlacePipeline
+    //   joint_ptp / urscript_ptp   = 纯点到点(不抓放)
+    // 下面按模式依次匹配, 命中就执行并 return。
+    // ========================================================================
     if (motion_control_mode == "print_joints") {
         const bool ok = printCurrentJointsForUrscript(node, *arm_ptr);
         rclcpp::shutdown();
@@ -2453,7 +2667,8 @@ int main(int argc, char** argv) {
             task_max_xy_offset,
             task_max_z_offset,
             task_max_descend,
-            pick_place_tasks)) {
+            pick_place_tasks,
+            motion_control_mode == "disassemble_pick_place")) {  // 拆卸允许 pick descend=0(在示教点直接抓)
         rclcpp::shutdown();
         spin_thread.join();
         return 1;
@@ -2561,6 +2776,8 @@ int main(int argc, char** argv) {
             urscript_disassemble_place_offset_x,
             urscript_disassemble_place_offset_y,
             urscript_disassemble_place_offset_z,
+            io_gripper_tool_dout,
+            io_gripper_wait_seconds,
             gripper_urscript_wait_seconds,
             gripper_socket_open_wait_seconds,
             gripper_socket_speed,
@@ -2574,6 +2791,7 @@ int main(int argc, char** argv) {
             onrobot_rg_force_n,
             urscript_place_settle_wait_seconds,
             urscript_pipeline_wait_seconds);
+    
         rclcpp::shutdown();
         spin_thread.join();
         return ok ? 0 : 1;

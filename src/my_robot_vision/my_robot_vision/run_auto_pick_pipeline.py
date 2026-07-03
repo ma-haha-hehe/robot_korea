@@ -1,7 +1,37 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
-"""Host-side automatic pipeline: home/perception pose -> vision -> execute."""
+"""【装配总控 · 宿主机侧】自动抓放流水线: 回观察位 -> 视觉识别 -> 执行抓放, 逐块循环。
+
+在哪里被调用:
+    run_carrot_onrobot.sh / run_estop_onrobot.sh / run_pick_onrobot.sh 等装配入口脚本
+    都是 `python3 run_auto_pick_pipeline.py <参数>` 的封装。本文件是装配的"大脑",
+    协调"宿主机 ROS(动机械臂) + docker 视觉容器(识别积木) + cpp 执行节点(抓放)"。
+
+一轮(一块积木)的完整流程 = main() 里的循环, 每轮做:
+    1) move_to_observe_pose()      机械臂 movej 回观察(拍照)位, 让相机看到积木
+    2) ensure_vision_service()     确保 docker 里视觉桥进程活着(等待目标物名)
+    3) trigger_and_wait_vision()   写目标物名 -> 视觉识别 -> 等 vision_output.yaml 出结果
+    4) copy_and_convert_vision()   把视觉结果 cp 回宿主机, 调 vision_to_execution_yaml.py
+                                    换算成 pick_place_task.yaml(示教位 + dx/dy/dz/yaw 偏移)
+    5) execute_pick_place()        ros2 launch 起 cpp 节点(joint_pick_place)执行这块抓放
+    (可选) run_async_next_vision() 边执行边预跑下一块视觉, 省时间
+
+关键路径常量(文件顶部): 蓝图 plan、视觉输出、bridge 配置、pick_place_task.yaml、示教关节 env。
+
+主要函数速查(起什么作用):
+    run() / capture()          跑 shell 命令(实时输出 / 抓输出)
+    ros_bash()                 在 source 好 ROS 的 bash 里跑命令
+    docker_exec()              进 vision_node_final 容器执行命令
+    write_plan()/generate_product_plan()  生成/写装配蓝图(要抓什么、放哪)
+    ensure_vision_service()    起/保活容器里的视觉桥(注意: 严禁 docker cp bridge.py, 见内部注释)
+    move_to_observe_pose()     机械臂回观察位
+    trigger_vision()/wait_for_vision_output()/trigger_and_wait_vision()  触发并等视觉结果
+    copy_vision_output()/convert_vision_output()/copy_and_convert_vision()  搬运+换算视觉结果
+    execute_pick_place()       组 launch 命令并执行 cpp 抓放(安全限制/静止检测在这里)
+    run_async_next_vision()    异步预跑下一块视觉(流水线加速)
+    main()                     解析参数 + 逐块主循环
+"""
 
 import argparse
 import importlib.util
@@ -199,7 +229,9 @@ def stop_vision_service(docker_cmd):
 
 def ensure_vision_service(docker_cmd, target, *, frozen_observation=False, show_windows=False):
     run(f"{docker_cmd} start {DOCKER_CONTAINER}", check=False)
-    run(f"{docker_cmd} cp {shlex.quote(str(VISION_BRIDGE_HOST))} {DOCKER_CONTAINER}:/vision_code/vision_node_test1_5_bridge.py")
+    # 2026-07-03: 不要 docker cp bridge.py! /vision_code 是宿主机 src/my_robot_vision/my_robot_vision
+    #   的 bind mount(见 docker inspect Mounts), docker cp 源=目标会先截断目标再读源 ->
+    #   把宿主机 bridge.py 清成 0 字节(反复踩坑的真凶)。bind mount 已实时同步宿主机改动, 无需 cp。
     run(f"{docker_cmd} cp {shlex.quote(str(PLAN_HOST))} {DOCKER_CONTAINER}:{PLAN_DOCKER}")
     stop_vision_service(docker_cmd)
 
@@ -238,8 +270,8 @@ def move_to_observe_pose():
         "joint_ptp_return_home:=false "
         "joint_ptp_dwell_seconds:=0.1 "
         "urscript_pipeline_wait_seconds:=8.0 "
-        "urscript_movej_velocity:=0.90 "
-        "urscript_movej_acceleration:=2.0"
+        "urscript_movej_velocity:=2.50 "   # 2026-07-03 回观察位大幅提速(0.90->2.50, 与去装配区同速)
+        "urscript_movej_acceleration:=5.0"
     )
     run(ros_bash(cmd))
 
@@ -359,6 +391,7 @@ def execute_pick_place(
     place_wiggle_velocity,
     place_wiggle_steps,
     return_home=True,
+    keep_gripper_closed=False,
 ):
     if dry_run:
         print("[AUTO] dry-run enabled: not executing robot pick/place.")
@@ -396,6 +429,7 @@ def execute_pick_place(
         f"gripper_socket_release_position:={gripper_release_position} "
         f"gripper_socket_release_wait_seconds:={float(gripper_release_wait):.3f} "
         f"gripper_urscript_wait_seconds:={float(gripper_wait):.3f} "
+        f"keep_gripper_closed:={'true' if keep_gripper_closed else 'false'} "
         f"onrobot_rg_model:={shlex.quote(str(onrobot_rg_model))} "
         f"onrobot_rg_open_width_mm:={int(onrobot_open_width_mm)} "
         f"onrobot_rg_close_width_mm:={int(onrobot_close_width_mm)} "
@@ -403,9 +437,10 @@ def execute_pick_place(
         f"onrobot_rg_release_width_mm:={int(onrobot_release_width_mm)} "
         f"onrobot_rg_force_n:={int(onrobot_force_n)} "
         f"task_file:={shlex.quote(str(TASK_FILE))} "
-        "task_max_xy_offset:=10.0 "  # 2026-07-01 用户要求取消安全限制(旧0.25)
-        "task_max_z_offset:=10.0 "   # 旧0.15
-        "task_max_descend:=10.0 "    # 旧0.40->0.80->取消
+        "task_max_xy_offset:=0.50 "  # 2026-07-03 0.25->0.35->0.50 (用户要求再增大); 与bridge safety.max_xy_offset一致
+        "task_max_z_offset:=0.15 "   # 旧0.15
+        "task_max_descend:=0.40 "    # 旧0.40->0.80->取消
+        "io_gripper_wait_seconds:=1.5 "  # 2026-07-03 放置开爪等待加长(1.0->1.5), 保证抬升前一定张开
         'urscript_pregrasp_joints:="$UR5_PREGRASP_JOINTS" '
         'urscript_preplace_joints:="$UR5_PREPLACE_JOINTS" '
         'urscript_home_joints:="$UR5_HOME_JOINTS" '
@@ -418,7 +453,8 @@ def execute_pick_place(
         f"urscript_pick_approach_movel_velocity:={float(pick_approach_movel_velocity):.3f} "
         f"urscript_pick_lift_velocity:={float(pick_lift_velocity):.3f} "
         "urscript_descend_acceleration:=0.35 "
-        "urscript_descend_velocity:=0.10 "
+        "urscript_descend_velocity:=0.40 "  # 2026-07-03 pick下降提速...->0.30->0.40(place前段另用place_fast_descend_velocity)
+        "urscript_place_fast_descend_velocity:=0.60 "  # 2026-07-03 place前段提速...->0.50->0.60(超慢末段不变)
         f"urscript_place_descend_velocity:={float(place_descend_velocity):.6f} "
         f"urscript_place_wiggle_enabled:={'true' if place_wiggle_enabled else 'false'} "
         f"urscript_place_wiggle_xy_amplitude:={float(place_wiggle_xy_amplitude):.6f} "
@@ -426,7 +462,7 @@ def execute_pick_place(
         f"urscript_place_wiggle_velocity:={float(place_wiggle_velocity):.6f} "
         f"urscript_place_wiggle_steps:={int(place_wiggle_steps)} "
         "urscript_place_slow_final_descend:=0.020 "
-        "urscript_place_settle_wait_seconds:=0.5 "
+        "urscript_place_settle_wait_seconds:=0.1 "  # 2026-07-03: 到位后更快开爪(原0.5)
         f"urscript_done_still_seconds:={effective_done_still:.3f} "
         f"urscript_pipeline_wait_seconds:={effective_pipeline_wait:.3f}"
     )
@@ -518,6 +554,7 @@ def run_async_next_vision(args, rounds):
             args.place_wiggle_velocity,
             args.place_wiggle_steps,
             False,
+            keep_gripper_closed=args.keep_gripper_closed,
         )
 
         if next_item is not None:
@@ -635,6 +672,8 @@ def main():
                              "doesn't toggle); auto-raised to gripper_wait+1.5s for safety. Lower gripper_wait to lower this")
     parser.add_argument("--place-descend-velocity", type=float, default=0.002,
                         help="m/s downward speed for the final placement insertion; 0.002 means 2 mm/s")
+    parser.add_argument("--keep-gripper-closed", action="store_true",
+                        help="放置点不松开夹爪, 一直夹紧(手臂照常抬起离开)")
     parser.add_argument("--disable-place-wiggle", action="store_true",
                         help="disable micro wiggle during the final slow placement descent")
     parser.add_argument("--place-wiggle-xy-amplitude", type=float, default=0.0006,
@@ -697,18 +736,19 @@ def main():
         print("[AUTO] pipeline finished")
         return
 
+    # ===== 逐块装配主循环: 每块 = 写蓝图 -> 回观察位 -> 视觉 -> 换算 -> 抓放 =====
     for index, item in enumerate(rounds, start=1):
         target = item["target"]
         print(f"\n[AUTO] ===== round {index}/{len(rounds)} target: {target} =====")
         if "task" in item:
-            write_active_plan_task(item["task"])
+            write_active_plan_task(item["task"])   # 用规划器生成的整任务
         else:
-            write_plan(target, item["place"], item["grasp_spin"], item["blueprint_yaw"])
+            write_plan(target, item["place"], item["grasp_spin"], item["blueprint_yaw"])  # 单目标临时蓝图
         if not args.skip_observe:
-            move_to_observe_pose()
-        ensure_vision_service(args.docker_cmd, target, show_windows=args.show_windows)
-        trigger_and_wait_vision(args.docker_cmd, target, args.vision_timeout)
-        copy_and_convert_vision(args.docker_cmd)
+            move_to_observe_pose()                 # 机械臂回观察位拍照
+        ensure_vision_service(args.docker_cmd, target, show_windows=args.show_windows)  # 保活视觉桥
+        trigger_and_wait_vision(args.docker_cmd, target, args.vision_timeout)           # 识别并等结果
+        copy_and_convert_vision(args.docker_cmd)   # 搬回宿主机 + 换算成 pick_place_task.yaml
         execute_pick_place(
             args.gripper_mode,
             args.dry_run,
@@ -740,6 +780,7 @@ def main():
             args.place_wiggle_velocity,
             args.place_wiggle_steps,
             True,
+            keep_gripper_closed=args.keep_gripper_closed,
         )
         # The next round always starts by moving/confirming UR5_OBSERVE_JOINTS
         # before perception. The URScript execution also returns there after

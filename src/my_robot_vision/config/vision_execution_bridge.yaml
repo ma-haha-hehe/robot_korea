@@ -50,6 +50,7 @@ handeye:
   # 3 cm deeper from the robot flange/tool0 area.
   # Re-run hand-eye calibration later with 15-20 diverse samples.
 
+
 reference:
   # TCP position when robot is at urscript_pregrasp_joints, before applying offsets.
   # 2026-06-26: 重测! pregrasp=observe 同一位姿, 取当前实测 TCP(旧值是过期 pregrasp)。
@@ -98,7 +99,7 @@ pick:
   # 2026-06-27: 撤回 base 系 Y 偏移(改用对象系长轴偏移 long_axis_offset_m)
   # 2026-06-30: 两点真值标定(P1误差[-10.6,-0.5]mm, P2[-12.5,-1.8]mm, 一致=恒定偏移) -> 取平均补 xy
   # 2026-07-01: 2x2 两点标定(误差base [-5.57,3.66]/[-7.56,1.03]mm 一致) -> 补[+6.57,-2.35]mm。z不动。
-  pick_offset_xyz: [-0.0050, -0.0036, 0.050]
+  pick_offset_xyz: [-0.0013, -0.0036, 0.050]   # 2026-07-03 真值标定 base_link x: -0.0050->-0.0040->-0.0030->-0.0023->同向再+1mm(->-0.0013)
   # 旧值: [-0.0116, -0.0012, 0.050]
   # 沿物体长轴(绿轴/Y)平移抓取点(FoundationPose origin 偏离几何中心时用); 用户确认中心准 -> 归零
   # 2026-06-27: 撤回(误差是基座系的, 不该用对象系修); 留接口备用
@@ -121,7 +122,7 @@ pick:
   # 2026-07-01: 0.27 -> 0.25 抓取再抬高 2cm。
   # 2026-07-02: 换 OnRobot RG2 时曾改 0.10(保守); 现用户先跑无夹爪, 切回无夹爪深值 0.25。
   #   (以后跑 RG2/run_pick_onrobot.sh 前, 再把抓/放 descend 改回 0.10 保守首跑)
-  descend: 0.22   # 2026-07-02 抓取低2mm(0.20->0.22)
+  descend: 0.1983   # 2026-07-03 抓取下降再高0.7mm(0.199->0.1983)
   # Keep the whole grasp descent at the normal descend speed.
   slow_final_descend: 0.000
 
@@ -139,7 +140,7 @@ place:
   # 2026-07-01: 0.265 -> 0.315 放置再低 5cm。
   # 2026-07-01: 0.315 -> 0.325 放置再低 1cm。
   # 2026-07-02: 换 RG2 时曾改 0.10; 现用户先跑无夹爪, 切回无夹爪深值 0.325。(跑 RG2 前再改回 0.10)
-  descend: 0.367 # 2026-07-02 放置低2mm(0.365->0.367)
+  descend: 0.3671 # 2026-07-03 放置(0.3651)再低2mm(->0.3671)
   # Use normal descend speed first, then extremely slow speed + wiggle for the last bit.
   # 2026-06-19: 0.02 -> 0.016 so the normal-speed descent is a bit longer and the
   # slow/wiggle phase starts slightly later/deeper (total descend unchanged).
@@ -156,7 +157,7 @@ yaw:
   # 2026-07-01: 每种积木 yaw 偏移不同(方形2x2 vs 长条2x4), 按 task.type 覆盖上面的全局值。
   # brick_4x2 = 白/蓝/绿等 2x4(两点标定 -92); brick_2x2 = 橙/黄/蓝 2x2(真值标定 -70.37)。
   pick_yaw_offset_by_type:
-    brick_4x2: -92.0    # 2026-07-02 撤销错误的+45, 恢复原两点标定值 -92
+    brick_4x2: -40.0    # 2026-07-03 真值标定: 视觉grasp yaw(base)=+77.0 vs 正确=+24.7, Δ=-52.3° -> +52.3°修正(-92+52.3≈-40); 与2x2(-43.37)一致(同垂直绿轴夹短边)。原-92夹的是4格长边(夹不住)
     brick_2x2: -43.37   # 2026-07-02 加90°归一化后, +45°把方形抓取从对角转到对边(-88.37+45)
   use_planner_blueprint_yaw: true
   place_yaw_offset_deg: 44.87  # 2026-07-02: 按你手摆的正确放置朝向标定(wrist_3 命令 0.6396 - preplace -0.1436 = +0.7832rad=+44.87°)
@@ -179,8 +180,9 @@ execution_axis:
 safety:
   # 2026-06-30: 0.15->0.18 放宽(积木离observe略远时dx/dy会刚过0.15; 18cm movel安全)
   # 2026-07-01: 0.18->0.25 放宽(新observe位TCP离积木~20cm, dx=0.201刚过0.18)。
-  max_xy_offset: 10.0   # 2026-07-01 用户要求取消安全限制(旧0.25)
+  # 2026-07-03: 0.25->0.35->0.50 放宽(yellow_2x2_base 实测 dy=0.312; 用户要求再增大)。
+  max_xy_offset: 0.50   # 拦离谱视觉位姿; 正常抓放<0.2
   # The five-block bridge product reaches planner z=0.0576 plus place_offset z=0.080,
   # so the generated place dz can reach about 0.1376 m.
-  max_z_offset: 10.0   # 2026-07-01 用户要求取消安全限制(旧0.15)
-  max_descend: 10.0   # 2026-07-01 用户要求取消安全限制(旧0.8)
+  max_z_offset: 0.15    # 2026-07-02 恢复
+  max_descend: 0.40    # 2026-07-02 恢复(现descend最大0.364)

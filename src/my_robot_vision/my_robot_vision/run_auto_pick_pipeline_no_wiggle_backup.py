@@ -198,7 +198,8 @@ def stop_vision_service(docker_cmd):
 
 def ensure_vision_service(docker_cmd, target, *, frozen_observation=False):
     run(f"{docker_cmd} start {DOCKER_CONTAINER}", check=False)
-    run(f"{docker_cmd} cp {shlex.quote(str(VISION_BRIDGE_HOST))} {DOCKER_CONTAINER}:/vision_code/vision_node_test1_5_bridge.py")
+    # 2026-07-03: 删掉! /vision_code 是宿主机 bridge 目录的 bind mount, docker cp 源=目标会把
+    #   宿主机 bridge.py 自我截断成0字节。bind mount 已同步, 无需 cp。(见主 pipeline 同注释)
     run(f"{docker_cmd} cp {shlex.quote(str(PLAN_HOST))} {DOCKER_CONTAINER}:{PLAN_DOCKER}")
     stop_vision_service(docker_cmd)
 

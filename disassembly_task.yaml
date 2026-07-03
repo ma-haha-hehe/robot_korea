@@ -10,14 +10,14 @@ tasks:
   pick:
     dx: 0.0
     dy: 0.0
-    dz: 0.0
+    dz: 0.0               # 2026-07-02 不抬升: movej落点(示教关节位)即接近点(高处), 无多余抬升阶段
     yaw_deg: 0.0
-    descend: 0.065          # from DIS_PULL_* pre-pull pose down to the brick
+    descend: 0.114         # 2026-07-02 抓取点(0.111); 2026-07-03 调整后 0.114(下探)
     slow_final_descend: 0.0
   place:
     dx: 0.0
     dy: 0.0
-    dz: 0.0
+    dz: 0.0              # 往前15cm增量由 DROP_STEP(base +X) 传; 往下用 descend 表达
     yaw_deg: 0.0
-    descend: 0.04          # from DIS_DROP_JOINTS down to the release height
+    descend: 0.15        # 2026-07-02 放置点 = observe往下15cm(再低2cm; observe->横移+X->下降->松)
     slow_final_descend: 0.0

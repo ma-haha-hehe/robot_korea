@@ -13,12 +13,24 @@
 #   export DIS_DROP_JOINTS="..."        # 统一的放置(扔到一边)位
 #   export DIS_HOME_JOINTS="..."        # 放完后回到的拆卸安全 home, 再去下一块 pregrasp
 set -e
+# 2026-07-02: 固定抓取点抓 3 次, 放到 3 个点: 放置示教点(observe)往下10cm(见 disassembly_task.yaml
+#   place.descend=0.10), 水平沿 base +X 逐块 +8cm (第1块0 / 第2块+8 / 第3块+16)。
 POSE="$1"
-REPEAT="${2:-4}"
-DROP_STEP_X="${DROP_STEP_X:--0.6}"
+REPEAT="${2:-3}"
+DROP_STEP_X="${DROP_STEP_X:-0.08}"
 DROP_STEP_Y="${DROP_STEP_Y:-0.0}"
 DROP_STEP_Z="${DROP_STEP_Z:-0.0}"
+PICK_OFFSET_X="${PICK_OFFSET_X:-0.0}"   # base系抓取x偏移(estop=0.01 抓取x+1cm); carrot 默认0 不受影响
+PRESTEP_DESCEND="${PRESTEP_DESCEND:-0.143}"   # 前置动作【下降抓】距离; carrot 默认0.143; estop 传更大值下探更深
+PULL_OFFSET_X="${PULL_OFFSET_X:-0.005}"       # 拔取点(前置横移落地点+每块抓取点)在 base x 整体平移, 默认+5mm; 两产品共用
+# 抓/放 descend 等来自 task 文件。默认 disassembly_task.yaml(=carrot 3块);
+#   estop 脚本传 TASK_FILE=disassembly_task_estop.yaml 用自己的一份, 与 carrot 完全分开。
+TASK_FILE="${TASK_FILE:-$PWD/disassembly_task.yaml}"
+# 夹爪模式: disassemble_pick_place 支持 none / robotiq_socket / onrobot_rg / onrobot_io。
+# 默认 onrobot_io: 与装配一致(工具口 pin16, False开/True关)。首验轨迹可传 GRIPPER_MODE=none。
+GRIPPER_MODE="${GRIPPER_MODE:-onrobot_io}"
 cd /home/i6user/Desktop/robot_lego
+export FASTRTPS_DEFAULT_PROFILES_FILE=/home/i6user/Desktop/robot_lego/fastdds_udp_only.xml  # 禁SHM走UDP修sequence-size崩溃
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 source src/panda_pick/config/ur5_taught_joints.env
@@ -45,10 +57,12 @@ for i in $(seq 1 "$REPEAT"); do
   PLACE_OFFSET_Y=$(awk -v n="$i" -v step="$DROP_STEP_Y" 'BEGIN { printf "%.6f", (n - 1) * step }')
   PLACE_OFFSET_Z=$(awk -v n="$i" -v step="$DROP_STEP_Z" 'BEGIN { printf "%.6f", (n - 1) * step }')
   echo "========== disassembly arm pull $i/$REPEAT: $POSE, drop_offset=($PLACE_OFFSET_X,$PLACE_OFFSET_Y,$PLACE_OFFSET_Z) =========="
+  PRESTEP=$([ "$i" -eq 1 ] && echo true || echo false)   # 前置动作(goto固定起点+开爪下降闭合, 及第一块的释放)只在第一块执行一次
   ros2 launch panda_pick run_ur5.launch.py \
     motion_control_mode:=disassemble_pick_place \
-    gripper_control_mode:=robotiq_socket \
-    task_file:="$PWD/disassembly_task.yaml" \
+    urscript_disassemble_prestep:="$PRESTEP" \
+    gripper_control_mode:="$GRIPPER_MODE" \
+    task_file:="$TASK_FILE" \
     urscript_pregrasp_joints:="$GRASP_JOINTS" \
     urscript_preplace_joints:="$DIS_DROP_JOINTS" \
     urscript_home_joints:="$DIS_HOME_JOINTS" \
@@ -67,6 +81,9 @@ for i in $(seq 1 "$REPEAT"); do
     urscript_movel_acceleration:=1.2 \
     urscript_descend_velocity:=0.08 \
     urscript_disassemble_extra_lift:=0.06 \
+    urscript_disassemble_pick_offset_x:="$PICK_OFFSET_X" \
+    urscript_disassemble_prestep_descend:="$PRESTEP_DESCEND" \
+    urscript_disassemble_pull_offset_x:="$PULL_OFFSET_X" \
     urscript_disassemble_place_offset_x:="$PLACE_OFFSET_X" \
     urscript_disassemble_place_offset_y:="$PLACE_OFFSET_Y" \
     urscript_disassemble_place_offset_z:="$PLACE_OFFSET_Z" \

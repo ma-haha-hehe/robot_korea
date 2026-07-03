@@ -1,0 +1,23 @@
+# "trafficlight": 绿2x2底 + 黄2x2中 + 红2x2顶 (3块堆叠)。装配点=装配区原点(base pos [0,0,0])。
+# 坐标 pos=[x, y, z] 是相对装配原点的偏移(米)。z 每层 +0.0192(一块砖高)。
+blocks:
+  - name: "green_2x2_base"
+    type: "brick_2x2"
+    color: "green"
+    vision_label: "green 2x2 brick."
+    pos: [0.0000, 0.0000, 0.0000]
+    rotation: [0, 0, 0]
+
+  - name: "yellow_2x2_middle"
+    type: "brick_2x2"
+    color: "yellow"
+    vision_label: "yellow 2x2 brick."
+    pos: [0.0000, 0.0000, 0.0192]
+    rotation: [0, 0, 0]
+
+  - name: "red_2x2_top"
+    type: "brick_2x2"
+    color: "red"
+    vision_label: "red 2x2 brick."
+    pos: [0.0000, 0.0000, 0.0384]
+    rotation: [0, 0, 0]

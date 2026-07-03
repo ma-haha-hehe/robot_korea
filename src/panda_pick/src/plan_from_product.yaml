@@ -26,10 +26,10 @@ tasksh:
     - 4.329780281177466e-17
     - 4.329780281177467e-17
   id: 0
-- name: yellow_2x2_middle
-  type: brick_2x2
-  color: yellow
-  vision_label: yellow 2x2 brick.
+- name: green_2x4_middle
+  type: brick_4x2
+  color: green
+  vision_label: green 2x4 brick.
   grasp_spin: 90
   blueprint_yaw: 0.0
   pick:

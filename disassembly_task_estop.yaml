@@ -1,0 +1,21 @@
+# 【estop 专用】拆卸任务偏移(2块)。独立于 carrot 的 disassembly_task.yaml, 互不影响。
+# 由 run_estop_disassemble.sh 传 TASK_FILE 指向本文件。改这里只影响 estop。
+# 单位: dx/dy/dz/descend 米, yaw_deg 度。相对示教好的抓取/放置关节角的小偏移。
+#   pick.descend  = 从拔取接近位再往下多少够到积木。
+#   place.descend = 到丢放区往下放多少。
+tasks:
+- id: disassemble_one
+  pick:
+    dx: 0.0
+    dy: 0.0
+    dz: 0.0
+    yaw_deg: 0.0
+    descend: 0.114        # estop 抓取下降(起点=carrot当前值, 可独立调)
+    slow_final_descend: 0.0
+  place:
+    dx: 0.0
+    dy: 0.0
+    dz: 0.0
+    yaw_deg: 0.0
+    descend: 0.15         # estop 放置下降(起点=carrot当前值, 可独立调)
+    slow_final_descend: 0.0

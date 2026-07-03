@@ -16,10 +16,10 @@ ros2 run my_robot_vision run_auto_pick_pipeline.py \
   --async-next-vision --start-index 0 --max-tasks 3 \
   --show-windows \
   --gripper-mode onrobot_io \
-  --movej-velocity 1.10 --movej-acceleration 2.0 \
-  --movel-velocity 0.40 --movel-acceleration 1.2 \
-  --pick-lift-velocity 0.32 \
-  --pick-approach-movej-velocity 0.60 --pick-approach-movel-velocity 0.18 \
+  --movej-velocity 0.55 --movej-acceleration 1.0 \
+  --movel-velocity 0.20 --movel-acceleration 0.6 \
+  --pick-lift-velocity 0.16 \
+  --pick-approach-movej-velocity 0.30 --pick-approach-movel-velocity 0.09 \
   --pipeline-wait 70.0 --done-still-seconds 12.0 --place-descend-velocity 0.002 \
   --place-wiggle-xy-amplitude 0.0006 --place-wiggle-velocity 0.012 --place-wiggle-steps 12 \
   --vision-timeout 180

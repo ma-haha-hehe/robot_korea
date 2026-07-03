@@ -1371,7 +1371,7 @@ set(CMAKE_MAKEFILE_PRODUCTS
   "ament_cmake_core/panda_pickConfig.cmake"
   "ament_cmake_core/stamps/nameConfig-version.cmake.in.stamp"
   "ament_cmake_core/panda_pickConfig-version.cmake"
-  "ament_cmake_symlink_install_targets_0_RelWithDebInfo.cmake"
+  "ament_cmake_symlink_install_targets_0_Release.cmake"
   "ament_cmake_index/share/ament_index/resource_index/package_run_dependencies/panda_pick"
   "ament_cmake_index/share/ament_index/resource_index/parent_prefix_path/panda_pick"
   "ament_cmake_index/share/ament_index/resource_index/packages/panda_pick"

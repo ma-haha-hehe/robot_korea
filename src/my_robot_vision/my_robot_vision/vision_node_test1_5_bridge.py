@@ -653,7 +653,20 @@ class RobotVisionBridge:
             return None
         # "已用区域"全程用高清 mask(检测/重叠比较/叠加都在高清帧), 不能用深度帧 mask
         self.remember_used_region(target, mask_hi)
-        return pose_samples[-1]
+        # 2026-07-02: 鲁棒位姿聚合 —— 多帧取平移中值, 剔除离群(>3cm), 再取最接近中值的一帧,
+        #   并把平移替换成内点中值, 抑制 FoundationPose 帧间抖动。
+        Ts = np.array([p[:3, 3] for p in pose_samples], dtype=float)
+        med = np.median(Ts, axis=0)
+        keep = [i for i in range(len(pose_samples)) if np.linalg.norm(Ts[i] - med) < 0.03]
+        if not keep:
+            keep = list(range(len(pose_samples)))
+        med2 = np.median(Ts[keep], axis=0)
+        best_i = min(keep, key=lambda i: float(np.linalg.norm(Ts[i] - med2)))
+        result = pose_samples[best_i].copy()
+        result[:3, 3] = med2
+        print('[VISION] 鲁棒位姿: %d帧/内点%d, 中值平移[%.3f,%.3f,%.3f]' % (
+            len(pose_samples), len(keep), med2[0], med2[1], med2[2]))
+        return result
 
     def write_result(self, target, transform, timing=None):
         os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)

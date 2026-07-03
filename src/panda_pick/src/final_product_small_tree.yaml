@@ -1,0 +1,24 @@
+# "small tree": 黄2x2底 + 绿2x4中 + 绿2x2顶 (3块堆叠)。装配点=装配区原点(base pos [0,0,0])。
+# 坐标 pos=[x, y, z] 是相对装配原点的偏移(米)。z 每层 +0.0192(一块砖高)。
+# 中间绿2x4 长轴沿【机械臂 base X 轴】(rotation 0 = 沿 x; 若要沿 y 才用 90)。全部正交, 无 45°斜放。
+blocks:
+  - name: "yellow_2x2_base"
+    type: "brick_2x2"
+    color: "yellow"
+    vision_label: "yellow 2x2 brick."
+    pos: [0.0000, 0.0000, 0.0000]
+    rotation: [0, 0, 0]
+
+  - name: "green_2x4_middle"
+    type: "brick_4x2"
+    color: "green"
+    vision_label: "green 2x4 brick."
+    pos: [0.0000, 0.0000, 0.0192]
+    rotation: [0, 0, 0]
+
+  - name: "green_2x2_top"
+    type: "brick_2x2"
+    color: "green"
+    vision_label: "green 2x2 brick."
+    pos: [0.0000, 0.0000, 0.0384]
+    rotation: [0, 0, 0]
