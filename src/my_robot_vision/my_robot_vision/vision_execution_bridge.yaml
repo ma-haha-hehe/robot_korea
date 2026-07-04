@@ -45,7 +45,7 @@ reference:
 placement:
   # Base-frame coordinate of blueprint origin on the place area.
   # Usually teach this once by putting tool0 above the assembly origin.
-  assembly_origin_base_xyz: [0.290575993, 0.474813149, 0.350253893]
+  assembly_origin_base_xyz: [0.291475993, 0.474813149, 0.350253893]  #X:0.290575993->..->0.291475993 (2026-07-04: 净右0.9mm)
   # Optional extra correction for all placement positions.
   # Because execution_axis.flip_x/flip_y are true, increasing X/Y here moves
   # the generated final place offset right/forward on the current table.
@@ -62,18 +62,18 @@ pick:
   pick_offset_xyz: [0.0, 0.010, 0.050]
   # Final grasp height = generated pre-grasp height - descend.
   # 2026-05-26: increased from 0.090 to 0.140 to lower the grasp 5.0 cm.
-  descend: 0.179   #0.183
+  descend: 0.1785   #0.179 0.183  (2026-07-04: 抓取抬高0.5mm)
   # Keep the whole grasp descent at the normal descend speed.
   slow_final_descend: 0.000
 
 place:
   # Final place height = generated pre-place height - descend.
   # 2026-05-26: increased from 0.145 to 0.155 to place 1.0 cm lower.
-  descend: 0.1615 #0.1612
+  descend: 0.1653 #...->0.1647->0.1653  (2026-07-04: 再下探0.6mm, 净比原0.1615深3.8mm)
   # Use normal descend speed first, then extremely slow speed + wiggle for the last bit.
   # 2026-06-19: 0.02 -> 0.016 so the normal-speed descent is a bit longer and the
   # slow/wiggle phase starts slightly later/deeper (total descend unchanged).
-  slow_final_descend: 0.016
+  slow_final_descend: 0.003   #0.016->0.011->0.006->0.003  (2026-07-04: 抖动距离累计缩短13mm; 仅比阈值0.002高1mm, 再短就会关闭抖动)
 
 yaw:
   # In joint_pick_place this becomes wrist_3 relative rotation.

@@ -7,19 +7,13 @@
 #   L2 红 2x2 + 蓝 2x2 并列  : 沿 y 各偏 ±0.008, 正好盖住下面 2x4 的两半
 #   L3 绿 2x2                : 顶层, 居中(压在红/蓝中缝上)
 blocks:
-  - name: "yellow_2x2_base"
-    type: "brick_2x2"
-    color: "yellow"
-    vision_label: "yellow 2x2 brick."
-    pos: [0.0000, 0.0000, 0.0000]
-    rotation: [0, 0, 0]
-
-  - name: "yellow_2x4_middle"
+  - name: "yellow_2x4_base"
     type: "brick_4x2"
     color: "yellow"
     vision_label: "yellow 2x4 brick."
-    pos: [0.0000, 0.0000, 0.0192]
-    rotation: [0, 0, 90]
+    pos: [0.0000, 0.0000, 0.0000]
+    rotation: [0, 0, 0]
+
 
   - name: "red_2x2_upper_left"
     type: "brick_2x2"

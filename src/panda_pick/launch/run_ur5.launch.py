@@ -62,6 +62,13 @@ def generate_launch_description():
     urscript_place_slow_final_descend = LaunchConfiguration("urscript_place_slow_final_descend")
     urscript_place_settle_wait_seconds = LaunchConfiguration("urscript_place_settle_wait_seconds")
     urscript_pipeline_wait_seconds = LaunchConfiguration("urscript_pipeline_wait_seconds")
+    # 2026-07-04 装配收尾抓取(合并进最后一块的同一段 URScript)。
+    urscript_finish_grab_enable = LaunchConfiguration("urscript_finish_grab_enable")
+    urscript_finish_drop_joints = LaunchConfiguration("urscript_finish_drop_joints")
+    urscript_finish_observe_joints = LaunchConfiguration("urscript_finish_observe_joints")
+    urscript_finish_place_descend = LaunchConfiguration("urscript_finish_place_descend")
+    urscript_finish_pick_descend_offset = LaunchConfiguration("urscript_finish_pick_descend_offset")
+    urscript_finish_descend_velocity = LaunchConfiguration("urscript_finish_descend_velocity")
     task_file = LaunchConfiguration("task_file")
     task_max_xy_offset = LaunchConfiguration("task_max_xy_offset")
     task_max_z_offset = LaunchConfiguration("task_max_z_offset")
@@ -218,6 +225,12 @@ def generate_launch_description():
                 "gripper_socket_release_wait_seconds": ParameterValue(
                     gripper_socket_release_wait_seconds, value_type=float
                 ),
+                "io_gripper_wait_seconds": ParameterValue(
+                    LaunchConfiguration("io_gripper_wait_seconds"), value_type=float
+                ),
+                "io_gripper_release_wait_seconds": ParameterValue(
+                    LaunchConfiguration("io_gripper_release_wait_seconds"), value_type=float
+                ),
                 "onrobot_rg_model": onrobot_rg_model,
                 "onrobot_rg_open_width_mm": ParameterValue(
                     onrobot_rg_open_width_mm, value_type=int
@@ -320,6 +333,20 @@ def generate_launch_description():
                 "urscript_pipeline_wait_seconds": ParameterValue(
                     urscript_pipeline_wait_seconds, value_type=float
                 ),
+                "urscript_finish_grab_enable": ParameterValue(
+                    urscript_finish_grab_enable, value_type=bool
+                ),
+                "urscript_finish_drop_joints": urscript_finish_drop_joints,
+                "urscript_finish_observe_joints": urscript_finish_observe_joints,
+                "urscript_finish_place_descend": ParameterValue(
+                    urscript_finish_place_descend, value_type=float
+                ),
+                "urscript_finish_pick_descend_offset": ParameterValue(
+                    urscript_finish_pick_descend_offset, value_type=float
+                ),
+                "urscript_finish_descend_velocity": ParameterValue(
+                    urscript_finish_descend_velocity, value_type=float
+                ),
                 "task_file": task_file,
                 "task_max_xy_offset": ParameterValue(task_max_xy_offset, value_type=float),
                 "task_max_z_offset": ParameterValue(task_max_z_offset, value_type=float),
@@ -370,6 +397,8 @@ def generate_launch_description():
         DeclareLaunchArgument("urscript_done_still_seconds", default_value="5.0"),
         DeclareLaunchArgument("gripper_socket_release_position", default_value="140"),
         DeclareLaunchArgument("gripper_socket_release_wait_seconds", default_value="0.5"),
+        DeclareLaunchArgument("io_gripper_wait_seconds", default_value="1.0"),  # onrobot_io 抓取闭合后等待; 默认1.0=还原拆卸旧行为
+        DeclareLaunchArgument("io_gripper_release_wait_seconds", default_value="1.0"),  # onrobot_io 放置松开后抬臂前等待(单独, 装配pipeline覆盖)
         DeclareLaunchArgument("onrobot_rg_model", default_value="rg2"),
         DeclareLaunchArgument("onrobot_rg_open_width_mm", default_value="90"),
         DeclareLaunchArgument("onrobot_rg_close_width_mm", default_value="12"),
@@ -406,6 +435,12 @@ def generate_launch_description():
         DeclareLaunchArgument("urscript_place_slow_final_descend", default_value="0.020"),
         DeclareLaunchArgument("urscript_place_settle_wait_seconds", default_value="0.5"),
         DeclareLaunchArgument("urscript_pipeline_wait_seconds", default_value="50.0"),
+        DeclareLaunchArgument("urscript_finish_grab_enable", default_value="false"),
+        DeclareLaunchArgument("urscript_finish_drop_joints", default_value=""),
+        DeclareLaunchArgument("urscript_finish_observe_joints", default_value=""),
+        DeclareLaunchArgument("urscript_finish_place_descend", default_value="0.10"),
+        DeclareLaunchArgument("urscript_finish_pick_descend_offset", default_value="0.0"),
+        DeclareLaunchArgument("urscript_finish_descend_velocity", default_value="0.10"),
         DeclareLaunchArgument("task_file", default_value=""),
         DeclareLaunchArgument("task_max_xy_offset", default_value="0.15"),
         DeclareLaunchArgument("task_max_z_offset", default_value="0.15"),

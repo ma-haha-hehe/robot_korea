@@ -57,7 +57,13 @@ for i in $(seq 1 "$REPEAT"); do
   PLACE_OFFSET_Y=$(awk -v n="$i" -v step="$DROP_STEP_Y" 'BEGIN { printf "%.6f", (n - 1) * step }')
   PLACE_OFFSET_Z=$(awk -v n="$i" -v step="$DROP_STEP_Z" 'BEGIN { printf "%.6f", (n - 1) * step }')
   echo "========== disassembly arm pull $i/$REPEAT: $POSE, drop_offset=($PLACE_OFFSET_X,$PLACE_OFFSET_Y,$PLACE_OFFSET_Z) =========="
-  PRESTEP=$([ "$i" -eq 1 ] && echo true || echo false)   # 前置动作(goto固定起点+开爪下降闭合, 及第一块的释放)只在第一块执行一次
+  # NO_PRESTEP=1: 彻底关闭前置动作(不先抓预置物到初始位), 每块直接在拔取姿态下降抓;
+  #   默认(未设)保持原行为: 前置动作(goto固定起点+开爪下降闭合, 及第一块释放)只在第一块执行一次。
+  if [ "${NO_PRESTEP:-0}" = "1" ]; then
+    PRESTEP=false
+  else
+    PRESTEP=$([ "$i" -eq 1 ] && echo true || echo false)
+  fi
   ros2 launch panda_pick run_ur5.launch.py \
     motion_control_mode:=disassemble_pick_place \
     urscript_disassemble_prestep:="$PRESTEP" \

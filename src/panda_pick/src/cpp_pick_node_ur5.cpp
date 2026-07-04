@@ -1570,6 +1570,25 @@ bool executeUrscriptPtpPipeline(rclcpp::Node::SharedPtr node,
         std::clamp(node->get_parameter_or<int>("io_gripper_tool_dout", 0), 0, 1);  // pin16=tool DO 0
     const double io_gripper_wait_seconds =
         std::max(0.0, node->get_parameter_or<double>("io_gripper_wait_seconds", 1.0));
+    // 2026-07-04: 放置松开专用等待(抬起前等夹爪完全张开); 缺省回退到 io_gripper_wait_seconds。
+    const double io_gripper_release_wait_seconds =
+        std::max(0.0, node->get_parameter_or<double>("io_gripper_release_wait_seconds", io_gripper_wait_seconds));
+    // 2026-07-04: 装配收尾抓取(合并进本段 URScript, 见函数末尾 finish 段)。
+    //   降深自动 = 最后一块放置总下降(place.descend - place.dz), 即降到成品顶。
+    const bool finish_grab_enable =
+        node->get_parameter_or<bool>("urscript_finish_grab_enable", false);
+    const std::string finish_drop_joints_text =
+        node->get_parameter_or<std::string>("urscript_finish_drop_joints", "");
+    const std::string finish_observe_joints_text =
+        node->get_parameter_or<std::string>("urscript_finish_observe_joints", "");
+    const double finish_place_descend =
+        std::max(0.0, node->get_parameter_or<double>("urscript_finish_place_descend", 0.10));
+    const double finish_pick_descend_offset =
+        node->get_parameter_or<double>("urscript_finish_pick_descend_offset", 0.0);
+    const double finish_descend_velocity =
+        std::max(0.01, node->get_parameter_or<double>("urscript_finish_descend_velocity", 0.10));
+    const auto finish_drop_joints = parseJointList(finish_drop_joints_text);
+    const auto finish_observe_joints = parseJointList(finish_observe_joints_text);
     // 2026-07-02: keep_gripper_closed=true 时, 放置点【不松开/不张开】, 夹爪一直夹紧(手臂照常抬起离开)。
     const bool keep_gripper_closed =
         node->get_parameter_or<bool>("keep_gripper_closed", false);
@@ -1885,7 +1904,7 @@ bool executeUrscriptPtpPipeline(rclcpp::Node::SharedPtr node,
                 gripper_socket_release_wait_seconds,
                 "release");
         } else if (use_onrobot_io) {
-            appendIoGripperMove(script, io_gripper_tool_dout, false, io_gripper_wait_seconds, "place release");
+            appendIoGripperMove(script, io_gripper_tool_dout, false, io_gripper_release_wait_seconds, "place release");
         }
         const double release_lift = place_lift_after_release > 0.0001
             ? std::clamp(place_lift_after_release, 0.0, place_descend)
@@ -1922,6 +1941,88 @@ bool executeUrscriptPtpPipeline(rclcpp::Node::SharedPtr node,
             script << "  sleep(0.5)\n";
         }
         script << "  textmsg(\"task " << sanitizeUrscriptText(task.id) << " done\")\n";
+    }
+    // ===== 2026-07-04 装配收尾抓取(合并进本段 URScript) =====
+    // 与最后一块同一 launch、同一次完成检测, 紧接放置无缝执行, 消除"末块完成→另起 launch 收尾"的等待。
+    // 时序: movej 到装配原点上方(复用 preplace) -> 张开 -> 下降到成品顶(=最后一块落点) -> 闭合抓成品
+    //       -> 抬回接近位(≈30cm) -> movej 右前放置位 -> 下降 finish_place_descend -> 松开 -> movej 回 observe。
+    // 降深自动: finish_pick_descend = 最后一块 place.descend - place.dz(preplace→落点总下降) + offset。
+    if (finish_grab_enable && !tasks.empty() && preplace_joints && finish_drop_joints) {
+        const PickPlaceTask& last_task = tasks.back();
+        const double last_place_descend =
+            last_task.place.descend > 0.0 ? last_task.place.descend : place_hover;
+        double finish_pick_descend =
+            last_place_descend - last_task.place.dz + finish_pick_descend_offset;
+        finish_pick_descend = std::clamp(finish_pick_descend, 0.0, 0.60);
+        RCLCPP_INFO(node->get_logger(),
+            "[收尾] finish_pick_descend=%.4f (= 末块 place.descend %.4f - place.dz %.4f + offset %.4f)",
+            finish_pick_descend, last_place_descend, last_task.place.dz, finish_pick_descend_offset);
+
+        // 按当前夹爪模式生成 开/合 指令(与主循环同一套 helper)。
+        auto finish_gripper = [&](bool close, const char* label, double wait_s) {
+            if (use_robotiq_urscript) {
+                script << (close ? "  rq_close_and_wait()\n" : "  rq_open_and_wait()\n");
+            } else if (use_robotiq_socket) {
+                appendRobotiqSocketMove(script, close ? 255 : 0, wait_s);
+            } else if (use_onrobot_rg) {
+                appendOnRobotRgMove(script, onrobot_rg_config,
+                    close ? onrobot_rg_close_width_mm : onrobot_rg_open_width_mm,
+                    onrobot_rg_force_n, wait_s, label);
+            } else if (use_onrobot_io) {
+                appendIoGripperMove(script, io_gripper_tool_dout, close, wait_s, label);
+            }
+        };
+        const double finish_open_wait = use_onrobot_io ? io_gripper_wait_seconds : gripper_socket_open_wait_seconds;
+        const double finish_close_wait = use_onrobot_io ? io_gripper_wait_seconds : gripper_socket_wait_seconds;
+        const double finish_release_wait = use_onrobot_io ? io_gripper_release_wait_seconds : gripper_socket_open_wait_seconds;
+
+        script << "  textmsg(\"finish grab start\")\n";
+        // 1) movej 到装配原点上方接近位(复用 preplace 关节)。
+        //    2026-07-04: wrist_3 叠加【最后一块 place.yaw】, 让收尾抓成品的夹爪朝向与末块放置时一致。
+        std::vector<double> finish_pre_joints = *preplace_joints;
+        finish_pre_joints[5] += last_task.place.yaw;
+        script << "  movej(" << jointListToUrscript(finish_pre_joints) << ", a="
+               << formatUrscriptNumber(movej_acceleration) << ", v="
+               << formatUrscriptNumber(movej_velocity) << ")\n";
+        script << "  finish_pre = get_actual_tcp_pose()\n";
+        // 2) 张开夹爪
+        finish_gripper(false, "finish open", finish_open_wait);
+        script << "  sleep(0.2)\n";
+        // 3) 下降到成品顶(= 最后一块下降完成的位置)
+        script << "  finish_down = p[finish_pre[0], finish_pre[1], finish_pre[2] - "
+               << formatUrscriptNumber(finish_pick_descend)
+               << ", finish_pre[3], finish_pre[4], finish_pre[5]]\n";
+        script << "  movel(finish_down, a=" << formatUrscriptNumber(descend_acceleration)
+               << ", v=" << formatUrscriptNumber(finish_descend_velocity) << ")\n";
+        // 4) 闭合抓紧成品
+        finish_gripper(true, "finish close", finish_close_wait);
+        script << "  sleep(0.5)\n";
+        // 5) 抬回接近位(≈30cm)
+        script << "  movel(finish_pre, a=" << formatUrscriptNumber(movel_acceleration)
+               << ", v=" << formatUrscriptNumber(pick_lift_velocity) << ")\n";
+        // 6) movej 到右前放置位
+        script << "  movej(" << jointListToUrscript(*finish_drop_joints) << ", a="
+               << formatUrscriptNumber(movej_acceleration) << ", v="
+               << formatUrscriptNumber(movej_velocity) << ")\n";
+        script << "  finish_drop_pre = get_actual_tcp_pose()\n";
+        // 7) 下降 finish_place_descend
+        script << "  finish_drop_down = p[finish_drop_pre[0], finish_drop_pre[1], finish_drop_pre[2] - "
+               << formatUrscriptNumber(finish_place_descend)
+               << ", finish_drop_pre[3], finish_drop_pre[4], finish_drop_pre[5]]\n";
+        script << "  movel(finish_drop_down, a=" << formatUrscriptNumber(descend_acceleration)
+               << ", v=" << formatUrscriptNumber(finish_descend_velocity) << ")\n";
+        // 8) 张开松开成品
+        finish_gripper(false, "finish release", finish_release_wait);
+        // 9) 抬回
+        script << "  movel(finish_drop_pre, a=" << formatUrscriptNumber(movel_acceleration)
+               << ", v=" << formatUrscriptNumber(movel_velocity) << ")\n";
+        // 10) movej 回 observe
+        if (finish_observe_joints) {
+            script << "  movej(" << jointListToUrscript(*finish_observe_joints) << ", a="
+                   << formatUrscriptNumber(movej_acceleration) << ", v="
+                   << formatUrscriptNumber(movej_velocity) << ")\n";
+        }
+        script << "  textmsg(\"finish grab done\")\n";
     }
     if (use_robotiq_socket) {
         appendRobotiqSocketClose(script);

@@ -68,6 +68,10 @@ DETECTION_THRESHOLD = float(os.environ.get("VISION_DETECTION_THRESHOLD", "0.15")
 RATIO_TOLERANCE = float(os.environ.get("VISION_RATIO_TOLERANCE", "0.35"))
 COLOR_MIN_FRACTION = float(os.environ.get("VISION_COLOR_MIN_FRACTION", "0.08"))
 USED_REGION_OVERLAP_THRESHOLD = float(os.environ.get("VISION_USED_REGION_OVERLAP_THRESHOLD", "0.35"))
+# 2026-07-04: 排除视野【左下角】一块区域(那里有不该抓的东西)。检测框中心落在
+#   (cx < W*X_MAX 且 cy > H*Y_MIN) 就跳过。按比例, 与分辨率无关。X_MAX<=0 则关闭。
+EXCLUDE_LL_X_MAX_FRAC = float(os.environ.get("VISION_EXCLUDE_LL_X_MAX_FRAC", "0.35"))
+EXCLUDE_LL_Y_MIN_FRAC = float(os.environ.get("VISION_EXCLUDE_LL_Y_MIN_FRAC", "0.60"))
 DISABLE_EMITTER = os.environ.get("VISION_DISABLE_EMITTER", "1") != "0"
 FROZEN_OBSERVATION = os.environ.get("VISION_FROZEN_OBSERVATION", "0") == "1"
 # ifm O3P 相机: host 的 o3p_grabber.py 把【已对齐】的彩色+深度+内参写到这个目录,
@@ -419,7 +423,10 @@ class RobotVisionBridge:
         elif color_name == "blue":
             color_mask = (h >= 85) & (h <= 135) & (s > 45) & (v > 45)
         elif color_name == "red":
-            color_mask = (((h <= 10) | (h >= 170)) & (s > 45) & (v > 45))
+            # 2026-07-04: 放宽红色范围, 修不同光线/角度下红识别不出(占比<0.08被拒)。
+            # 2026-07-04 居中临时值(等日志 medHSV 精调): hue<=12防黄误判/又不太严, 高端165;
+            # s>30(兼顾偏淡红且与黑块低饱和区分); v>25。红/黄hue太近, 最终按日志实测定分界。
+            color_mask = (((h <= 12) | (h >= 165)) & (s > 30) & (v > 25))
         elif color_name == "green":
             color_mask = (h >= 40) & (h <= 85) & (s > 45) & (v > 45)
         elif color_name == "black":
@@ -478,9 +485,19 @@ class RobotVisionBridge:
         self.sam_predictor.set_image(cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB))
         candidates = []
         viz = img_bgr.copy()
+        img_h, img_w = img_bgr.shape[:2]
         for cand_index, result in enumerate(results):
             box = result["box"]
             xyxy = np.array([box["xmin"], box["ymin"], box["xmax"], box["ymax"]])
+            # 2026-07-04: 排除视野左下角一块(不该出现目标)。框中心在排除区 -> 跳过。
+            _cx = 0.5 * (float(xyxy[0]) + float(xyxy[2]))
+            _cy = 0.5 * (float(xyxy[1]) + float(xyxy[3]))
+            if (EXCLUDE_LL_X_MAX_FRAC > 0.0
+                    and _cx < img_w * EXCLUDE_LL_X_MAX_FRAC
+                    and _cy > img_h * EXCLUDE_LL_Y_MIN_FRAC):
+                print(f"[VISION] skip candidate in lower-left exclude zone: "
+                      f"center=({_cx:.0f},{_cy:.0f}) img=({img_w}x{img_h})")
+                continue
             masks, _, _ = self.sam_predictor.predict(box=xyxy, multimask_output=False)
             mask = masks[0]
 
@@ -493,7 +510,12 @@ class RobotVisionBridge:
                 continue
             rect = cv2.minAreaRect(max(contours, key=cv2.contourArea))
             w, h = rect[1]
-            actual_ratio = max(w, h) / (min(w, h) + 1e-6)
+            mask_ratio = max(w, h) / (min(w, h) + 1e-6)   # SAM mask 旋转外接矩形比(斜放准, 欠分割切半会偏小)
+            box_w = float(xyxy[2] - xyxy[0])
+            box_h = float(xyxy[3] - xyxy[1])
+            box_ratio = max(box_w, box_h) / (min(box_w, box_h) + 1e-6)  # 检测框AABB比(欠分割准, 砖斜放会偏小)
+            # 2026-07-04: 取两者更大值 -> 兼顾 SAM欠分割(mask偏小)与斜放AABB失真(box偏小), 谁准用谁。
+            actual_ratio = max(mask_ratio, box_ratio)
             ratio_diff = abs(actual_ratio - target_ratio)
             color_fraction = self.color_fraction(img_bgr, mask, target_color)
             ratio_score = 1.0 / (ratio_diff + 0.1)
@@ -502,10 +524,14 @@ class RobotVisionBridge:
             label_score = 1.25 if target.lower().strip(".") in label.lower() else 1.0
             used_overlap = self.used_region_overlap(mask) if self.frozen_observation else 0.0
             score = float(result["score"]) * ratio_score * color_score * label_score
+            # 2026-07-04 诊断: 打候选的 HSV中位数 + 实测长宽 + 目标ratio, 用于精调红/黄阈值与2x4/2x2判定。
+            _mp = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)[mask.astype(bool)]
+            _mhsv = np.median(_mp, axis=0).astype(int).tolist() if _mp.size else [-1, -1, -1]
             print(
                 "[VISION] candidate "
                 f"#{cand_index}: label={label!r}, det={float(result['score']):.3f}, "
-                f"ratio={actual_ratio:.2f}, ratio_diff={ratio_diff:.2f}, "
+                f"medHSV={_mhsv}, box=({box_w:.0f}x{box_h:.0f}), maskRatio={mask_ratio:.2f}, boxRatio={box_ratio:.2f}, "
+                f"ratio={actual_ratio:.2f}, target_ratio={target_ratio:.1f}, ratio_diff={ratio_diff:.2f}, "
                 f"target_color={target_color}, color_fraction={color_fraction:.2f}, "
                 f"used_overlap={used_overlap:.2f}, score={score:.3f}, box={xyxy.tolist()}"
             )

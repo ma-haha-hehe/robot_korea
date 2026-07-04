@@ -69,7 +69,7 @@ placement:
   # 2026-06-27: = 用户手摆的装配中心(origin本身, 落点=origin+place_plan+place_offset)
   # 2026-06-30: 暂时设成 = preplace TCP(临时, 待用真装配原点重设)
   # 2026-07-01: = 新preplace TCP。用户确认 preplace xy = 装配中心原点, 高度由 place.descend 补偿。
-  assembly_origin_base_xyz: [-0.157768, -0.461238, 0.450376]  # 2026-07-02 正左方preplace; 后方的[-0.200846,0.073377,0.540999]
+  assembly_origin_base_xyz: [-0.156468, -0.461238, 0.450376]  # X:-0.157768->-0.156468 (2026-07-04 净右1.3mm; +X=右). place_pre_base_xyz(63行)不动
   # 历史: [-0.158453,-0.460457,0.437833] / [-0.432748,0.060326,0.429157] / [-0.1254,0.3891,0.3051]
   # 2026-06-30: 装配网格绕 base Z 的朝向角(度)。装配板斜着摆时填这个,
   # 蓝图 place.pos 会先绕 Z 旋转 assembly_yaw_deg 再加到 assembly_origin。
@@ -122,7 +122,7 @@ pick:
   # 2026-07-01: 0.27 -> 0.25 抓取再抬高 2cm。
   # 2026-07-02: 换 OnRobot RG2 时曾改 0.10(保守); 现用户先跑无夹爪, 切回无夹爪深值 0.25。
   #   (以后跑 RG2/run_pick_onrobot.sh 前, 再把抓/放 descend 改回 0.10 保守首跑)
-  descend: 0.1983   # 2026-07-03 抓取下降再高0.7mm(0.199->0.1983)
+  descend: 0.2098   # ...->0.2078->0.2098 (2026-07-04 抓取再低2mm)
   # Keep the whole grasp descent at the normal descend speed.
   slow_final_descend: 0.000
 
@@ -140,11 +140,11 @@ place:
   # 2026-07-01: 0.265 -> 0.315 放置再低 5cm。
   # 2026-07-01: 0.315 -> 0.325 放置再低 1cm。
   # 2026-07-02: 换 RG2 时曾改 0.10; 现用户先跑无夹爪, 切回无夹爪深值 0.325。(跑 RG2 前再改回 0.10)
-  descend: 0.3671 # 2026-07-03 放置(0.3651)再低2mm(->0.3671)
+  descend: 0.3684 # ...->0.3689->0.3684 (2026-07-04 放置再提高0.5mm; 今日净+1.3mm)
   # Use normal descend speed first, then extremely slow speed + wiggle for the last bit.
   # 2026-06-19: 0.02 -> 0.016 so the normal-speed descent is a bit longer and the
   # slow/wiggle phase starts slightly later/deeper (total descend unchanged).
-  slow_final_descend: 0.01   # 2026-07-02: 放置最后1cm 超慢速(place_descend_velocity=2mm/s, 约5s); done-still=12s>5s 不会误判
+  slow_final_descend: 0.003   # 0.01->0.003 (2026-07-04 抖动距离缩到3mm, 仅比阈值0.002高1mm)
 
 yaw:
   # In joint_pick_place this becomes wrist_3 relative rotation.

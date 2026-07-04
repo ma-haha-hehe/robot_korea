@@ -270,8 +270,8 @@ def move_to_observe_pose():
         "joint_ptp_return_home:=false "
         "joint_ptp_dwell_seconds:=0.1 "
         "urscript_pipeline_wait_seconds:=8.0 "
-        "urscript_movej_velocity:=2.50 "   # 2026-07-03 回观察位大幅提速(0.90->2.50, 与去装配区同速)
-        "urscript_movej_acceleration:=5.0"
+        "urscript_movej_velocity:=3.00 "   # 2026-07-04 回/去观察位再提速(2.50->3.00, 接近UR5关节上限~3.14)
+        "urscript_movej_acceleration:=6.0"
     )
     run(ros_bash(cmd))
 
@@ -392,6 +392,9 @@ def execute_pick_place(
     place_wiggle_steps,
     return_home=True,
     keep_gripper_closed=False,
+    finish_grab=False,
+    finish_place_descend=0.10,
+    finish_pick_descend_offset=0.0,
 ):
     if dry_run:
         print("[AUTO] dry-run enabled: not executing robot pick/place.")
@@ -430,6 +433,14 @@ def execute_pick_place(
         f"gripper_socket_release_wait_seconds:={float(gripper_release_wait):.3f} "
         f"gripper_urscript_wait_seconds:={float(gripper_wait):.3f} "
         f"keep_gripper_closed:={'true' if keep_gripper_closed else 'false'} "
+        # 2026-07-04 装配收尾抓取: 合并进最后一块的同一段 URScript(finish_grab 仅末块传 true)。
+        # 降深自动=末块 place.descend-place.dz(cpp 内算), 抓取接近位复用 preplace, 结束回 observe。
+        f"urscript_finish_grab_enable:={'true' if finish_grab else 'false'} "
+        'urscript_finish_drop_joints:="$UR5_FINISH_DROP_JOINTS" '
+        'urscript_finish_observe_joints:="$UR5_OBSERVE_JOINTS" '
+        f"urscript_finish_place_descend:={float(finish_place_descend):.4f} "
+        f"urscript_finish_pick_descend_offset:={float(finish_pick_descend_offset):.4f} "
+        "urscript_finish_descend_velocity:=0.10 "
         f"onrobot_rg_model:={shlex.quote(str(onrobot_rg_model))} "
         f"onrobot_rg_open_width_mm:={int(onrobot_open_width_mm)} "
         f"onrobot_rg_close_width_mm:={int(onrobot_close_width_mm)} "
@@ -440,7 +451,8 @@ def execute_pick_place(
         "task_max_xy_offset:=0.50 "  # 2026-07-03 0.25->0.35->0.50 (用户要求再增大); 与bridge safety.max_xy_offset一致
         "task_max_z_offset:=0.15 "   # 旧0.15
         "task_max_descend:=0.40 "    # 旧0.40->0.80->取消
-        "io_gripper_wait_seconds:=1.5 "  # 2026-07-03 放置开爪等待加长(1.0->1.5), 保证抬升前一定张开
+        "io_gripper_wait_seconds:=1.0 "  # 2026-07-04 抓取闭合后等待, 调回昨天手感1.0
+        "io_gripper_release_wait_seconds:=2.5 "  # 2026-07-04 放置松开后单独等2.5s, 保证完全张开再抬(不影响抓取)
         'urscript_pregrasp_joints:="$UR5_PREGRASP_JOINTS" '
         'urscript_preplace_joints:="$UR5_PREPLACE_JOINTS" '
         'urscript_home_joints:="$UR5_HOME_JOINTS" '
@@ -453,8 +465,8 @@ def execute_pick_place(
         f"urscript_pick_approach_movel_velocity:={float(pick_approach_movel_velocity):.3f} "
         f"urscript_pick_lift_velocity:={float(pick_lift_velocity):.3f} "
         "urscript_descend_acceleration:=0.35 "
-        "urscript_descend_velocity:=0.40 "  # 2026-07-03 pick下降提速...->0.30->0.40(place前段另用place_fast_descend_velocity)
-        "urscript_place_fast_descend_velocity:=0.60 "  # 2026-07-03 place前段提速...->0.50->0.60(超慢末段不变)
+        "urscript_descend_velocity:=0.70 "  # 2026-07-04 pick下降再提速...->0.55->0.70(place前段另用place_fast_descend_velocity)
+        "urscript_place_fast_descend_velocity:=1.00 "  # 2026-07-04 place前段再提速...->0.80->1.00(超慢末段不变)
         f"urscript_place_descend_velocity:={float(place_descend_velocity):.6f} "
         f"urscript_place_wiggle_enabled:={'true' if place_wiggle_enabled else 'false'} "
         f"urscript_place_wiggle_xy_amplitude:={float(place_wiggle_xy_amplitude):.6f} "
@@ -555,6 +567,10 @@ def run_async_next_vision(args, rounds):
             args.place_wiggle_steps,
             False,
             keep_gripper_closed=args.keep_gripper_closed,
+            # 最后一块(无下一目标)时, 把收尾抓取合并进这一次执行(同一段 URScript, 无缝紧接)。
+            finish_grab=(next_item is None and getattr(args, "finish_grab", False)),
+            finish_place_descend=args.finish_place_descend,
+            finish_pick_descend_offset=args.finish_pick_descend_offset,
         )
 
         if next_item is not None:
@@ -583,6 +599,8 @@ def run_async_next_vision(args, rounds):
                 args.docker_cmd,
                 vision_cache_path(index + 1, next_item["target"]),
             )
+
+    # 2026-07-04: 收尾抓取已合并进最后一块的 execute_pick_place(见上, finish_grab=...), 无需单独一步。
 
 
 def parse_place(text):
@@ -692,6 +710,12 @@ def main():
                         help="first planner task index to execute when --product-yaml is used")
     parser.add_argument("--max-tasks", type=int, default=0,
                         help="limit number of planner tasks when --product-yaml is used; 0 means all")
+    parser.add_argument("--finish-grab", action="store_true",
+                        help="装配末块完成后(合并进同一段URScript无缝紧接), 抓起成品搬到右前放置位(UR5_FINISH_DROP_JOINTS)再回observe。仅 --async-next-vision 路径生效")
+    parser.add_argument("--finish-pick-descend-offset", type=float, default=0.0,
+                        help="收尾抓取降深微调(米): 降深自动=末块 place.descend-place.dz(降到成品顶); 此值在其上加减(+更深/-更浅)")
+    parser.add_argument("--finish-place-descend", type=float, default=0.10,
+                        help="收尾放置: 到右前放置位后向下多少米再松开(默认0.10)")
     args = parser.parse_args()
 
     if not TAUGHT_ENV.exists():
