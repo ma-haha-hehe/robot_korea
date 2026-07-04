@@ -21,6 +21,14 @@ DROP_STEP_X="${DROP_STEP_X:-0.08}"
 DROP_STEP_Y="${DROP_STEP_Y:-0.0}"
 DROP_STEP_Z="${DROP_STEP_Z:-0.0}"
 PICK_OFFSET_X="${PICK_OFFSET_X:-0.0}"   # base系抓取x偏移(estop=0.01 抓取x+1cm); carrot 默认0 不受影响
+# 2026-07-05: 每轮独立的抓取x偏移列表(空格分隔, 第i项给第i轮), 用于同层并排积木(如 icecream 红/蓝)。
+#   设了它就覆盖 PICK_OFFSET_X; 某轮没给(列表短)则回退 PICK_OFFSET_X。不设=原行为, carrot/estop 不受影响。
+#   例: PICK_OFFSET_X_LIST="0 0.016 -0.016 0 0" -> 第2轮x+16mm, 第3轮x-16mm, 其余同原抓取点。
+PICK_OFFSET_X_LIST="${PICK_OFFSET_X_LIST:-}"
+# 2026-07-05: 每轮独立的【丢放 y 偏移】列表(空格分隔, 第i项给第i轮), 以 observe(=DIS_DROP_JOINTS)的 y 为原点。
+#   设了它就覆盖 DROP_STEP_Y 的线性递增; 某轮没给(列表短)则取 0。不设=原行为((i-1)*DROP_STEP_Y)。
+#   配 DROP_STEP_X=0 使用 -> x 固定, 只有 y 来回摆: 例 "0 -0.06 0.06 -0.12 0.12"(原点/负/正/负/正, 间隔6cm)。
+PLACE_OFFSET_Y_LIST="${PLACE_OFFSET_Y_LIST:-}"
 PRESTEP_DESCEND="${PRESTEP_DESCEND:-0.143}"   # 前置动作【下降抓】距离; carrot 默认0.143; estop 传更大值下探更深
 PULL_OFFSET_X="${PULL_OFFSET_X:-0.005}"       # 拔取点(前置横移落地点+每块抓取点)在 base x 整体平移, 默认+5mm; 两产品共用
 # 抓/放 descend 等来自 task 文件。默认 disassembly_task.yaml(=carrot 3块);
@@ -54,9 +62,18 @@ fi
 # 抓提放松一条龙: 到拔取姿态 -> 下降/闭合 -> 抬起 -> 到丢放姿态 -> 慢速下降 -> 松开 -> 回拆卸 home。
 for i in $(seq 1 "$REPEAT"); do
   PLACE_OFFSET_X=$(awk -v n="$i" -v step="$DROP_STEP_X" 'BEGIN { printf "%.6f", (n - 1) * step }')
-  PLACE_OFFSET_Y=$(awk -v n="$i" -v step="$DROP_STEP_Y" 'BEGIN { printf "%.6f", (n - 1) * step }')
+  if [ -n "$PLACE_OFFSET_Y_LIST" ]; then
+    # 每轮丢放y偏移: 列表第i项(以observe的y为原点); 列表短了取0。
+    PLACE_OFFSET_Y=$(echo "$PLACE_OFFSET_Y_LIST" | awk -v n="$i" '{print $n}')
+    PLACE_OFFSET_Y="${PLACE_OFFSET_Y:-0.0}"
+  else
+    PLACE_OFFSET_Y=$(awk -v n="$i" -v step="$DROP_STEP_Y" 'BEGIN { printf "%.6f", (n - 1) * step }')
+  fi
   PLACE_OFFSET_Z=$(awk -v n="$i" -v step="$DROP_STEP_Z" 'BEGIN { printf "%.6f", (n - 1) * step }')
-  echo "========== disassembly arm pull $i/$REPEAT: $POSE, drop_offset=($PLACE_OFFSET_X,$PLACE_OFFSET_Y,$PLACE_OFFSET_Z) =========="
+  # 本轮抓取x偏移: 列表给了第i项就用它, 否则回退统一的 PICK_OFFSET_X(原行为)。
+  ROUND_PICK_OFFSET_X=$(echo "$PICK_OFFSET_X_LIST" | awk -v n="$i" '{print $n}')
+  ROUND_PICK_OFFSET_X="${ROUND_PICK_OFFSET_X:-$PICK_OFFSET_X}"
+  echo "========== disassembly arm pull $i/$REPEAT: $POSE, pick_offset_x=$ROUND_PICK_OFFSET_X, drop_offset=($PLACE_OFFSET_X,$PLACE_OFFSET_Y,$PLACE_OFFSET_Z) =========="
   # NO_PRESTEP=1: 彻底关闭前置动作(不先抓预置物到初始位), 每块直接在拔取姿态下降抓;
   #   默认(未设)保持原行为: 前置动作(goto固定起点+开爪下降闭合, 及第一块释放)只在第一块执行一次。
   if [ "${NO_PRESTEP:-0}" = "1" ]; then
@@ -87,7 +104,7 @@ for i in $(seq 1 "$REPEAT"); do
     urscript_movel_acceleration:=1.2 \
     urscript_descend_velocity:=0.08 \
     urscript_disassemble_extra_lift:=0.06 \
-    urscript_disassemble_pick_offset_x:="$PICK_OFFSET_X" \
+    urscript_disassemble_pick_offset_x:="$ROUND_PICK_OFFSET_X" \
     urscript_disassemble_prestep_descend:="$PRESTEP_DESCEND" \
     urscript_disassemble_pull_offset_x:="$PULL_OFFSET_X" \
     urscript_disassemble_place_offset_x:="$PLACE_OFFSET_X" \
