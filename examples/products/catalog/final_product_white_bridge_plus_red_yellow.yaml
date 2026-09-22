@@ -1,0 +1,49 @@
+schema_version: 1
+product:
+  name: final_product_white_bridge_plus_red_yellow
+blocks:
+- id: white_2x4_base_left
+  type: brick_4x2
+  color: white
+  target:
+    position:
+    - -0.032
+    - 0.0
+    - 0.0
+    yaw_deg: 0.0
+- id: white_2x4_base_right
+  type: brick_4x2
+  color: white
+  target:
+    position:
+    - 0.032
+    - 0.0
+    - 0.0
+    yaw_deg: 0.0
+- id: white_2x4_top_cross
+  type: brick_4x2
+  color: white
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0192
+    yaw_deg: 90.0
+- id: red_2x4_upper_cross
+  type: brick_4x2
+  color: red
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0384
+    yaw_deg: 0.0
+- id: yellow_2x2_top
+  type: brick_2x2
+  color: yellow
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0576
+    yaw_deg: 0.0

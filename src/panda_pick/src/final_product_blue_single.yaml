@@ -1,8 +1,0 @@
-# Task 1: 单个蓝色 2x4 砖块。
-blocks:
-  - name: "blue_2x4_single"
-    type: "brick_4x2"
-    color: "blue"
-    vision_label: "blue 2x4 brick."
-    pos: [0.0000, 0.0000, 0.0000]
-    rotation: [0, 0, 0]

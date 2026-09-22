@@ -1,0 +1,58 @@
+schema_version: 1
+product:
+  name: final_product_t
+blocks:
+- id: base_4x2_lvl1
+  type: brick_4x2
+  color: gray
+  target:
+    position:
+    - -0.032
+    - 0.0
+    - 0.0
+    yaw_deg: 0.0
+- id: base_4x2_lvl1_2
+  type: brick_4x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0
+    yaw_deg: 0.0
+- id: base_4x2_lvl1_3
+  type: brick_4x2
+  color: gray
+  target:
+    position:
+    - 0.032
+    - 0.0
+    - 0.0
+    yaw_deg: 0.0
+- id: base_4x2_lvl1_4
+  type: brick_4x2
+  color: gray
+  target:
+    position:
+    - -0.016
+    - 0.0
+    - 0.0192
+    yaw_deg: 0.0
+- id: base_4x2_lvl1_5
+  type: brick_4x2
+  color: gray
+  target:
+    position:
+    - 0.016
+    - 0.0
+    - 0.0192
+    yaw_deg: 0.0
+- id: top_4x2_lvl4
+  type: brick_4x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0384
+    yaw_deg: 0.0

@@ -1,0 +1,113 @@
+# Explicit alternate design; original catalogue target is unchanged.
+schema_version: 1
+product:
+  name: final_product_flower_supported
+blocks:
+- id: 4x2_brick_1
+  type: brick_4x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0
+    yaw_deg: 0.0
+- id: 4x2_brick_2
+  type: brick_4x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0192
+    yaw_deg: 0.0
+- id: 2x2_brick_3
+  type: brick_2x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0384
+    yaw_deg: 0.0
+- id: 4x2_brick_5
+  type: brick_4x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - -0.016
+    - 0.0576
+    yaw_deg: 90.0
+- id: 2x2_brick_6
+  type: brick_2x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - -0.048
+    - 0.0768
+    yaw_deg: 0.0
+- id: 2x2_brick_7
+  type: brick_2x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0768
+    yaw_deg: 0.0
+- id: 4x2_brick_8
+  type: brick_4x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - 0.016
+    - 0.096
+    yaw_deg: 90.0
+- id: 2x2_brick_15
+  type: brick_2x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - -0.048
+    - 0.096
+    yaw_deg: 0.0
+- id: 2x2_brick_9
+  type: brick_2x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - 0.048
+    - 0.1152
+    yaw_deg: 0.0
+- id: 2x2_brick_11
+  type: brick_2x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.1152
+    yaw_deg: 0.0
+- id: 2x2_brick_12
+  type: brick_2x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.1344
+    yaw_deg: 0.0
+- id: 2x2_brick_13
+  type: brick_2x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - 0.048
+    - 0.1344
+    yaw_deg: 0.0

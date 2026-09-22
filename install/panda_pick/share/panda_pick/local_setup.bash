@@ -1,1 +1,0 @@
-/home/i6user/Desktop/robot_lego/build/panda_pick/ament_cmake_environment_hooks/local_setup.bash

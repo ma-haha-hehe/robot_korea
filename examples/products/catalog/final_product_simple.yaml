@@ -1,0 +1,49 @@
+schema_version: 1
+product:
+  name: final_product_simple
+blocks:
+- id: white 4x2 brick
+  type: brick_4x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.015
+    yaw_deg: 0.0
+- id: blue 2x2 brick
+  type: brick_2x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - 0.016
+    - 0.045
+    yaw_deg: 0.0
+- id: blue 2x2 brick_2
+  type: brick_2x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - -0.016
+    - 0.045
+    yaw_deg: 0.0
+- id: yellow 4x2 brick
+  type: brick_4x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.075
+    yaw_deg: 90.0
+- id: white 4x2 brick_2
+  type: brick_4x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.105
+    yaw_deg: 0.0
