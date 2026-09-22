@@ -29,8 +29,8 @@ setup(
     ],
     install_requires=['setuptools', 'PyYAML', 'numpy'],
     zip_safe=True,
-    maintainer='robot_korea contributors',
-    maintainer_email='maintainers@example.invalid',
+    maintainer='ma-haha-hehe',
+    maintainer_email='187615757+ma-haha-hehe@users.noreply.github.com',
     description='MuJoCo and ROS 2 bridge for repeatable LEGO manipulation experiments',
     license='Apache-2.0',
     extras_require={

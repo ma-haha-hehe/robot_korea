@@ -4,7 +4,7 @@
   <name>mj_bridge</name>
   <version>0.1.0</version>
   <description>MuJoCo and ROS 2 bridge for repeatable LEGO manipulation experiments</description>
-  <maintainer email="maintainers@example.invalid">robot_korea contributors</maintainer>
+  <maintainer email="187615757+ma-haha-hehe@users.noreply.github.com">ma-haha-hehe</maintainer>
   <license>Apache-2.0</license>
 
   <exec_depend>rclpy</exec_depend>
