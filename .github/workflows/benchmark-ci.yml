@@ -5,7 +5,7 @@ jobs:
     runs-on: ubuntu-22.04
     container: ros:humble-ros-base-jammy
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
       - run: apt-get update && apt-get install -y python3-pip python3-pytest python3-yaml ros-humble-control-msgs
       - run: python3 -m pip install -r requirements-sim.txt
       - run: PYTHONPATH=src/mj_bridge python3 -m pytest -q src/mj_bridge/test/test_benchmark_core.py src/mj_bridge/test/test_public_regressions.py
@@ -32,7 +32,7 @@ jobs:
           python3 -m mj_bridge.benchmark_cli run --product examples/products/catalog/final_product_orange_green_blue_white_simple.yaml --seed 0 --headless --executor baseline --output-dir /tmp/oracle-slip
       - name: Preserve execution evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: oracle-results
           path: |
