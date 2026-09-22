@@ -1,0 +1,13 @@
+schema_version: 1
+product:
+  name: final_product_blue_single
+blocks:
+- id: blue_2x4_single
+  type: brick_4x2
+  color: blue
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0
+    yaw_deg: 0.0

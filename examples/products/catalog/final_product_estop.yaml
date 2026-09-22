@@ -1,0 +1,22 @@
+schema_version: 1
+product:
+  name: final_product_estop
+blocks:
+- id: yellow_2x4_base
+  type: brick_4x2
+  color: yellow
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0
+    yaw_deg: 0.0
+- id: red_2x2_top_center
+  type: brick_2x2
+  color: red
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0192
+    yaw_deg: 0.0

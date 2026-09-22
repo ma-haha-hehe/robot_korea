@@ -1,2 +1,0 @@
-sync()
-global RQ_2FG_Position=floor((modbus_get_signal_status("Position_Status",False))/256)

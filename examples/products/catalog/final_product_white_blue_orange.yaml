@@ -1,0 +1,31 @@
+schema_version: 1
+product:
+  name: final_product_white_blue_orange
+blocks:
+- id: white_2x4_base
+  type: brick_4x2
+  color: white
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0
+    yaw_deg: 0.0
+- id: blue_2x4_middle
+  type: brick_4x2
+  color: blue
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0192
+    yaw_deg: 0.0
+- id: orange_2x2_top
+  type: brick_2x2
+  color: orange
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0384
+    yaw_deg: 0.0

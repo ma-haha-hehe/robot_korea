@@ -1,0 +1,31 @@
+schema_version: 1
+product:
+  name: final_product_carrot
+blocks:
+- id: yellow_2x2_base
+  type: brick_2x2
+  color: yellow
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0
+    yaw_deg: 0.0
+- id: yellow_2x2_middle
+  type: brick_2x2
+  color: yellow
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0192
+    yaw_deg: 0.0
+- id: green_2x2_top
+  type: brick_2x2
+  color: green
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0384
+    yaw_deg: 0.0

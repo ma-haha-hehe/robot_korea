@@ -1,0 +1,22 @@
+schema_version: 1
+product:
+  name: final_product_real_simple
+blocks:
+- id: blue_4x2_01
+  type: brick_4x2
+  color: blue
+  target:
+    position:
+    - 0.08
+    - 0.0
+    - 0.0
+    yaw_deg: 0.0
+- id: white_4x2_01
+  type: brick_4x2
+  color: white
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0
+    yaw_deg: 0.0

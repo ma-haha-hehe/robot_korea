@@ -1,0 +1,41 @@
+name: benchmark-ci
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    container: ros:humble-ros-base-jammy
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - run: apt-get update && apt-get install -y python3-pip python3-pytest python3-yaml ros-humble-control-msgs
+      - run: python3 -m pip install -r requirements-sim.txt
+      - run: PYTHONPATH=src/mj_bridge python3 -m pytest -q src/mj_bridge/test/test_benchmark_core.py src/mj_bridge/test/test_public_regressions.py
+      - run: PYTHONPATH=src/mj_bridge python3 -m mj_bridge.benchmark_cli validate examples/products/traffic_light.yaml
+      - run: PYTHONPATH=src/mj_bridge python3 -m mj_bridge.benchmark_cli generate --product examples/products/traffic_light.yaml --seed 42 --output-dir /tmp/episode
+      - run: python3 -c "import mujoco; mujoco.MjModel.from_xml_path('/tmp/episode/scene.xml')"
+      - name: Oracle single-block execution
+        shell: bash
+        run: |
+          source /opt/ros/humble/setup.bash
+          export PYTHONPATH="$PWD/src/mj_bridge:$PYTHONPATH"
+          OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 -m mj_bridge.benchmark_cli run --product examples/products/catalog/final_product_blue_single.yaml --seed 42 --headless --executor oracle-baseline --output-dir /tmp/oracle-single
+      - name: Adjacent square-brick placement regression
+        shell: bash
+        env:
+          OPENBLAS_NUM_THREADS: '1'
+          OMP_NUM_THREADS: '1'
+        run: |
+          source /opt/ros/humble/setup.bash
+          export PYTHONPATH="$PWD/src/mj_bridge:$PYTHONPATH"
+          for seed in 17 42; do
+            python3 -m mj_bridge.benchmark_cli run --product examples/products/catalog/final_product_3x2x4_2x2top.yaml --seed "$seed" --headless --executor baseline --output-dir "/tmp/oracle-adjacent/seed-$seed"
+          done
+          python3 -m mj_bridge.benchmark_cli run --product examples/products/catalog/final_product_orange_green_blue_white_simple.yaml --seed 0 --headless --executor baseline --output-dir /tmp/oracle-slip
+      - name: Preserve execution evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: oracle-results
+          path: |
+            /tmp/oracle-single
+            /tmp/oracle-adjacent
+            /tmp/oracle-slip

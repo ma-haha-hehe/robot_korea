@@ -9,6 +9,11 @@ from xml.dom import minidom
 import yaml
 import numpy as np
 
+try:
+    from .benchmark_core import load_yaml as load_benchmark_yaml
+except ImportError:  # Allow `python scene_builder.py` during local development.
+    from benchmark_core import load_yaml as load_benchmark_yaml
+
 
 # ============================================================
 # 1. 文件路径
@@ -172,6 +177,8 @@ COLOR_MAP = {
     "grey": "0.5 0.5 0.5 1",
     "white": "1 1 1 1",
     "black": "0.1 0.1 0.1 1",
+    "orange": "1.0 0.45 0.0 1",
+    "purple": "0.55 0.2 0.75 1",
 }
 
 
@@ -218,7 +225,7 @@ def find_and_remove_old_dynamic_bricks(worldbody: ET.Element) -> None:
 
         name = child.get("name", "")
 
-        if "brick" in name:
+        if "brick" in name or name.startswith("lego_figure"):
             to_remove.append(child)
 
         if name == ASSEMBLY_BASE_NAME:
@@ -454,6 +461,84 @@ def create_brick_body(block: dict, yaml_parts_center: np.ndarray) -> ET.Element:
     return body
 
 
+def create_episode_brick_body(block: dict) -> ET.Element:
+    """Create one loose source part from a benchmark episode manifest."""
+    brick_type = block["type"]
+    if brick_type not in BRICK_SPECS:
+        raise ValueError(f"未知积木类型: {brick_type}")
+    body = ET.Element("body", {
+        "name": block["body_name"],
+        "quat": quat_from_yaw(float(block.get("yaw_rad", 0.0))),
+    })
+    ET.SubElement(body, "freejoint")
+    add_duplo_collision_geoms(body, brick_type)
+    # Public episodes render the same self-authored primitives used for collision.
+    # This keeps release artifacts independent from unverified LEGO mesh files.
+    rgba = get_rgba(block.get("color", "gray"))
+    for geom in body.findall("geom"):
+        geom.set("rgba", rgba)
+    p = block["position"]
+    body.set("pos", f"{float(p[0]):.6f} {float(p[1]):.6f} {float(p[2]):.6f}")
+    return body
+
+
+def add_figure_geom(body, *, name, geom_type, size, pos=None, rgba="0.8 0.8 0.8 1", **attrs):
+    """添加同时参与显示和碰撞的乐高人物几何体。"""
+    geom = ET.SubElement(body, "geom")
+    geom.set("name", name)
+    geom.set("type", geom_type)
+    geom.set("size", size)
+    if pos is not None:
+        geom.set("pos", pos)
+    geom.set("rgba", rgba)
+    geom.set("friction", "1.2 0.08 0.005")
+    geom.set("solref", "0.006 1")
+    geom.set("solimp", "0.92 0.98 0.002")
+    geom.set("density", "650")
+    for key, value in attrs.items():
+        geom.set(key, str(value))
+    return geom
+
+
+def create_lego_figure_body(spec: dict) -> ET.Element:
+    """用稳定的基本碰撞体创建单刚体乐高人物，适合第一阶段抓取对比。"""
+    name = spec.get("name", "lego_figure_1")
+    x, y, yaw = [float(v) for v in spec.get("pose", [0.48, -0.12, 0.0])]
+
+    body = ET.Element("body")
+    body.set("name", name)
+    body.set("pos", f"{x:.5f} {y:.5f} {TABLE_TOP_Z:.5f}")
+    body.set("quat", quat_from_yaw(yaw))
+    ET.SubElement(body, "freejoint")
+
+    # 尺寸接近经典 minifigure，但整体略放大，便于 Panda 双指夹爪实验。
+    add_figure_geom(body, name=f"{name}_left_leg", geom_type="box",
+                    size="0.0038 0.0040 0.0060", pos="-0.0043 0 0.0060",
+                    rgba="0.12 0.22 0.75 1")
+    add_figure_geom(body, name=f"{name}_right_leg", geom_type="box",
+                    size="0.0038 0.0040 0.0060", pos="0.0043 0 0.0060",
+                    rgba="0.12 0.22 0.75 1")
+    add_figure_geom(body, name=f"{name}_hip", geom_type="box",
+                    size="0.0082 0.0042 0.0022", pos="0 0 0.0138",
+                    rgba="0.12 0.22 0.75 1")
+    add_figure_geom(body, name=f"{name}_torso", geom_type="box",
+                    size="0.0090 0.0045 0.0070", pos="0 0 0.0230",
+                    rgba="0.82 0.10 0.08 1")
+    add_figure_geom(body, name=f"{name}_left_arm", geom_type="capsule",
+                    size="0.0022", rgba="0.82 0.10 0.08 1",
+                    fromto="-0.0105 0 0.0280 -0.0125 0 0.0170")
+    add_figure_geom(body, name=f"{name}_right_arm", geom_type="capsule",
+                    size="0.0022", rgba="0.82 0.10 0.08 1",
+                    fromto="0.0105 0 0.0280 0.0125 0 0.0170")
+    add_figure_geom(body, name=f"{name}_head", geom_type="cylinder",
+                    size="0.0052 0.0052", pos="0 0 0.0352",
+                    rgba="1.0 0.72 0.18 1")
+    add_figure_geom(body, name=f"{name}_head_stud", geom_type="cylinder",
+                    size="0.0030 0.0012", pos="0 0 0.0416",
+                    rgba="1.0 0.72 0.18 1")
+    return body
+
+
 # ============================================================
 # 10. 生成 scene.xml
 # ============================================================
@@ -462,6 +547,7 @@ def build(
     initial_yaml: str = INITIAL_YAML,
     template_xml: str = SCENE_TEMPLATE_XML,
     output_xml: str = SCENE_OUTPUT_XML,
+    episode_manifest: str | None = None,
 ) -> str:
     """
     读取：
@@ -498,11 +584,24 @@ def build(
         dtype=float,
     )
 
-    blocks = data.get("blocks", [])
-
-    for block in blocks:
-        brick_body = create_brick_body(block, yaml_parts_center)
-        worldbody.append(brick_body)
+    if episode_manifest:
+        episode = load_benchmark_yaml(episode_manifest)
+        asset = root.find("asset")
+        if asset is not None:
+            for mesh in list(asset.findall("mesh")):
+                if mesh.get("name", "").startswith("lego_"):
+                    asset.remove(mesh)
+        blocks = episode.get("spawned_blocks", [])
+        figures = []
+        for block in blocks:
+            worldbody.append(create_episode_brick_body(block))
+    else:
+        blocks = data.get("blocks", [])
+        for block in blocks:
+            worldbody.append(create_brick_body(block, yaml_parts_center))
+        figures = data.get("figures", [])
+        for figure in figures:
+            worldbody.append(create_lego_figure_body(figure))
 
     xml_text = prettify_xml(root)
 
@@ -514,6 +613,7 @@ def build(
     print(f"initial  : {initial_yaml}")
     print(f"output   : {output_xml}")
     print(f"blocks   : {len(blocks)}")
+    print(f"figures  : {len(figures)}")
     print(f"parts center mapped to world: {DESIRED_PARTS_CENTER.tolist()}")
     print(f"collision z offset: {COLLISION_Z_OFFSET}")
     print(f"brick body half height: {BRICK_BODY_HALF_HEIGHT}")

@@ -1,0 +1,68 @@
+# Explicit alternate design; original catalogue target is unchanged.
+schema_version: 1
+product:
+  name: final_product2_supported
+blocks:
+- id: leg_left
+  type: brick_2x2
+  color: gray
+  target:
+    position:
+    - 0
+    - 0.016
+    - 0
+    yaw_deg: 0.0
+- id: leg_right
+  type: brick_2x2
+  color: gray
+  target:
+    position:
+    - 0
+    - -0.016
+    - 0
+    yaw_deg: 0.0
+- id: hips
+  type: brick_4x2
+  color: gray
+  target:
+    position:
+    - 0
+    - 0
+    - 0.0192
+    yaw_deg: 90.0
+- id: torso
+  type: brick_4x2
+  color: gray
+  target:
+    position:
+    - 0
+    - 0
+    - 0.0384
+    yaw_deg: 90.0
+- id: hand_left
+  type: brick_2x2
+  color: gray
+  target:
+    position:
+    - 0
+    - 0.032
+    - 0.0576
+    yaw_deg: 0.0
+- id: hand_right
+  type: brick_2x2
+  color: gray
+  target:
+    position:
+    - 0
+    - -0.032
+    - 0.0576
+    yaw_deg: 0.0
+- id: head
+  type: brick_2x2
+  color: gray
+  target:
+    position:
+    - 0
+    - 0
+    - 0.0576
+    yaw_deg: 0.0

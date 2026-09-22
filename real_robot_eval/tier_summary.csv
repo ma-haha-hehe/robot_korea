@@ -1,4 +1,0 @@
-tier,trials,successful_trials,failed_trials,success_rate,planned_steps_per_trial,mean_total_time_s,std_total_time_s,median_total_time_s,min_total_time_s,max_total_time_s,notes
-Tier 1,10,9,1,0.900,1,55.775,4.287,57.899,45.343,59.345,end_to_end_time_includes_planning_vision_conversion_communication_and_execution
-Tier 2,10,9,1,0.900,3,167.977,8.958,170.233,152.343,177.342,end_to_end_time_includes_planning_vision_conversion_communication_and_execution
-Tier 3,10,8,2,0.800,5,183.330,7.383,182.299,170.352,195.322,end_to_end_time_includes_planning_vision_conversion_communication_and_execution

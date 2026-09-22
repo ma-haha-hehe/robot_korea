@@ -1,7 +1,0 @@
-{
-    "summary": {"success_count": 12, "total_compute_time": 140.0, "total_manip_time": 560.0, "collision_count": 2, "stability_violations": 6},
-    "raw_data": [
-        {"success": 1.0, "compute_time": 7.0, "manip_time": 28.0, "accuracy_error": 0.0085, "stability_violation": 0.0, "collision": 0.0},
-        {"success": 0.0, "compute_time": 6.9, "manip_time": 15.0, "accuracy_error": 0.0150, "stability_violation": 1.0, "collision": 0.0}
-    ]
-}

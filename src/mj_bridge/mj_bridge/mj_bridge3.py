@@ -6,6 +6,8 @@ import sys
 import time
 import yaml
 import threading
+import json
+import math
 import numpy as np
 
 import mujoco
@@ -14,15 +16,19 @@ import mujoco.viewer
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
-from rclpy.executors import MultiThreadedExecutor
+from rclpy.executors import MultiThreadedExecutor, ExternalShutdownException
+from rclpy.signals import SignalHandlerOptions
 
 from control_msgs.action import FollowJointTrajectory
-from sensor_msgs.msg import JointState
+from sensor_msgs.msg import CameraInfo, Image, JointState
+from std_msgs.msg import String
+from std_srvs.srv import Trigger
 
 BASE = os.path.dirname(__file__)
 sys.path.append(BASE)
 
 from scene_builder import build
+from benchmark_core import dump_json, load_yaml as load_benchmark_yaml, score_episode
 
 def yaw_from_quat_wxyz(q: np.ndarray) -> float:
     w, x, y, z = q
@@ -122,9 +128,18 @@ def xy_overlap_area(pos_a, half_a, pos_b, half_b) -> float:
 # 路径配置
 # ============================================================
 
-SOURCE_DIR = "/home/i6user/Desktop/robot_lego/src/mj_bridge/mj_bridge"
-MODEL_XML_PATH = os.path.join(SOURCE_DIR, "scene.xml")
-YAML_CONFIG_PATH = os.path.join(SOURCE_DIR, "initial_positions.yaml")
+SOURCE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_XML_PATH = os.environ.get("MJ_BRIDGE_MODEL", os.path.join(SOURCE_DIR, "scene.xml"))
+YAML_CONFIG_PATH = os.environ.get(
+    "MJ_BRIDGE_INITIAL_POSITIONS",
+    os.path.join(SOURCE_DIR, "initial_positions.yaml"),
+)
+BENCHMARK_CONFIG_PATH = os.environ.get(
+    "MJ_BRIDGE_BENCHMARK_CONFIG",
+    os.path.join(SOURCE_DIR, "benchmark.yaml"),
+)
+EPISODE_MANIFEST_PATH = os.environ.get("LEGO_BENCH_MANIFEST", "")
+RUN_DIR = os.environ.get("LEGO_BENCH_RUN_DIR", "")
 
 
 # ============================================================
@@ -177,19 +192,20 @@ VERTICAL_CONTACT_TOL = 0.006
 
 ASSEMBLY_BASE_NAME = "assembly_base_plate"
 
-ASSEMBLY_BASE_CENTER_X = 0.25
-ASSEMBLY_BASE_CENTER_Y = 0.0
+ASSEMBLY_BASE_CENTER_X = 0.35
+ASSEMBLY_BASE_CENTER_Y = 0.35
 
 STUD_PITCH = 0.016
 
 BRICK_BODY_HALF_HEIGHT = 0.0095
+COLLISION_Z_OFFSET = -0.009
 
 TABLE_TOP_Z = 0.04
 BASE_PLATE_THICKNESS = 0.006
 BASE_STUD_HEIGHT = 0.004
 
 BASE_STUD_TOP_Z = TABLE_TOP_Z + BASE_PLATE_THICKNESS + BASE_STUD_HEIGHT
-BRICK_ON_BASE_CENTER_Z = BASE_STUD_TOP_Z + BRICK_BODY_HALF_HEIGHT
+BRICK_ON_BASE_CENTER_Z = BASE_STUD_TOP_Z + BRICK_BODY_HALF_HEIGHT - COLLISION_Z_OFFSET
 
 BASE_PLATE_HALF_X = 12 * STUD_PITCH / 2.0
 BASE_PLATE_HALF_Y = 12 * STUD_PITCH / 2.0
@@ -206,7 +222,9 @@ class MuJoCoActionServer(Node):
         # 1. 生成并加载 MuJoCo 模型
         # ====================================================
 
-        build()
+        # The public CLI has already generated an episode-specific scene.
+        if not EPISODE_MANIFEST_PATH:
+            build()
 
         self.model = mujoco.MjModel.from_xml_path(MODEL_XML_PATH)
         self.data = mujoco.MjData(self.model)
@@ -308,6 +326,17 @@ class MuJoCoActionServer(Node):
             self.target_qpos[:] = self.data.qpos[:]
             self.target_qvel[:] = 0.0
 
+        # 保存一个确定性的 episode 初态，供自动批量实验复位。
+        self.episode_initial_qpos = self.data.qpos.copy()
+        self.episode_initial_qvel = self.data.qvel.copy()
+        self.benchmark_config = self.load_benchmark_config()
+        self.episode_manifest = (
+            load_benchmark_yaml(EPISODE_MANIFEST_PATH)
+            if EPISODE_MANIFEST_PATH and os.path.exists(EPISODE_MANIFEST_PATH)
+            else None
+        )
+        self.reset_benchmark_state()
+
         # ====================================================
         # 7. 发布 joint_states，给 MoveIt / RViz 用
         # ====================================================
@@ -322,6 +351,18 @@ class MuJoCoActionServer(Node):
             0.02,
             self.publish_joint_states,
         )
+
+        self.benchmark_pub = self.create_publisher(String, "/mj_bridge/benchmark_state", 10)
+        self.goal_pub = self.create_publisher(String, "/lego_bench/goal", 10)
+        self.oracle_pub = self.create_publisher(String, "/lego_bench/ground_truth", 10)
+        self.benchmark_timer = self.create_timer(0.05, self.update_benchmark_state)
+        self.reset_service = self.create_service(Trigger, "/mj_bridge/reset", self.handle_reset)
+        self.result_service = self.create_service(Trigger, "/mj_bridge/result", self.handle_result)
+        self.observation_mode = os.environ.get("LEGO_BENCH_OBSERVATION", "oracle")
+        self.connection_mode = os.environ.get("LEGO_BENCH_CONNECTION_MODE", "snap")
+        self.camera_renderer = None
+        if self.observation_mode == "rgbd":
+            self.init_virtual_camera()
 
         # ====================================================
         # 8. Action Server
@@ -349,6 +390,277 @@ class MuJoCoActionServer(Node):
         self.get_logger().info("手臂与夹爪 Action Server 均已就绪")
         self.get_logger().info("Arm action: /mj_panda_arm_controller/follow_joint_trajectory")
         self.get_logger().info("Hand action: /mj_panda_hand_controller/follow_joint_trajectory")
+        self.get_logger().info("Benchmark services: /mj_bridge/reset, /mj_bridge/result")
+        if self.episode_manifest:
+            self.get_logger().info(
+                f"LEGO Bench episode: {self.episode_manifest['episode_id']} "
+                f"({len(self.episode_manifest['spawned_blocks'])} parts)"
+            )
+            self.get_logger().info(f"Connection mode: {self.connection_mode}")
+
+    def init_virtual_camera(self):
+        self.camera_width = 320
+        self.camera_height = 240
+        self.camera_renderer = mujoco.Renderer(
+            self.model, height=self.camera_height, width=self.camera_width
+        )
+        self.rgb_pub = self.create_publisher(Image, "/camera/color/image_raw", 5)
+        self.depth_pub = self.create_publisher(Image, "/camera/depth/image_raw", 5)
+        self.segmentation_pub = self.create_publisher(Image, "/camera/segmentation", 5)
+        self.camera_info_pub = self.create_publisher(CameraInfo, "/camera/camera_info", 5)
+        self._last_camera_publish = 0.0
+        self.get_logger().info("RGB-D observation enabled on /camera/*")
+
+    def _image_message(self, array, encoding):
+        msg = Image()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id = "realsense"
+        msg.height, msg.width = array.shape[:2]
+        msg.encoding = encoding
+        msg.is_bigendian = False
+        msg.step = int(array.strides[0])
+        msg.data = np.ascontiguousarray(array).tobytes()
+        return msg
+
+    def publish_virtual_camera(self):
+        if self.camera_renderer is None:
+            return
+        with self.mj_lock:
+            self.camera_renderer.update_scene(self.data, camera="realsense")
+            rgb = self.camera_renderer.render().copy()
+            self.camera_renderer.enable_depth_rendering()
+            self.camera_renderer.update_scene(self.data, camera="realsense")
+            depth = self.camera_renderer.render().astype(np.float32).copy()
+            self.camera_renderer.disable_depth_rendering()
+            self.camera_renderer.enable_segmentation_rendering()
+            self.camera_renderer.update_scene(self.data, camera="realsense")
+            segmentation = self.camera_renderer.render().astype(np.int32).copy()
+            self.camera_renderer.disable_segmentation_rendering()
+        self.rgb_pub.publish(self._image_message(rgb, "rgb8"))
+        self.depth_pub.publish(self._image_message(depth, "32FC1"))
+        self.segmentation_pub.publish(self._image_message(segmentation, "32SC2"))
+        info = CameraInfo()
+        info.header.stamp = self.get_clock().now().to_msg()
+        info.header.frame_id = "realsense"
+        info.width, info.height = self.camera_width, self.camera_height
+        fy = self.camera_height / (2.0 * math.tan(math.radians(60.0) / 2.0))
+        fx = fy
+        cx, cy = self.camera_width / 2.0, self.camera_height / 2.0
+        info.k = [fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0]
+        info.p = [fx, 0.0, cx, 0.0, 0.0, fy, cy, 0.0, 0.0, 0.0, 1.0, 0.0]
+        info.distortion_model = "plumb_bob"
+        info.d = [0.0] * 5
+        self.camera_info_pub.publish(info)
+
+    def load_benchmark_config(self):
+        defaults = {
+            "target_body": "2x2_brick_1",
+            "lift_height_m": 0.05,
+            "hold_time_s": 0.5,
+            "max_episode_time_s": 30.0,
+        }
+        if not os.path.exists(BENCHMARK_CONFIG_PATH):
+            self.get_logger().warn(f"没有找到 benchmark.yaml: {BENCHMARK_CONFIG_PATH}")
+            return defaults
+        with open(BENCHMARK_CONFIG_PATH, "r", encoding="utf-8") as f:
+            loaded = yaml.safe_load(f) or {}
+        defaults.update(loaded)
+        return defaults
+
+    def reset_benchmark_state(self):
+        self.collision_count = 0
+        self.stability_violations = 0
+        self._active_safety_contacts = set()
+        self._unstable_blocks = set()
+        if self.episode_manifest:
+            self.target_body_id = -1
+            self.episode_start_time = time.monotonic()
+            self.lift_start_time = None
+            self.episode_success = False
+            self.episode_timeout = False
+            self.initial_target_z = None
+            return
+        target = str(self.benchmark_config["target_body"])
+        body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, target)
+        self.target_body_id = body_id
+        self.episode_start_time = time.monotonic()
+        self.lift_start_time = None
+        self.episode_success = False
+        self.episode_timeout = False
+        self.initial_target_z = float(self.data.xpos[body_id][2]) if body_id >= 0 else None
+
+    def benchmark_result(self):
+        with self.mj_lock:
+            if self.episode_manifest:
+                elapsed = time.monotonic() - self.episode_start_time
+                self.episode_timeout = bool(self.episode_timeout or elapsed >= float(
+                    self.benchmark_config.get("max_episode_time_s", 300.0)))
+                scored = score_episode(
+                    self.episode_manifest,
+                    self.current_block_state(),
+                    xy_tol=float(self.benchmark_config.get("position_tolerance_xy_m", 0.006)),
+                    z_tol=float(self.benchmark_config.get("position_tolerance_z_m", 0.004)),
+                    yaw_tol_deg=float(self.benchmark_config.get("yaw_tolerance_deg", 8.0)),
+                )
+                scored["success"] = bool(scored["success"] and not self.episode_timeout)
+                scored.update({
+                    "episode_id": self.episode_manifest["episode_id"],
+                    "seed": self.episode_manifest["seed"],
+                    "elapsed_s": elapsed,
+                    "timeout": self.episode_timeout,
+                    "collision_count": self.collision_count,
+                    "stability_violations": self.stability_violations,
+                    "observation_mode": self.observation_mode,
+                    "connection_mode": self.connection_mode,
+                })
+                return scored
+            current_z = None
+            if self.target_body_id >= 0:
+                current_z = float(self.data.xpos[self.target_body_id][2])
+            return {
+                "target_body": self.benchmark_config["target_body"],
+                "success": self.episode_success,
+                "timeout": self.episode_timeout,
+                "elapsed_s": time.monotonic() - self.episode_start_time,
+                "initial_z_m": self.initial_target_z,
+                "current_z_m": current_z,
+                "required_lift_m": float(self.benchmark_config["lift_height_m"]),
+                "required_hold_s": float(self.benchmark_config["hold_time_s"]),
+                "collision_count": self.collision_count,
+                "stability_violations": self.stability_violations,
+            }
+
+    def update_safety_metrics(self):
+        """Count contact/instability transitions, rather than every simulation step."""
+        if not self.episode_manifest:
+            return
+        with self.mj_lock:
+            contacts = set()
+            for index in range(self.data.ncon):
+                contact = self.data.contact[index]
+                body1 = int(self.model.geom_bodyid[contact.geom1])
+                body2 = int(self.model.geom_bodyid[contact.geom2])
+                name1 = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_BODY, body1) or "world"
+                name2 = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_BODY, body2) or "world"
+                names = {name1, name2}
+                robot_contact = any(name.startswith("panda_") or name == "hand" for name in names)
+                environment_contact = any(
+                    name in {"table", "assembly_base_plate", "world"} for name in names
+                )
+                if robot_contact and environment_contact:
+                    contacts.add(tuple(sorted(names)))
+            self.collision_count += len(contacts - self._active_safety_contacts)
+            self._active_safety_contacts = contacts
+
+            unstable = set()
+            for item in self.episode_manifest["spawned_blocks"]:
+                body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, item["body_name"])
+                if body_id < 0:
+                    continue
+                x, y, z = (float(v) for v in self.data.xpos[body_id])
+                # Local +Z projected on world +Z. Below 0.7 means a severe tilt (>45 degrees).
+                upright = float(self.data.xmat[body_id][8]) >= 0.7
+                if z < 0.025 or not (-0.75 <= x <= 0.75 and -0.75 <= y <= 0.75) or not upright:
+                    unstable.add(item["id"])
+            self.stability_violations += len(unstable - self._unstable_blocks)
+            self._unstable_blocks = unstable
+
+    def update_benchmark_state(self):
+        if self.episode_manifest:
+            self.episode_timeout = time.monotonic() - self.episode_start_time >= float(
+                self.benchmark_config["max_episode_time_s"]
+            )
+            result = self.benchmark_result()
+            self.episode_success = bool(result["success"])
+            self.publish_public_state(result)
+            return
+        if self.target_body_id < 0 or self.episode_success or self.episode_timeout:
+            return
+        with self.mj_lock:
+            now = time.monotonic()
+            current_z = float(self.data.xpos[self.target_body_id][2])
+            lifted = current_z - self.initial_target_z >= float(self.benchmark_config["lift_height_m"])
+            if lifted:
+                if self.lift_start_time is None:
+                    self.lift_start_time = now
+                elif now - self.lift_start_time >= float(self.benchmark_config["hold_time_s"]):
+                    self.episode_success = True
+            else:
+                self.lift_start_time = None
+            self.episode_timeout = now - self.episode_start_time >= float(
+                self.benchmark_config["max_episode_time_s"]
+            )
+        msg = String()
+        msg.data = json.dumps(self.benchmark_result(), ensure_ascii=False)
+        self.benchmark_pub.publish(msg)
+
+    def current_block_state(self):
+        """Return the authoritative MuJoCo state keyed by public product block ID."""
+        blocks = {}
+        if not self.episode_manifest:
+            return {"blocks": blocks}
+        for item in self.episode_manifest["spawned_blocks"]:
+            body_id = mujoco.mj_name2id(
+                self.model, mujoco.mjtObj.mjOBJ_BODY, item["body_name"]
+            )
+            if body_id < 0:
+                continue
+            blocks[item["id"]] = {
+                "type": item["type"],
+                "color": item["color"],
+                "body_name": item["body_name"],
+                "position": [float(v) for v in self.data.xpos[body_id]],
+                "quaternion_wxyz": [float(v) for v in self.data.xquat[body_id]],
+                "yaw_rad": float(yaw_from_quat_wxyz(self.data.xquat[body_id])),
+            }
+        return {"episode_id": self.episode_manifest["episode_id"], "blocks": blocks}
+
+    def publish_public_state(self, result=None):
+        if self.observation_mode == "oracle":
+            state = self.current_block_state()
+            oracle = String()
+            oracle.data = json.dumps(state, ensure_ascii=False)
+            self.oracle_pub.publish(oracle)
+        goal = String()
+        goal.data = json.dumps({
+            "episode_id": self.episode_manifest["episode_id"],
+            "product": self.episode_manifest["product"],
+            "target_blocks": self.episode_manifest["target_blocks"],
+        }, ensure_ascii=False)
+        self.goal_pub.publish(goal)
+        msg = String()
+        msg.data = json.dumps(result or self.benchmark_result(), ensure_ascii=False)
+        self.benchmark_pub.publish(msg)
+
+    def handle_reset(self, request, response):
+        del request
+        with self.mj_lock:
+            self.data.qpos[:] = self.episode_initial_qpos
+            self.data.qvel[:] = self.episode_initial_qvel
+            self.target_qpos[:] = self.episode_initial_qpos
+            self.target_qvel[:] = 0.0
+            self.trajectory = None
+            self.is_executing = False
+            self.gripper_target = GRIPPER_OPEN_VALUE
+            self.gripper_goal_value = GRIPPER_OPEN_VALUE
+            self.gripper_moving = False
+            self.fake_welds.clear()
+            self.welded_pairs.clear()
+            mujoco.mj_forward(self.model, self.data)
+            self.reset_benchmark_state()
+        response.success = self.episode_manifest is not None or self.target_body_id >= 0
+        response.message = json.dumps(self.benchmark_result(), ensure_ascii=False)
+        return response
+
+    def handle_result(self, request, response):
+        del request
+        result = self.benchmark_result()
+        if RUN_DIR:
+            dump_json(os.path.join(RUN_DIR, "actual_state.json"), self.current_block_state())
+            dump_json(os.path.join(RUN_DIR, "result.json"), result)
+        response.success = bool(result["success"])
+        response.message = json.dumps(result, ensure_ascii=False)
+        return response
 
     # =========================================================
     # 初始位姿
@@ -696,10 +1008,25 @@ class MuJoCoActionServer(Node):
                     error_p = self.target_qpos[qadr] - self.data.qpos[qadr]
                     error_v = -self.data.qvel[vadr]
 
-                    torque = KP * error_p + KD * error_v
-                    torque = np.clip(torque, -MAX_TORQUE, MAX_TORQUE)
+                    # Compensate gravity/Coriolis so a static Cartesian goal
+                    # does not sag to a neighbouring stud under arm weight.
+                    torque = KP * error_p + KD * error_v + self.data.qfrc_bias[vadr]
+                    # Scalar saturation avoids dispatching NumPy for each of
+                    # seven joints at every 1 ms physics step.
+                    if torque > MAX_TORQUE:
+                        torque = MAX_TORQUE
+                    elif torque < -MAX_TORQUE:
+                        torque = -MAX_TORQUE
 
-                    self.data.ctrl[i] = torque
+                    # Panda XML uses affine position actuators, not motors.
+                    # Convert desired joint torque into their control input;
+                    # writing Nm directly into a radian target saturates them.
+                    gain = float(self.model.actuator_gainprm[i, 0])
+                    bias_params = self.model.actuator_biasprm[i]
+                    bias = (bias_params[0]
+                            + bias_params[1] * self.data.actuator_length[i]
+                            + bias_params[2] * self.data.actuator_velocity[i])
+                    self.data.ctrl[i] = (torque - bias) / gain
 
                 # 夹爪 position actuator
                 elif actuator_name == "finger_actuator1":
@@ -829,7 +1156,7 @@ class MuJoCoActionServer(Node):
             return False
 
         # 必须接近底板 stud 顶部
-        brick_bottom_z = pos[2] - BRICK_BODY_HALF_HEIGHT
+        brick_bottom_z = pos[2] + COLLISION_Z_OFFSET - BRICK_BODY_HALF_HEIGHT
         vertical_gap = abs(brick_bottom_z - BASE_STUD_TOP_Z)
 
         if vertical_gap > BASE_SNAP_VERTICAL_TOL:
@@ -891,23 +1218,24 @@ class MuJoCoActionServer(Node):
         """
 
         with self.mj_lock:
-            for i in range(self.data.ncon):
-                contact = self.data.contact[i]
-
-                body1_id = self.model.geom_bodyid[contact.geom1]
-                body2_id = self.model.geom_bodyid[contact.geom2]
-
-                body1_name = mujoco.mj_id2name(
-                    self.model,
-                    mujoco.mjtObj.mjOBJ_BODY,
-                    body1_id,
-                )
-
-                body2_name = mujoco.mj_id2name(
-                    self.model,
-                    mujoco.mjtObj.mjOBJ_BODY,
-                    body2_id,
-                )
+            # Snapping calls mj_forward and rebuilds data.contact. Snapshot body
+            # pairs first, otherwise later indices may disappear mid-iteration.
+            if not hasattr(self, '_snap_body_names'):
+                self._snap_body_names = [mujoco.mj_id2name(
+                    self.model, mujoco.mjtObj.mjOBJ_BODY, i) or ''
+                    for i in range(self.model.nbody)]
+                self._snap_body_mask = np.array([
+                    name == ASSEMBLY_BASE_NAME or 'brick' in name
+                    for name in self._snap_body_names], dtype=bool)
+            # MuJoCo exposes contact fields as array views. Filter irrelevant
+            # robot/table contacts in bulk while preserving contact order.
+            body1 = self.model.geom_bodyid[self.data.contact.geom1]
+            body2 = self.model.geom_bodyid[self.data.contact.geom2]
+            selected = self._snap_body_mask[body1] & self._snap_body_mask[body2]
+            contact_pairs = list(zip(body1[selected], body2[selected]))
+            for body1_id, body2_id in contact_pairs:
+                body1_name = self._snap_body_names[body1_id]
+                body2_name = self._snap_body_names[body2_id]
 
                 if body1_name is None or body2_name is None:
                     continue
@@ -991,6 +1319,20 @@ class MuJoCoActionServer(Node):
             return
 
         qadr = self.model.jnt_qposadr[child_jnt]
+
+        # Explicit simplified stud engagement: the solid collision boxes have
+        # no underside cavities, so surface contact alone adds 4 mm per layer.
+        # Snap only a contact-qualified pair, using its measured relative pose,
+        # never a task target. The nominal layer pitch is 19.2 mm.
+        parent_pos = self.data.xpos[parent_id].copy()
+        child_pos = self.data.qpos[qadr:qadr + 3].copy()
+        child_pos[:2] = parent_pos[:2] + np.round(
+            (child_pos[:2] - parent_pos[:2]) / STUD_PITCH) * STUD_PITCH
+        child_pos[2] = parent_pos[2] + 0.0192
+        self.data.qpos[qadr:qadr + 3] = child_pos
+        self.data.qpos[qadr + 3:qadr + 7] = quat_wxyz_from_yaw(
+            snap_yaw_to_90(yaw_from_quat_wxyz(self.data.qpos[qadr + 3:qadr + 7])))
+        mujoco.mj_forward(self.model, self.data)
 
         rel_pos = self.data.xpos[child_id].copy() - self.data.xpos[parent_id].copy()
         child_quat = self.data.qpos[qadr + 3:qadr + 7].copy()
@@ -1081,10 +1423,12 @@ class MuJoCoActionServer(Node):
 
 
 def main():
-    rclpy.init()
+    # Let Python deliver SIGINT once; shut ROS down after the worker exits.
+    rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
 
     node = None
     executor = None
+    ros_thread = None
 
     try:
         node = MuJoCoActionServer()
@@ -1092,11 +1436,17 @@ def main():
         executor = MultiThreadedExecutor()
         executor.add_node(node)
 
-        ros_thread = threading.Thread(target=executor.spin, daemon=True)
+        def spin_ros():
+            try:
+                executor.spin()
+            except ExternalShutdownException:
+                pass
+
+        ros_thread = threading.Thread(target=spin_ros, daemon=True)
         ros_thread.start()
 
-        with mujoco.viewer.launch_passive(node.model, node.data) as viewer:
-            while viewer.is_running() and rclpy.ok():
+        def run_loop(viewer=None):
+            while rclpy.ok() and (viewer is None or viewer.is_running()):
                 loop_start = time.time()
 
                 # 更新手臂目标
@@ -1108,11 +1458,22 @@ def main():
                 for _ in range(SIM_SUBSTEPS):
                     node.step_pid()
 
-                    # 积木接触后固定
-                    node.auto_weld_touching_bricks()
-                    node.maintain_fake_welds()
+                    # snap 是公开、显式的简化连接模型；physics 不进行任何自动吸附。
+                    if node.connection_mode == "snap":
+                        node.auto_weld_touching_bricks()
+                        node.maintain_fake_welds()
 
-                viewer.sync()
+                node.update_safety_metrics()
+
+                # MuJoCo's EGL context is thread-affine. Render on the same main
+                # thread that created the renderer, at a bounded 10 Hz rate.
+                if (node.camera_renderer is not None
+                        and time.monotonic() - node._last_camera_publish >= 0.1):
+                    node.publish_virtual_camera()
+                    node._last_camera_publish = time.monotonic()
+
+                if viewer is not None:
+                    viewer.sync()
 
                 elapsed = time.time() - loop_start
                 sleep_time = LOOP_DT - elapsed
@@ -1120,18 +1481,28 @@ def main():
                 if sleep_time > 0:
                     time.sleep(sleep_time)
 
+        if os.environ.get("MJ_BRIDGE_HEADLESS", "0").lower() in ("1", "true", "yes"):
+            node.get_logger().info("Running in headless mode")
+            run_loop()
+        else:
+            with mujoco.viewer.launch_passive(node.model, node.data) as viewer:
+                run_loop(viewer)
+
     except KeyboardInterrupt:
         pass
 
     finally:
         if executor is not None:
             executor.shutdown()
+        if ros_thread is not None:
+            ros_thread.join(timeout=3.0)
 
         if node is not None:
+            if node.camera_renderer is not None:
+                node.camera_renderer.close()
             node.destroy_node()
 
-        if rclpy.ok():
-            rclpy.shutdown()
+        rclpy.try_shutdown()
 
 
 if __name__ == "__main__":
