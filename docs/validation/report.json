@@ -1,7 +1,7 @@
 {
-  "created_utc": "2026-09-22T18:00:21.794465+00:00",
+  "created_utc": "2026-09-22T18:06:50.841353+00:00",
   "scope": "MuJoCo Oracle baseline, snap connections; no real-robot validation",
-  "unit_tests_passed": 68,
+  "unit_tests_passed": 69,
   "catalogue_products": 36,
   "primary_episodes": 87,
   "primary_successes": 87,
@@ -536,7 +536,7 @@
   },
   "source_sha256": {
     "src/mj_bridge/mj_bridge/benchmark.yaml": "59966fa98d5cf4b8981dd59b04deaa121d1db8fd0a3bb1fa716cf59b85150f4f",
-    "src/mj_bridge/mj_bridge/benchmark_cli.py": "deacb23349a4aba9c362c14aa223ef93aac311b3939622d1965d6edcb91e79b6",
+    "src/mj_bridge/mj_bridge/benchmark_cli.py": "ad1bff6b331e13484095c690f089d85e2894d69bf23356825b697a0308a897db",
     "src/mj_bridge/mj_bridge/benchmark_core.py": "16b6081db7c0b66c56cf3aa95bbc88225f5c6be029a6a266ef18422bbdee1e65",
     "src/mj_bridge/mj_bridge/hand.xml": "d2a6539d0fd7c55c75c14f11c78f04505ee33f31d93e6112e3ad7120e5ee786a",
     "src/mj_bridge/mj_bridge/initial_positions.yaml": "1c0400595587c9b1d824a081bb7ccaea6ca03d3c2bb72216fd7afe8d2b1a0180",

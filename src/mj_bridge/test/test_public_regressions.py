@@ -10,6 +10,14 @@ def product():
     return normalize_product({'blocks': [{'name': 'red_2x2', 'pos': [0, 0, 0]}]})
 
 
+def test_oracle_doctor_reports_missing_ros_dependency(monkeypatch, capsys):
+    from mj_bridge import benchmark_cli
+    monkeypatch.setattr(benchmark_cli.importlib.util, 'find_spec',
+                        lambda name: None if name == 'control_msgs' else object())
+    assert benchmark_cli.main(['doctor', '--backend', 'oracle']) == 2
+    assert 'missing Python module: control_msgs' in capsys.readouterr().out
+
+
 @pytest.mark.parametrize('summary', [
     {'finished':False,'episodes':1,'successes':1,'results':[{'success':True}]},
     {'finished':True,'episodes':1,'successes':1,'results':[{'success':False}]},

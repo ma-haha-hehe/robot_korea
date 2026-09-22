@@ -11,6 +11,8 @@ exposes standard control/observation interfaces, and scores the final assembly.
 
 Requires Ubuntu 22.04 with ROS 2 Humble base already installed and its apt
 repository configured. The script below installs the additional simulation packages.
+Simulator dependencies are pinned in `requirements-sim.txt` to the versions used
+for the recorded validation.
 
 ```bash
 bash install_sim_system_deps.sh

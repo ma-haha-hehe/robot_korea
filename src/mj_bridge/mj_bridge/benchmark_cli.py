@@ -6,6 +6,7 @@ import argparse
 import os
 import shutil
 import json
+import importlib.util
 from pathlib import Path
 
 from .benchmark_core import (
@@ -18,6 +19,14 @@ from .scene_builder import BASE_DIR, build
 def normalized_from_path(path: str) -> dict:
     source = Path(path)
     return normalize_product(load_yaml(source), name=source.stem)
+
+
+def oracle_preflight():
+    required = ('mujoco', 'rclpy', 'control_msgs', 'sensor_msgs',
+                'std_msgs', 'std_srvs', 'trajectory_msgs')
+    errors = [f'missing Python module: {name}' for name in required
+              if importlib.util.find_spec(name) is None]
+    return {'backend': 'oracle', 'ready': not errors, 'errors': errors}
 
 
 def generate(product_path: str, seed: int, output_dir: str) -> tuple[dict, Path]:
@@ -96,7 +105,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if args.command == "doctor":
         from .perception import vision_preflight
-        status = ({"backend": "oracle", "ready": True, "errors": []}
+        status = (oracle_preflight()
                   if args.backend == "oracle" else vision_preflight())
         print(json.dumps(status, indent=2))
         return 0 if status['ready'] else 2
