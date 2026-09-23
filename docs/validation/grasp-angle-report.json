@@ -1,0 +1,1248 @@
+{
+  "scope": "Static 0/90 degree finger-clearance planning only; not physical execution",
+  "products": 43,
+  "angle_plans": 40,
+  "source_sha256": {
+    "src/mj_bridge/mj_bridge/assembly_planner.py": "3c02c5856275df487ca0b64ab3799da60480743723feaa7a50ee1eb2d4fad01e",
+    "src/mj_bridge/mj_bridge/product_geometry.py": "549ce5db9537c0f56103d3f825a04ef9f9507c487117bc641bd18beab620607b",
+    "src/mj_bridge/mj_bridge/part_registry.yaml": "4ca5e5529b9d876d95d5e9e767f9fef5b60e09275e44193b89500a712f13c5db"
+  },
+  "results": [
+    {
+      "product": "final_product",
+      "group": "catalog",
+      "nominal_geometry_valid": false,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "leg_right",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "leg_left",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "hips",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "torso",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "hand_right",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "hand_left",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "head",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product2",
+      "group": "catalog",
+      "nominal_geometry_valid": false,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "leg_right",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "leg_left",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "hips",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "torso",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "hand_right",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "hand_left",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "head",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_2x4x2_orange_top",
+      "group": "catalog",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "white_2x4_base",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "blue_2x4_middle",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "orange_2x2_top",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_3x2x4_2x2top",
+      "group": "catalog",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "white_2x4_base_right",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "white_2x4_base_left",
+          "grasp_spin_deg": 0,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "green_2x4_cross",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "red_2x2_top_right",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "orange_2x2_top_left",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_battery",
+      "group": "catalog",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "blue_2x2_base",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "yellow_2x2_top",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_blue_single",
+      "group": "catalog",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "blue_2x4_single",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_burger",
+      "group": "catalog",
+      "nominal_geometry_valid": false,
+      "angle_plan_valid": false,
+      "error": "overlapping target solids: blue_2x2_upper_right, red_2x2_upper_left"
+    },
+    {
+      "product": "final_product_burger2",
+      "group": "catalog",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "yellow_2x4_base",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "red_2x2_middle_fill",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "red_2x4_middle",
+          "grasp_spin_deg": 0,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "yellow_2x4_top",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_carrot",
+      "group": "catalog",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "yellow_2x2_base",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "yellow_2x2_middle",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "green_2x2_top",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_door",
+      "group": "catalog",
+      "nominal_geometry_valid": false,
+      "angle_plan_valid": false,
+      "error": "overlapping target solids: yellow_4x2_brick_2, white_4x2_brick_0"
+    },
+    {
+      "product": "final_product_estop",
+      "group": "catalog",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "yellow_2x4_base",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "red_2x2_top_center",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_flower",
+      "group": "catalog",
+      "nominal_geometry_valid": false,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "4x2_brick_1",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "4x2_brick_2",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "2x2_brick_3",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "4x2_brick_5",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "2x2_brick_7",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "2x2_brick_6",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "2x2_brick_15",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "4x2_brick_8",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "2x2_brick_11",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "2x2_brick_9",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "2x2_brick_13",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "2x2_brick_12",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_green_white_stack",
+      "group": "catalog",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "white_2x4_base",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "green_2x4_top",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_hammer",
+      "group": "catalog",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "red_2x2_base",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "red_2x2_middle",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "blue_2x4_top",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_icecream",
+      "group": "catalog",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "yellow_2x2_base",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "yellow_2x4_middle",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "blue_2x2_upper_right",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "red_2x2_upper_left",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "green_2x2_top",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_magnet",
+      "group": "catalog",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "red_2x2_base",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "blue_2x2_top",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_orange_green_blue_white_simple",
+      "group": "catalog",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "white_2x4_base_right",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "white_2x4_base_left",
+          "grasp_spin_deg": 0,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "green_2x4_middle_cross",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "blue_2x4_upper",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "orange_2x2_top",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_real_simple",
+      "group": "catalog",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "white_4x2_01",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "blue_4x2_01",
+          "grasp_spin_deg": 0,
+          "grasp_offset_rad": 0.0
+        }
+      ]
+    },
+    {
+      "product": "final_product_simple",
+      "group": "catalog",
+      "nominal_geometry_valid": false,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "white 4x2 brick",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "blue 2x2 brick_2",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "blue 2x2 brick",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "yellow 4x2 brick",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "white 4x2 brick_2",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_small_tree",
+      "group": "catalog",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "yellow_2x2_base",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "green_2x4_middle",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "green_2x2_top",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_stack_3x_2x4",
+      "group": "catalog",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "white_2x4_bottom",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "yellow_2x4_middle",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "blue_2x4_top",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_t",
+      "group": "catalog",
+      "nominal_geometry_valid": false,
+      "angle_plan_valid": false,
+      "error": "overlapping target solids: base_4x2_lvl1_2, base_4x2_lvl1"
+    },
+    {
+      "product": "final_product_tier1_single_2x4",
+      "group": "catalog",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "yellow_2x4_single",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_tier2_stack_3x_2x4",
+      "group": "catalog",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "white_2x4_bottom",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "white_2x4_middle",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "blue_2x4_top",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_tier3_bridge_plus_red_yellow",
+      "group": "catalog",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "white_2x4_base_right",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "white_2x4_base_left",
+          "grasp_spin_deg": 0,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "white_2x4_top_cross",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "red_2x4_upper_cross",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "yellow_2x2_top",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_tier3_white_bridge_3x_2x4",
+      "group": "catalog",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "white_2x4_base_right",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "white_2x4_base_left",
+          "grasp_spin_deg": 0,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "white_2x4_top_cross",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 0.0
+        }
+      ]
+    },
+    {
+      "product": "final_product_tier4_bridge_plus_red_yellow",
+      "group": "catalog",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "white_2x4_base_right",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "white_2x4_base_left",
+          "grasp_spin_deg": 0,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "white_2x4_top_cross",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "red_2x4_upper_cross",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "yellow_2x2_top",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_trafficlight",
+      "group": "catalog",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "green_2x2_base",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "yellow_2x2_middle",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "red_2x2_top",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_wb_tier4_007",
+      "group": "catalog",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "4x2_brick_9",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "2x2_brick_2",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "4x2_brick_3",
+          "grasp_spin_deg": 0,
+          "grasp_offset_rad": -1.5707963267948966
+        },
+        {
+          "block_id": "4x2_brick_1",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "2x2_brick_4",
+          "grasp_spin_deg": 0,
+          "grasp_offset_rad": -1.5707963267948966
+        },
+        {
+          "block_id": "2x2_brick_6",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "2x2_brick_5",
+          "grasp_spin_deg": 0,
+          "grasp_offset_rad": -1.5707963267948966
+        },
+        {
+          "block_id": "4x2_brick_7",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "2x2_brick_8",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 0.0
+        }
+      ]
+    },
+    {
+      "product": "final_product_white_blue_green_stack",
+      "group": "catalog",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "white_2x4_base",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "blue_2x4_middle",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "green_2x4_top",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_white_blue_orange",
+      "group": "catalog",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "white_2x4_base",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "blue_2x4_middle",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "orange_2x2_top",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_white_bridge_3x_2x4",
+      "group": "catalog",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "white_2x4_base_right",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "white_2x4_base_left",
+          "grasp_spin_deg": 0,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "white_2x4_top_cross",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 0.0
+        }
+      ]
+    },
+    {
+      "product": "final_product_white_bridge_plus_red_yellow",
+      "group": "catalog",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "white_2x4_base_right",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "white_2x4_base_left",
+          "grasp_spin_deg": 0,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "white_2x4_top_cross",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "red_2x4_upper_cross",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "yellow_2x2_top",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_white_cross_tower_6x_2x4",
+      "group": "catalog",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "white_2x4_base_right",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "white_2x4_base_left",
+          "grasp_spin_deg": 0,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "white_2x4_middle_right",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "white_2x4_middle_left",
+          "grasp_spin_deg": 0,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "white_2x4_top_cross",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 0.0
+        }
+      ]
+    },
+    {
+      "product": "final_product_white_ladder_5x_2x4",
+      "group": "catalog",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "white_2x4_base_right",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "white_2x4_base_center",
+          "grasp_spin_deg": 0,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "white_2x4_base_left",
+          "grasp_spin_deg": 0,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "white_2x4_top_right_cross",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "white_2x4_top_left_cross",
+          "grasp_spin_deg": 0,
+          "grasp_offset_rad": -1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_white_orange_blue_stack",
+      "group": "catalog",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "white_2x4_base",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "orange_2x2_mid",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "blue_2x4_top",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product2_supported",
+      "group": "supported_variants",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "leg_right",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "leg_left",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "hips",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "torso",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "head",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "hand_right",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "hand_left",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_burger_supported",
+      "group": "supported_variants",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "yellow_2x4_base",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "blue_2x2_upper_right",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "red_2x2_upper_left",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "green_2x2_top",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_door_supported",
+      "group": "supported_variants",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "white_4x2_brick_1",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "white_4x2_brick_0",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "yellow_4x2_brick_3",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "yellow_4x2_brick_2",
+          "grasp_spin_deg": 0,
+          "grasp_offset_rad": -1.5707963267948966
+        },
+        {
+          "block_id": "red_2x2_brick_5",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "red_2x2_brick_4",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_flower_supported",
+      "group": "supported_variants",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "4x2_brick_1",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "4x2_brick_2",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "2x2_brick_3",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "4x2_brick_5",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "2x2_brick_7",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "2x2_brick_6",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "2x2_brick_15",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "4x2_brick_8",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "2x2_brick_11",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "2x2_brick_9",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "2x2_brick_13",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "2x2_brick_12",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_simple_supported",
+      "group": "supported_variants",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "white 4x2 brick",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "blue 2x2 brick_2",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "blue 2x2 brick",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "yellow 4x2 brick",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "white 4x2 brick_2",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_supported",
+      "group": "supported_variants",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "leg_right",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "leg_left",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "hips",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "torso",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "head",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "hand_right",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        },
+        {
+          "block_id": "hand_left",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 1.5707963267948966
+        }
+      ]
+    },
+    {
+      "product": "final_product_t_supported",
+      "group": "supported_variants",
+      "nominal_geometry_valid": true,
+      "angle_plan_valid": true,
+      "steps": [
+        {
+          "block_id": "base_4x2_lvl1_3",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "base_4x2_lvl1_2",
+          "grasp_spin_deg": 0,
+          "grasp_offset_rad": -1.5707963267948966
+        },
+        {
+          "block_id": "base_4x2_lvl1",
+          "grasp_spin_deg": 0,
+          "grasp_offset_rad": -1.5707963267948966
+        },
+        {
+          "block_id": "base_4x2_lvl1_5",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 0.0
+        },
+        {
+          "block_id": "base_4x2_lvl1_4",
+          "grasp_spin_deg": 0,
+          "grasp_offset_rad": -1.5707963267948966
+        },
+        {
+          "block_id": "top_4x2_lvl4",
+          "grasp_spin_deg": 90,
+          "grasp_offset_rad": 0.0
+        }
+      ]
+    }
+  ]
+}
