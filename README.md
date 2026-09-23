@@ -46,6 +46,23 @@ Docker:
 docker compose -f docker-compose.benchmark.yaml up --build
 ```
 
+## Grasp-angle planning
+
+Generate an assembly-by-disassembly plan without starting the simulator:
+
+```bash
+source enter_sim_env.sh
+export PYTHONPATH="$PWD/src/mj_bridge:$PYTHONPATH"
+python scripts/plan_assembly.py examples/products/catalog/final_product_hammer.yaml \
+  --output runs/hammer-angle-plan.json
+```
+
+The planner checks 0°/90° finger clearance against oriented part footprints,
+rejects blocked removals, and reverses the removal order into an assembly plan.
+This independent planning entry point does not change the published execution
+baseline. It validates geometric grasp access, not dynamic assembly stability.
+See [angle conventions and scope](docs/GRASP_PLANNING_ZH.md).
+
 ## Automatic simulation validation
 
 ```bash

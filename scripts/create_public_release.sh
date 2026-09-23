@@ -29,13 +29,14 @@ rsync -a --delete --delete-excluded \
   --include '/src/mj_bridge/setup.cfg' --include '/src/mj_bridge/BENCHMARK.md' \
   --include '/src/mj_bridge/resource/' --include '/src/mj_bridge/resource/mj_bridge' \
   --include '/src/mj_bridge/launch/' --include '/src/mj_bridge/launch/lego_bench.launch.py' \
-  --include '/src/mj_bridge/test/' --include '/src/mj_bridge/test/test_benchmark_core.py' --include '/src/mj_bridge/test/test_public_regressions.py' \
+  --include '/src/mj_bridge/test/' --include '/src/mj_bridge/test/test_benchmark_core.py' --include '/src/mj_bridge/test/test_public_regressions.py' --include '/src/mj_bridge/test/test_grasp_planning.py' \
   --include '/src/mj_bridge/mj_bridge/' \
   --include '/src/mj_bridge/mj_bridge/assets/' --include '/src/mj_bridge/mj_bridge/assets/***' \
   --include '/src/mj_bridge/mj_bridge/__init__.py' \
   --include '/src/mj_bridge/mj_bridge/LICENSE' \
   --include '/src/mj_bridge/mj_bridge/benchmark.yaml' \
   --include '/src/mj_bridge/mj_bridge/benchmark_cli.py' \
+  --include '/src/mj_bridge/mj_bridge/assembly_planner.py' \
   --include '/src/mj_bridge/mj_bridge/reference_executor.py' \
   --include '/src/mj_bridge/mj_bridge/perception.py' \
   --include '/src/mj_bridge/mj_bridge/product_geometry.py' \
@@ -50,7 +51,7 @@ rsync -a --delete --delete-excluded \
   --include '/src/mj_bridge/mj_bridge/scene_builder.py' \
   --include '/src/mj_bridge/mj_bridge/scene_template.xml' \
   --include '/examples/***' --include '/docs/***' --include '/.github/***' \
-  --include '/scripts/' --include '/scripts/test_product_suite.py' --include '/scripts/audit_product_geometry.py' --include '/scripts/create_public_release.sh' --include '/scripts/write_validation_report.py' \
+  --include '/scripts/' --include '/scripts/plan_assembly.py' --include '/scripts/test_product_suite.py' --include '/scripts/audit_product_geometry.py' --include '/scripts/create_public_release.sh' --include '/scripts/write_validation_report.py' \
   --include '/.gitignore' --include '/pytest.ini' --include '/conftest.py' --include '/README.md' --include '/THIRD_PARTY_NOTICES.md' \
   --include '/LICENSE' --include '/.dockerignore' \
   --include '/requirements-sim.txt' --include '/Dockerfile.benchmark' \
