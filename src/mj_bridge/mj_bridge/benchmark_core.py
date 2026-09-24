@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import copy
 import hashlib
 import math
 import random
@@ -134,7 +135,11 @@ def normalize_product(data: dict, *, name: str = "product") -> dict:
         raise ProductError("product YAML must contain a 'blocks' or legacy 'tasks' list")
 
     normalized = {"schema_version": 1, "product": {"name": product_name}, "blocks": blocks}
+    if "initial_layout" in data:
+        normalized["initial_layout"] = copy.deepcopy(data["initial_layout"])
     validate_product(normalized)
+    from .recorded_layout import validate_layout
+    validate_layout(normalized)
     return normalized
 
 
@@ -176,11 +181,45 @@ def _overlap(a, b) -> bool:
     return not (a[1] <= b[0] or b[1] <= a[0] or a[3] <= b[2] or b[3] <= a[2])
 
 
+def plastic_fixture_offset(product):
+    """Align the mounting plate to the product's lowest-layer stud grid.
+
+    Product coordinates remain unchanged. The fixed fixture may translate by
+    at most half a stud pitch on either axis before the episode is created.
+    """
+    pitch = .016
+    bottom = min(b['target']['position'][2] for b in product['blocks'])
+    base = [b for b in product['blocks'] if abs(b['target']['position'][2] - bottom) < 1e-5]
+    first = base[0]['target']['position']
+    offset = [round((float(value) + pitch/2) % pitch - pitch/2, 9) for value in first[:2]]
+    for block in base:
+        yaw = float(block['target'].get('yaw_deg', 0.))
+        if abs((yaw + 45.) % 90. - 45.) > 1e-5:
+            raise ProductError('plastic baseplate requires cardinal lowest-layer parts')
+        for axis in (0, 1):
+            delta = float(block['target']['position'][axis]) - offset[axis]
+            if abs(delta - round(delta / pitch) * pitch) > 1e-5:
+                raise ProductError('lowest-layer parts do not share one plastic stud grid')
+    return offset
+
+
 def generate_episode(product: dict, *, seed: int, registry: dict | None = None,
                      spawn_region: dict | None = None, margin_m: float = 0.018,
-                     max_attempts: int = 5000) -> dict:
+                     max_attempts: int = 5000, connection_mode: str = "snap",
+                     contact_profile: str = "loose") -> dict:
     registry = registry or load_registry()
+    if connection_mode not in {"snap", "physics"}:
+        raise ProductError("unknown connection mode")
+    if contact_profile not in {'loose', 'plastic'}:
+        raise ProductError('unknown contact profile')
+    if contact_profile == 'plastic' and connection_mode != 'physics':
+        raise ProductError('plastic contact requires physics connection mode')
+    from .plastic_contact import PlasticContact
+    geometry = ('hollow_plastic_clutch_v2' if contact_profile == 'plastic' else
+                'hollow_primitives_v1' if connection_mode == 'physics' else 'solid_primitives_v1')
     validate_product(product, registry)
+    from .recorded_layout import validate_layout
+    recorded = validate_layout(product, registry)
     region = spawn_region or DEFAULT_SPAWN_REGION
     rng = random.Random(int(seed))
     occupied = []
@@ -188,6 +227,18 @@ def generate_episode(product: dict, *, seed: int, registry: dict | None = None,
     for block in product["blocks"]:
         spec = registry[block["type"]]
         size = [float(v) for v in spec["size_m"]]
+        if connection_mode == "physics":
+            size[2] = .0192
+        if recorded is not None:
+            pose = recorded[block['id']]
+            spawned.append({
+                'id': block['id'], 'type': block['type'], 'color': block['color'],
+                'body_name': body_name(block['type'], block['id']),
+                'geometry': geometry,
+                'position': [*pose['position_xy_m'], TABLE_TOP_Z + size[2] / 2 - BRICK_COLLISION_CENTER_OFFSET_Z],
+                'yaw_rad': math.radians(pose['yaw_deg']),
+            })
+            continue
         for _ in range(max_attempts):
             yaw = rng.uniform(-math.pi, math.pi)
             # Sample conservatively away from table edges; exact rotated AABB is checked below.
@@ -201,6 +252,7 @@ def generate_episode(product: dict, *, seed: int, registry: dict | None = None,
                 spawned.append({
                     "id": block["id"], "type": block["type"], "color": block["color"],
                     "body_name": body_name(block["type"], block["id"]),
+                    "geometry": geometry,
                     "position": [x, y, TABLE_TOP_Z + size[2] / 2 - BRICK_COLLISION_CENTER_OFFSET_Z],
                     "yaw_rad": yaw,
                 })
@@ -208,6 +260,7 @@ def generate_episode(product: dict, *, seed: int, registry: dict | None = None,
         else:
             raise ProductError(f"cannot place {len(product['blocks'])} parts in spawn region with margin {margin_m}")
 
+    fixture_offset = plastic_fixture_offset(product) if contact_profile == 'plastic' else [0., 0.]
     targets = []
     for block in product["blocks"]:
         p = block["target"]["position"]
@@ -216,13 +269,22 @@ def generate_episode(product: dict, *, seed: int, registry: dict | None = None,
             "id": block["id"], "type": block["type"], "color": block["color"],
             "body_name": body_name(block["type"], block["id"]),
             "position": [ASSEMBLY_ORIGIN[0] + p[0], ASSEMBLY_ORIGIN[1] + p[1],
-                         BASE_STUD_TOP_Z + float(spec["size_m"][2]) / 2
+                         (.046 if connection_mode == "physics" else BASE_STUD_TOP_Z)
+                         + (.0192 if connection_mode == "physics" else float(spec["size_m"][2])) / 2
                          - BRICK_COLLISION_CENTER_OFFSET_Z + p[2]],
             "yaw_rad": math.radians(float(block["target"].get("yaw_deg", 0.0))),
         })
     return {
         "schema_version": 1,
+        "connection_mode": connection_mode,
+        "contact_profile": contact_profile,
+        "contact_parameters": (vars(PlasticContact())
+            if contact_profile == "plastic" else None),
+        "geometry": geometry,
+        "assembly_fixture": {"position_offset_xy_m": fixture_offset,
+                             "reason": "align lowest-layer stud grid" if contact_profile == 'plastic' else "default"},
         "episode_id": f"{product['product']['name']}-seed-{int(seed)}",
+        "initial_layout_mode": "recorded" if recorded is not None else "seeded",
         "seed": int(seed), "product": product, "spawn_region": region,
         "spawned_blocks": spawned, "target_blocks": targets,
     }
@@ -235,6 +297,12 @@ def angular_error(actual: float, target: float, symmetry_deg: float) -> float:
 
 def score_episode(manifest: dict, actual: dict, registry: dict | None = None,
                   xy_tol=0.006, z_tol=0.004, yaw_tol_deg=8.0) -> dict:
+    plastic = manifest.get("contact_profile") == "plastic"
+    # Plastic acceptance must agree with the insertion controller and report.
+    # A caller may tighten these limits, but loose-brick defaults cannot relax them.
+    if plastic:
+        xy_tol, z_tol = min(xy_tol, .001), min(z_tol, .0004)
+    tilt_limit = math.cos(math.radians(3 if plastic else 8))
     registry = registry or load_registry()
     if not manifest.get("target_blocks"):
         raise ProductError("cannot score an episode without target blocks")
@@ -251,12 +319,12 @@ def score_episode(manifest: dict, actual: dict, registry: dict | None = None,
             xy = math.hypot(dx, dy)
             yaw_error = angular_error(float(observed.get("yaw_rad", 0.0)), target["yaw_rad"],
                                       registry[target["type"]]["yaw_symmetry_deg"])
-            upright = True
+            upright = not plastic
             if "quaternion_wxyz" in observed:
                 q = observed["quaternion_wxyz"]
                 norm = sum(float(v) ** 2 for v in q)
                 upright = (len(q) == 4 and math.isfinite(norm) and norm > 0
-                           and 1 - 2 * (q[1] ** 2 + q[2] ** 2) / norm >= math.cos(math.radians(8)))
+                           and 1 - 2 * (q[1] ** 2 + q[2] ** 2) / norm >= tilt_limit)
             ok = (xy <= xy_tol and abs(dz) <= z_tol
                   and yaw_error <= math.radians(yaw_tol_deg) and upright)
             item = {"id": target["id"], "success": ok, "xy_error_m": xy,

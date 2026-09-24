@@ -1,0 +1,3474 @@
+{
+  "scope": "selected inputs only; not execution or success evidence",
+  "seed": 42,
+  "population": 400,
+  "selected": 240,
+  "tiers": {
+    "1": {
+      "population": 100,
+      "selected": 60,
+      "strata": 3,
+      "represented": 3
+    },
+    "2": {
+      "population": 100,
+      "selected": 60,
+      "strata": 10,
+      "represented": 10
+    },
+    "3": {
+      "population": 100,
+      "selected": 60,
+      "strata": 57,
+      "represented": 57
+    },
+    "4": {
+      "population": 100,
+      "selected": 60,
+      "strata": 54,
+      "represented": 54
+    }
+  },
+  "mandatory": [
+    "tier2_task_001",
+    "tier3_task_003",
+    "tier3_task_026",
+    "tier3_task_030",
+    "tier3_task_043",
+    "tier3_task_048",
+    "tier3_task_064",
+    "tier3_task_079",
+    "tier3_task_085",
+    "tier4_task_022",
+    "tier4_task_051",
+    "tier4_task_072"
+  ],
+  "unselected": [
+    "tier1_task_002",
+    "tier1_task_010",
+    "tier1_task_011",
+    "tier1_task_012",
+    "tier1_task_016",
+    "tier1_task_017",
+    "tier1_task_024",
+    "tier1_task_029",
+    "tier1_task_033",
+    "tier1_task_034",
+    "tier1_task_035",
+    "tier1_task_036",
+    "tier1_task_040",
+    "tier1_task_045",
+    "tier1_task_046",
+    "tier1_task_048",
+    "tier1_task_049",
+    "tier1_task_051",
+    "tier1_task_052",
+    "tier1_task_053",
+    "tier1_task_054",
+    "tier1_task_056",
+    "tier1_task_059",
+    "tier1_task_060",
+    "tier1_task_062",
+    "tier1_task_063",
+    "tier1_task_065",
+    "tier1_task_067",
+    "tier1_task_069",
+    "tier1_task_070",
+    "tier1_task_071",
+    "tier1_task_076",
+    "tier1_task_078",
+    "tier1_task_080",
+    "tier1_task_082",
+    "tier1_task_083",
+    "tier1_task_084",
+    "tier1_task_086",
+    "tier1_task_093",
+    "tier1_task_099",
+    "tier2_task_002",
+    "tier2_task_003",
+    "tier2_task_004",
+    "tier2_task_008",
+    "tier2_task_014",
+    "tier2_task_015",
+    "tier2_task_016",
+    "tier2_task_018",
+    "tier2_task_023",
+    "tier2_task_025",
+    "tier2_task_026",
+    "tier2_task_028",
+    "tier2_task_030",
+    "tier2_task_035",
+    "tier2_task_041",
+    "tier2_task_044",
+    "tier2_task_047",
+    "tier2_task_048",
+    "tier2_task_049",
+    "tier2_task_050",
+    "tier2_task_052",
+    "tier2_task_056",
+    "tier2_task_060",
+    "tier2_task_061",
+    "tier2_task_062",
+    "tier2_task_063",
+    "tier2_task_069",
+    "tier2_task_070",
+    "tier2_task_073",
+    "tier2_task_074",
+    "tier2_task_075",
+    "tier2_task_076",
+    "tier2_task_086",
+    "tier2_task_089",
+    "tier2_task_091",
+    "tier2_task_094",
+    "tier2_task_096",
+    "tier2_task_097",
+    "tier2_task_098",
+    "tier2_task_100",
+    "tier3_task_001",
+    "tier3_task_002",
+    "tier3_task_011",
+    "tier3_task_013",
+    "tier3_task_015",
+    "tier3_task_017",
+    "tier3_task_019",
+    "tier3_task_021",
+    "tier3_task_023",
+    "tier3_task_027",
+    "tier3_task_029",
+    "tier3_task_033",
+    "tier3_task_036",
+    "tier3_task_039",
+    "tier3_task_041",
+    "tier3_task_042",
+    "tier3_task_044",
+    "tier3_task_046",
+    "tier3_task_049",
+    "tier3_task_050",
+    "tier3_task_051",
+    "tier3_task_055",
+    "tier3_task_058",
+    "tier3_task_059",
+    "tier3_task_063",
+    "tier3_task_066",
+    "tier3_task_068",
+    "tier3_task_069",
+    "tier3_task_072",
+    "tier3_task_076",
+    "tier3_task_078",
+    "tier3_task_080",
+    "tier3_task_083",
+    "tier3_task_088",
+    "tier3_task_089",
+    "tier3_task_090",
+    "tier3_task_091",
+    "tier3_task_093",
+    "tier3_task_095",
+    "tier3_task_096",
+    "tier4_task_002",
+    "tier4_task_003",
+    "tier4_task_006",
+    "tier4_task_009",
+    "tier4_task_018",
+    "tier4_task_024",
+    "tier4_task_025",
+    "tier4_task_034",
+    "tier4_task_035",
+    "tier4_task_037",
+    "tier4_task_040",
+    "tier4_task_041",
+    "tier4_task_045",
+    "tier4_task_047",
+    "tier4_task_050",
+    "tier4_task_056",
+    "tier4_task_058",
+    "tier4_task_059",
+    "tier4_task_060",
+    "tier4_task_061",
+    "tier4_task_062",
+    "tier4_task_064",
+    "tier4_task_065",
+    "tier4_task_067",
+    "tier4_task_070",
+    "tier4_task_071",
+    "tier4_task_073",
+    "tier4_task_074",
+    "tier4_task_075",
+    "tier4_task_077",
+    "tier4_task_078",
+    "tier4_task_080",
+    "tier4_task_081",
+    "tier4_task_086",
+    "tier4_task_089",
+    "tier4_task_094",
+    "tier4_task_095",
+    "tier4_task_097",
+    "tier4_task_098",
+    "tier4_task_100"
+  ],
+  "tasks": [
+    {
+      "product": "tier1_task_001",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          0
+        ]
+      ],
+      "input_sha256": "584bb65c38f0f2ebb69477b8de3f64a07c78ec1eccbe921fb81aa95672ed8ddc"
+    },
+    {
+      "product": "tier1_task_003",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          0
+        ]
+      ],
+      "input_sha256": "e9894a10dc288e4a77717d16d1dd5b6a85080fab231101c88cae76b86aac142f"
+    },
+    {
+      "product": "tier1_task_004",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "58980fce5404a969c38c33c81612270c4b4cb20dc0972709d42ba3e49b1359a4"
+    },
+    {
+      "product": "tier1_task_005",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          0
+        ]
+      ],
+      "input_sha256": "048fdb0a0ca4f8fbc547d9da2111c9d33699d5368cd39f126182238f8d38c67a"
+    },
+    {
+      "product": "tier1_task_006",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "51d7802868c080b3e07d92792fa0014618e499d2dc809814269669727252baa0"
+    },
+    {
+      "product": "tier1_task_007",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          0
+        ]
+      ],
+      "input_sha256": "3baf361323c4e076c1ebad8d1fab5ad90a641c0871688669cac51220e023857b"
+    },
+    {
+      "product": "tier1_task_008",
+      "tier": 1,
+      "stratum": [
+        2,
+        0,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "dd147fb426a3d221f1472c5456cc164b0b469f64665a28d036e9324c6db412fc"
+    },
+    {
+      "product": "tier1_task_009",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "9ed9c26794b0e534dbf4cc8a40e5c4b2b44ce59b4309857004f4ede6694fdd2b"
+    },
+    {
+      "product": "tier1_task_013",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          0
+        ]
+      ],
+      "input_sha256": "775b64c0be42825a1482a3ec94086bac74d69b3bd83831fcb1e4cd5742d8c86c"
+    },
+    {
+      "product": "tier1_task_014",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "2b63e3db940d898ebfcba256bf7415f7ba8ef07283aa35ecb407455a7c60d056"
+    },
+    {
+      "product": "tier1_task_015",
+      "tier": 1,
+      "stratum": [
+        2,
+        0,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "330c58a5409538af82de3b4e15c6bcf18169299cf76d4d0341a06e76487bb2f4"
+    },
+    {
+      "product": "tier1_task_018",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "e1fdaaf52ed88626e8ad315af4eac1894f142ae7f5d536d1a193b5504533549a"
+    },
+    {
+      "product": "tier1_task_019",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "f290e53825bb6e8e428ee11735f3495b50ea3fe8866cc4782d4df1b23bc404e4"
+    },
+    {
+      "product": "tier1_task_020",
+      "tier": 1,
+      "stratum": [
+        2,
+        0,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "3f39b456687a08cc1a97e01aa29037eaa8c9e91f0c84c1b816d0c2305e70a4eb"
+    },
+    {
+      "product": "tier1_task_021",
+      "tier": 1,
+      "stratum": [
+        2,
+        0,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "af9b10c279f86a8cc6b6fdf6944bc6b0435319ec81216ff5d0510d9704f22c23"
+    },
+    {
+      "product": "tier1_task_022",
+      "tier": 1,
+      "stratum": [
+        2,
+        0,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "324bd85cf73f52d7762625bad50052d35a28f2a82525851b6190c870e2234897"
+    },
+    {
+      "product": "tier1_task_023",
+      "tier": 1,
+      "stratum": [
+        2,
+        0,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "3eb780c1299208a41520b6b8ed4e95e74892ef5d139db76786e8162b88ab636e"
+    },
+    {
+      "product": "tier1_task_025",
+      "tier": 1,
+      "stratum": [
+        2,
+        0,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "8d47d07d86f97bbc2cee55f187b551d295f488b07a12d500d6ee9592de8b4223"
+    },
+    {
+      "product": "tier1_task_026",
+      "tier": 1,
+      "stratum": [
+        2,
+        0,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "b25b7da2ad222a1db4e25eb3e238b8ea47b3750062ab1e7b2dd767df694e5e64"
+    },
+    {
+      "product": "tier1_task_027",
+      "tier": 1,
+      "stratum": [
+        2,
+        0,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "a58d0a6b824a8b1c48d2284287959bb56686b899b8e1dd2a48a99d44708845ad"
+    },
+    {
+      "product": "tier1_task_028",
+      "tier": 1,
+      "stratum": [
+        2,
+        0,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "a3e85db5411907012c362032d7b0db6727a51bbcab7c4ed58174e60f74fc471b"
+    },
+    {
+      "product": "tier1_task_030",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          0
+        ]
+      ],
+      "input_sha256": "33ee6bb28f3a2e7fd06693d98e3ca4264787770b688a4abfffe0973611281809"
+    },
+    {
+      "product": "tier1_task_031",
+      "tier": 1,
+      "stratum": [
+        2,
+        0,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "304d276524e78a61e89d27c56558fcc7b85044ea025489e8b57c408ed3215878"
+    },
+    {
+      "product": "tier1_task_032",
+      "tier": 1,
+      "stratum": [
+        2,
+        0,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "a4ad739bdc1d26ccc2829b669ce66cab6ee3e31f995973debda3c57bd9480c70"
+    },
+    {
+      "product": "tier1_task_037",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          0
+        ]
+      ],
+      "input_sha256": "859b0d750c09504f7fe2b0ad3b268212a6b4cd6cc2f85c8d3fd8a4740850a951"
+    },
+    {
+      "product": "tier1_task_038",
+      "tier": 1,
+      "stratum": [
+        2,
+        0,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "211ecec66b2b05e55e8c68c5a5a5473141a4842b9e24d10f45c3492999ff71e3"
+    },
+    {
+      "product": "tier1_task_039",
+      "tier": 1,
+      "stratum": [
+        2,
+        0,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "339e851874ad7065a2ac04ab78ea220cb66d3830cd50bec0720693d8f9e2e540"
+    },
+    {
+      "product": "tier1_task_041",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          0
+        ]
+      ],
+      "input_sha256": "488b7720d67eb62068a28eec225cb5ce176c2bc526adc533dfecdbde43f397df"
+    },
+    {
+      "product": "tier1_task_042",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          0
+        ]
+      ],
+      "input_sha256": "f150618b28053a4eafdd1b3253533e6561459ee9639bbd15367cecfc17fd53d5"
+    },
+    {
+      "product": "tier1_task_043",
+      "tier": 1,
+      "stratum": [
+        2,
+        0,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "fc505e5d04d556eacf9297a61b139a9d25de8feb9691462728f5351a097d8542"
+    },
+    {
+      "product": "tier1_task_044",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "e58e6a14ef7143bd54003bea9bc7ec3fe51785c8bf0d4d47891f8d0207c0de3f"
+    },
+    {
+      "product": "tier1_task_047",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "accbeddb8b37769148667b4feee3937f5e7cc4df06d7db7b4dc8a1149e859139"
+    },
+    {
+      "product": "tier1_task_050",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          0
+        ]
+      ],
+      "input_sha256": "f97603546969e78ad0fb8136cc760b10fba363f33201b686c446abddcb459dc0"
+    },
+    {
+      "product": "tier1_task_055",
+      "tier": 1,
+      "stratum": [
+        2,
+        0,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "08a87776a8245a367910468d9abb5dbbc6ce3b3e7fa53af6cd7eb069f3ddf839"
+    },
+    {
+      "product": "tier1_task_057",
+      "tier": 1,
+      "stratum": [
+        2,
+        0,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "1320f7ce8e4c36702e548f448f16f63b6b5447fc8975c326fc8a6cd307927b1a"
+    },
+    {
+      "product": "tier1_task_058",
+      "tier": 1,
+      "stratum": [
+        2,
+        0,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "affb1e39555bcf0c2d97d1207dcae786c68e88a48b1d8aaf15bc996510ec676d"
+    },
+    {
+      "product": "tier1_task_061",
+      "tier": 1,
+      "stratum": [
+        2,
+        0,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "9ca6f9c678f3055a3aa89a81bb920af9f159c479949e9c99daf5d0d81da6d4ab"
+    },
+    {
+      "product": "tier1_task_064",
+      "tier": 1,
+      "stratum": [
+        2,
+        0,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "24d441bb28dba44f2865cf66e99a5725ff0a9886ac12c0153137f675c5a67296"
+    },
+    {
+      "product": "tier1_task_066",
+      "tier": 1,
+      "stratum": [
+        2,
+        0,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "f68358b46e87497f302d4a9da90726f632547fb71da8a4db005b1e47450e0ee6"
+    },
+    {
+      "product": "tier1_task_068",
+      "tier": 1,
+      "stratum": [
+        2,
+        0,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "44e64aa2e81f7ea32f980919c6759c36ef2d334d05fbef98b0f9b2e1d8b61dd8"
+    },
+    {
+      "product": "tier1_task_072",
+      "tier": 1,
+      "stratum": [
+        2,
+        0,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "3a63a7c76d50529b93d6356b33adf32302f41d07ac571a62a3c390dec1f6f517"
+    },
+    {
+      "product": "tier1_task_073",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "971e133fd2520078bd437a733b79ba5a4d5d5a484d98351fba1999ea8e139a6e"
+    },
+    {
+      "product": "tier1_task_074",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          0
+        ]
+      ],
+      "input_sha256": "4c1b1524c0eb7c6c893fcfb6eb57561a0bda93725ce503134873daecd57f18cd"
+    },
+    {
+      "product": "tier1_task_075",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "0ba536de63ee86319fed03730069d0871213dc5cda38a7183c9140f762c6b36e"
+    },
+    {
+      "product": "tier1_task_077",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          0
+        ]
+      ],
+      "input_sha256": "33646e7e72c51d23553d6418a0a661e1ade7e327d3cfb2609c90f7166b6e86fa"
+    },
+    {
+      "product": "tier1_task_079",
+      "tier": 1,
+      "stratum": [
+        2,
+        0,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "34f9a49b90540fd9de640b6560763f88675508c52c42307b88d4fd674ccb43be"
+    },
+    {
+      "product": "tier1_task_081",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "acdb7a722f98660229e5f49b2ce273db4621d20ead3f2dca38500e3a790fecd4"
+    },
+    {
+      "product": "tier1_task_085",
+      "tier": 1,
+      "stratum": [
+        2,
+        0,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "ea49cedf3c7640e49865a32f71574c0cfaafdb5d4f2d6f451b105d903bae2bcb"
+    },
+    {
+      "product": "tier1_task_087",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "47b6e3521056ea27cf5eb27bb42039c5662f2adee4b2019df98af9d48f8a7d4c"
+    },
+    {
+      "product": "tier1_task_088",
+      "tier": 1,
+      "stratum": [
+        2,
+        0,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "0156ffdbb41a1d3880e03ada01d5b3d6a70dc99fed320f96bad2bf4b60a35cd7"
+    },
+    {
+      "product": "tier1_task_089",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "7813f29a8be722d8409053af4d3d3bcc8e9171e213755860e231d0204f156a21"
+    },
+    {
+      "product": "tier1_task_090",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "6537faa94a4333d5ff661dd2a6eb695971d83737b9e6b24b4db0ed93be72188c"
+    },
+    {
+      "product": "tier1_task_091",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          0
+        ]
+      ],
+      "input_sha256": "3a05e65b8b0507c9aab6ca88d10175dd67a998857ceae34c4cdf6b3321c40729"
+    },
+    {
+      "product": "tier1_task_092",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          0
+        ]
+      ],
+      "input_sha256": "e16cdbdfd61eaf80abfe162c422e50b115cced3eae4827a4a4a1f5b107108a1c"
+    },
+    {
+      "product": "tier1_task_094",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "254e269625942a41b68cd5856953c117dd95a8caaab0a33205c407fc1fc5cb1b"
+    },
+    {
+      "product": "tier1_task_095",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "4f9ddcb50ce334e96fbe2c07893d003ba294a91f88745ffaaef71ab47dc07268"
+    },
+    {
+      "product": "tier1_task_096",
+      "tier": 1,
+      "stratum": [
+        2,
+        0,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "773a8f5ab3d282034a795974061fd7392fdd51eecc766ab892b5b9ced18dcdd6"
+    },
+    {
+      "product": "tier1_task_097",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          0
+        ]
+      ],
+      "input_sha256": "20d8b5b16c8a686b46a5012666087cd3f7945f92a1beb0675a757c2bef5d6502"
+    },
+    {
+      "product": "tier1_task_098",
+      "tier": 1,
+      "stratum": [
+        2,
+        0,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "58acb886ed3b34167708f4a7637b4ebbfd5f631261c3af679ef8f1c9b978b4d7"
+    },
+    {
+      "product": "tier1_task_100",
+      "tier": 1,
+      "stratum": [
+        2,
+        2,
+        0.0191,
+        [
+          0
+        ]
+      ],
+      "input_sha256": "6ced321b0af52e1e1b84c34d938e8ef29220dbb1fd4ea5bfb6d2100d6893f4d4"
+    },
+    {
+      "product": "tier2_task_001",
+      "tier": 2,
+      "stratum": [
+        3,
+        1,
+        0.0382,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "4a0ab9e590cc0613ba185fd4216343cdb392b207b695ebdf17c744838a493aaa"
+    },
+    {
+      "product": "tier2_task_005",
+      "tier": 2,
+      "stratum": [
+        3,
+        1,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "3c85f2e8f390d8a873fe906370a3f2d4c4c09818b25b524129751fcfdd0ee590"
+    },
+    {
+      "product": "tier2_task_006",
+      "tier": 2,
+      "stratum": [
+        3,
+        1,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "908e25813da413be062e603a4c67eb027750706ae4b3327447d5731bc0c6f1eb"
+    },
+    {
+      "product": "tier2_task_007",
+      "tier": 2,
+      "stratum": [
+        3,
+        1,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "42b46072661c03a5aa18bcf4689b3b80ba5cd6c242bbb210dc5f5c7f28ae913c"
+    },
+    {
+      "product": "tier2_task_009",
+      "tier": 2,
+      "stratum": [
+        4,
+        2,
+        0.0573,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "5f6a7460e47caa0e399822191cc59d475378a93e16fcebcad62bcc51a2c7937d"
+    },
+    {
+      "product": "tier2_task_010",
+      "tier": 2,
+      "stratum": [
+        3,
+        1,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "42e4477bea0fc2ad5084a772c8d7a7e5f59df3329629ac777c2e191d9eedf3a9"
+    },
+    {
+      "product": "tier2_task_011",
+      "tier": 2,
+      "stratum": [
+        2,
+        1,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "e6618ac1688022f8f7ca96abc05a0afe875971e76ad321978987730a87681e8a"
+    },
+    {
+      "product": "tier2_task_012",
+      "tier": 2,
+      "stratum": [
+        3,
+        1,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "e044c287dc14a74dc305f6394da5ac5899bd1dffd37f24273e657a71eb4c7b9b"
+    },
+    {
+      "product": "tier2_task_013",
+      "tier": 2,
+      "stratum": [
+        2,
+        1,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "e14a741a797628ceeaf3ba106167a9b5f558dd62ece3e9f5150d246e3b66b179"
+    },
+    {
+      "product": "tier2_task_017",
+      "tier": 2,
+      "stratum": [
+        3,
+        1,
+        0.0382,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "4ace9aa37b8fac361fb3714b1f4a5b64cbb4db93b5f40a083988158ff5c3f2b5"
+    },
+    {
+      "product": "tier2_task_019",
+      "tier": 2,
+      "stratum": [
+        3,
+        1,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "4cffc90a913b6b39896ca89c0ef83032717b4afb0bb64cec8592e84e385e5a2f"
+    },
+    {
+      "product": "tier2_task_020",
+      "tier": 2,
+      "stratum": [
+        4,
+        1,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "7f2b3cfb63daeaebf43ace1db62dc9b55667faa9e0f8c56c3515df3c0c524406"
+    },
+    {
+      "product": "tier2_task_021",
+      "tier": 2,
+      "stratum": [
+        3,
+        2,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "4f3d7997ed6e0b2088158bfc626ca75480976564a4cd98d6abb8fe925bf201fe"
+    },
+    {
+      "product": "tier2_task_022",
+      "tier": 2,
+      "stratum": [
+        4,
+        2,
+        0.0573,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "0dce39c08453fa18ead0563dda7216b2d0283399829308d633f5ce47a1fcf427"
+    },
+    {
+      "product": "tier2_task_024",
+      "tier": 2,
+      "stratum": [
+        3,
+        1,
+        0.0382,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "86715856c2b285ef9a6a01c10f0693b6ec7552f629ce4bd7b600cbb0f973bde2"
+    },
+    {
+      "product": "tier2_task_027",
+      "tier": 2,
+      "stratum": [
+        2,
+        1,
+        0.0191,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "50608a5d3b8114eecf5a85f979d90ed7739746ae15a14bcf95d2956022bc2865"
+    },
+    {
+      "product": "tier2_task_029",
+      "tier": 2,
+      "stratum": [
+        3,
+        1,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "b3b75bb637104534597c41143f56a96d435e3b3ff0ac978b9e62c7ac608c42e3"
+    },
+    {
+      "product": "tier2_task_031",
+      "tier": 2,
+      "stratum": [
+        3,
+        1,
+        0.0382,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "106125eeea46430f07e124fa685b4f55584e6a732652d4fbd3a98509061dcc5c"
+    },
+    {
+      "product": "tier2_task_032",
+      "tier": 2,
+      "stratum": [
+        3,
+        1,
+        0.0382,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "b0a1a68338916ce5589abeb66b7da5de16b8c4e55439bc34ca11f75eb0a511b6"
+    },
+    {
+      "product": "tier2_task_033",
+      "tier": 2,
+      "stratum": [
+        4,
+        2,
+        0.0573,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "b50b22373726d2639f126421948b5805ed263933953215c65ff301986fcb72d9"
+    },
+    {
+      "product": "tier2_task_034",
+      "tier": 2,
+      "stratum": [
+        3,
+        1,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "0029075ddcba55faea6aedd87ac31c23cdbb1dcb60457016fe81eee5e8d75fcc"
+    },
+    {
+      "product": "tier2_task_036",
+      "tier": 2,
+      "stratum": [
+        4,
+        1,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "0ab566633bee0a2abaf0e17c07475f662f6c935f1cbb28201fab282737d01d78"
+    },
+    {
+      "product": "tier2_task_037",
+      "tier": 2,
+      "stratum": [
+        4,
+        2,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "8effb883936b2a0e9718f4711627878054c5162c6b57437623ef3251f04cf3d6"
+    },
+    {
+      "product": "tier2_task_038",
+      "tier": 2,
+      "stratum": [
+        3,
+        2,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "1066d1ba23913cd314d5820f83b07825eb3694574e45f646d0e73f8b03f47c83"
+    },
+    {
+      "product": "tier2_task_039",
+      "tier": 2,
+      "stratum": [
+        2,
+        1,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "00e4c728d39e170f8acb05cafd5f3cfe40e1209c4ac6e89f711730c6274d05db"
+    },
+    {
+      "product": "tier2_task_040",
+      "tier": 2,
+      "stratum": [
+        4,
+        2,
+        0.0573,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "9afdb6dcc1a5099b89904fb067b042b4ac9b96356419c562962de44c2cb0c9a1"
+    },
+    {
+      "product": "tier2_task_042",
+      "tier": 2,
+      "stratum": [
+        2,
+        1,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "a085b0f9b2def9b3729ad398a0ae201ef0bd8d81aba65a251150b0930da9b308"
+    },
+    {
+      "product": "tier2_task_043",
+      "tier": 2,
+      "stratum": [
+        3,
+        1,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "9d4a05ecde53c1719f521602d44ec49715a2360c1724e8d1a19ff6f244a49df9"
+    },
+    {
+      "product": "tier2_task_045",
+      "tier": 2,
+      "stratum": [
+        4,
+        1,
+        0.0573,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "e27483dcf439395828b28700c02906c120de29616dafff189df1327c2b956227"
+    },
+    {
+      "product": "tier2_task_046",
+      "tier": 2,
+      "stratum": [
+        4,
+        1,
+        0.0573,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "e0a48f0f4e21065dbb3bf798a2b93bb33ba4de2fed9ac2b5a30982ddadaf41ec"
+    },
+    {
+      "product": "tier2_task_051",
+      "tier": 2,
+      "stratum": [
+        3,
+        1,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "e919f1fdd70b844d4bf6311097172219bc2b2b6dcddd33da464e7011ea668f7a"
+    },
+    {
+      "product": "tier2_task_053",
+      "tier": 2,
+      "stratum": [
+        4,
+        1,
+        0.0573,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "1e8819e902db394e6f5e22231b632d165092a46cade30fff49b429c73f9c9d99"
+    },
+    {
+      "product": "tier2_task_054",
+      "tier": 2,
+      "stratum": [
+        3,
+        1,
+        0.0382,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "c8c3cba70ab8cdd5273ed6b50fecf12ed5fcecd9c37d92d539a175592535aba3"
+    },
+    {
+      "product": "tier2_task_055",
+      "tier": 2,
+      "stratum": [
+        3,
+        1,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "264a6d7dbed709352b3566b751dca701129a166e0ca8069a50d8cf4081127aa1"
+    },
+    {
+      "product": "tier2_task_057",
+      "tier": 2,
+      "stratum": [
+        4,
+        2,
+        0.0573,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "9ed8fab418da26b40f341dc8854e46f54af0473a2add5c9d112507d0e0056679"
+    },
+    {
+      "product": "tier2_task_058",
+      "tier": 2,
+      "stratum": [
+        4,
+        2,
+        0.0573,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "a8ec29091ad27a5696e768eb8920f811d93d555a9211fb7212abb69e01468b71"
+    },
+    {
+      "product": "tier2_task_059",
+      "tier": 2,
+      "stratum": [
+        2,
+        1,
+        0.0191,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "4ef862513f022c0130d209d07415ce3b699f5cdd2de1c8af69c3c64c6cb15db2"
+    },
+    {
+      "product": "tier2_task_064",
+      "tier": 2,
+      "stratum": [
+        4,
+        1,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "100f1de6acb3c11f5dade3e35403d713cd0a14b39b6ef23e03baa244c4399680"
+    },
+    {
+      "product": "tier2_task_065",
+      "tier": 2,
+      "stratum": [
+        3,
+        2,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "b66cffaa46014ab938996e687f9e526a01365ee025987834620f337d38df8378"
+    },
+    {
+      "product": "tier2_task_066",
+      "tier": 2,
+      "stratum": [
+        3,
+        1,
+        0.0382,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "a10775a03cf15865a2558633e4786978f810880f967a6eab8db5384b275b25b4"
+    },
+    {
+      "product": "tier2_task_067",
+      "tier": 2,
+      "stratum": [
+        3,
+        1,
+        0.0382,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "f83a748e110b8c045c397e11cc1d34e64888541c1c7344a37c2f1aa5734dc631"
+    },
+    {
+      "product": "tier2_task_068",
+      "tier": 2,
+      "stratum": [
+        2,
+        1,
+        0.0191,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "e93e91e6db1aa3eb9c8367ac0c702566d02810a4146c29519acfc86cba24dc65"
+    },
+    {
+      "product": "tier2_task_071",
+      "tier": 2,
+      "stratum": [
+        3,
+        1,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "0884c4fdbedb6c211ec16b43b772b37ddb3997ced2546f371b03130b51618c83"
+    },
+    {
+      "product": "tier2_task_072",
+      "tier": 2,
+      "stratum": [
+        2,
+        1,
+        0.0191,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "88f5493f59d57118df6ae2edf8b704cf67b7fb2380ba6a9408837bf94530580f"
+    },
+    {
+      "product": "tier2_task_077",
+      "tier": 2,
+      "stratum": [
+        2,
+        1,
+        0.0191,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "12b9635bb241abb8915cae7e7e3d3c839993454ae350b8f1da17624a3ef12bd4"
+    },
+    {
+      "product": "tier2_task_078",
+      "tier": 2,
+      "stratum": [
+        3,
+        1,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "4faeb4ec0e95c56e6fa640ed24e21c6f73e3ddf6ec0dd8f5519d546d7ce9e070"
+    },
+    {
+      "product": "tier2_task_079",
+      "tier": 2,
+      "stratum": [
+        4,
+        2,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "3764d49853fa2c679ad492a9e4ec2cf91b5075ce5268be1c5bb1f06a5e0289a0"
+    },
+    {
+      "product": "tier2_task_080",
+      "tier": 2,
+      "stratum": [
+        3,
+        1,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "29e6e80eff22caaccfc5b6a2b25adf25dd691af8832de5b0e5881b0237ebbd91"
+    },
+    {
+      "product": "tier2_task_081",
+      "tier": 2,
+      "stratum": [
+        2,
+        1,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "79a73008062facd15f126267fbbcc289f554fafc8a7816d038aa0430137fb421"
+    },
+    {
+      "product": "tier2_task_082",
+      "tier": 2,
+      "stratum": [
+        3,
+        1,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "802972159661a126f1b15cd855cad58a62daa0dd171a68110fed2d3553d87cfe"
+    },
+    {
+      "product": "tier2_task_083",
+      "tier": 2,
+      "stratum": [
+        3,
+        1,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "9ac3b01d71e41f2e993b93c04de0e26ef6f505ce535d3697abe1114bfa079dd4"
+    },
+    {
+      "product": "tier2_task_084",
+      "tier": 2,
+      "stratum": [
+        4,
+        1,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "be2440429bf520003b949780104a7a322cab25e0df6f085e654accd907a5f138"
+    },
+    {
+      "product": "tier2_task_085",
+      "tier": 2,
+      "stratum": [
+        3,
+        2,
+        0.0382,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "b6abefd9d48a88f93a247ec1e15fe38704f58e3030a7f2a3a7f3f17e2c82339a"
+    },
+    {
+      "product": "tier2_task_087",
+      "tier": 2,
+      "stratum": [
+        3,
+        1,
+        0.0382,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "89ed65e710355d30c70c8e243179a73088f3c5220e3d5aad2c276b10b4bc30b0"
+    },
+    {
+      "product": "tier2_task_088",
+      "tier": 2,
+      "stratum": [
+        2,
+        1,
+        0.0191,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "bfdf6cde1695b1d9aeb55d3e044c1d8aa66452df58f6f5b7eb2b174710d010bd"
+    },
+    {
+      "product": "tier2_task_090",
+      "tier": 2,
+      "stratum": [
+        4,
+        1,
+        0.0573,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "402a6caf78c104770e0ed03ff9b3cd353f095d67f2d72404f43a8d337f895649"
+    },
+    {
+      "product": "tier2_task_092",
+      "tier": 2,
+      "stratum": [
+        3,
+        1,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "3c500be06b052f47df43f4e9b515485c4446ce644888d78d42bc5b115ec5a5d5"
+    },
+    {
+      "product": "tier2_task_093",
+      "tier": 2,
+      "stratum": [
+        3,
+        1,
+        0.0382,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "dbb8cf6d8bcfa83daeed16af0cb21ac4d2f3f784dc6d3771bca3b9f24383024d"
+    },
+    {
+      "product": "tier2_task_095",
+      "tier": 2,
+      "stratum": [
+        2,
+        1,
+        0.0191,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "d958f0245f4878a7246e9f754aa33ef7347639042282fa78a560cabc4c6da50d"
+    },
+    {
+      "product": "tier2_task_099",
+      "tier": 2,
+      "stratum": [
+        3,
+        1,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "3992513082cc284bef776ee7116fcea5f6da4e65af59ffb83451af3452a65544"
+    },
+    {
+      "product": "tier3_task_003",
+      "tier": 3,
+      "stratum": [
+        7,
+        5,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "612076f482c545f533ca25a07cb9c72d373310213754cf84eee3599f751629f5"
+    },
+    {
+      "product": "tier3_task_004",
+      "tier": 3,
+      "stratum": [
+        4,
+        0,
+        0.0382,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "3a0fd944324f846ea2df15467e02a23016c33a709c17b937af10239681f22e32"
+    },
+    {
+      "product": "tier3_task_005",
+      "tier": 3,
+      "stratum": [
+        8,
+        3,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "544cc38a6464d1f41fb7f2a6f7e1c4be94eab4c762a0759587648e4a2dfe24fd"
+    },
+    {
+      "product": "tier3_task_006",
+      "tier": 3,
+      "stratum": [
+        7,
+        3,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "53c2627e271526248abc56f9bac6439defcbf9288fa164fee81880148104e38a"
+    },
+    {
+      "product": "tier3_task_007",
+      "tier": 3,
+      "stratum": [
+        6,
+        4,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "72f8241b627ea13b3e886f9d02e9d28467f49ff4433cb4ea0dddf6af1017f914"
+    },
+    {
+      "product": "tier3_task_008",
+      "tier": 3,
+      "stratum": [
+        6,
+        2,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "97b6d6aff639b32f5c27b9f1d451b47f6a7c77743651a9ab99ca09b2322393a5"
+    },
+    {
+      "product": "tier3_task_009",
+      "tier": 3,
+      "stratum": [
+        5,
+        4,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "eb4a797d320696ed0f923587d341d6d2af109303a003f8ef9d6578fdf6f9fb74"
+    },
+    {
+      "product": "tier3_task_010",
+      "tier": 3,
+      "stratum": [
+        4,
+        2,
+        0.0191,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "b9b272e24cf80692dd8f62523d6dea20479f3aa6d301f034fb091e3a3c0ae8ec"
+    },
+    {
+      "product": "tier3_task_012",
+      "tier": 3,
+      "stratum": [
+        7,
+        1,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "096b901e56cdfa777673cc5b87c9aa39a3c4265dab91de006e970c97268c8b0f"
+    },
+    {
+      "product": "tier3_task_014",
+      "tier": 3,
+      "stratum": [
+        6,
+        3,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "e154835d05b74286ec32baa736f298538b80deb6b2463a22a48ebbd2b7e55839"
+    },
+    {
+      "product": "tier3_task_016",
+      "tier": 3,
+      "stratum": [
+        5,
+        2,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "fb352e73f8f33cda1461f2ba7e027b161403c6ab893ed64ac45a8dd4067edfd0"
+    },
+    {
+      "product": "tier3_task_018",
+      "tier": 3,
+      "stratum": [
+        8,
+        3,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "f42370a2edf1d1b25257ce1110cf6b327bbbbdbe90632a81837095e5c0c3f3d6"
+    },
+    {
+      "product": "tier3_task_020",
+      "tier": 3,
+      "stratum": [
+        11,
+        5,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "aac0456afe3e819d29fec20e57be2f7bff40c50f20c48bee70e418a49ff8eae4"
+    },
+    {
+      "product": "tier3_task_022",
+      "tier": 3,
+      "stratum": [
+        6,
+        3,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "03e32a117d8c7e8ee1147380402d7753348ac4ae0721295005cce70e7e263249"
+    },
+    {
+      "product": "tier3_task_024",
+      "tier": 3,
+      "stratum": [
+        4,
+        1,
+        0.0382,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "ee148653747dd835b5a001b6883a0b997633ddf3c044fb979bd1e1ed4cb4b6fb"
+    },
+    {
+      "product": "tier3_task_025",
+      "tier": 3,
+      "stratum": [
+        4,
+        2,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "eab1243126aa48ccedc4018d75f08a1265575a72aedf9fdbf12128c78e2a0009"
+    },
+    {
+      "product": "tier3_task_026",
+      "tier": 3,
+      "stratum": [
+        7,
+        4,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "9b117c877d017d9c33dd054afe5a6591c275cb246108143ea781a75af8a335c0"
+    },
+    {
+      "product": "tier3_task_028",
+      "tier": 3,
+      "stratum": [
+        5,
+        3,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "2855de339370a31cdc75a411fe3bee8421a871697cb613c846ae4d0ac184d298"
+    },
+    {
+      "product": "tier3_task_030",
+      "tier": 3,
+      "stratum": [
+        5,
+        4,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "ef4443077dd267b0fbdcf805a88c62a5816678be709ef3cba172ea843d108f9a"
+    },
+    {
+      "product": "tier3_task_031",
+      "tier": 3,
+      "stratum": [
+        5,
+        1,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "1df8a54c87556d044810c4fab550b82934376a4b93792d596511f2e8474f7351"
+    },
+    {
+      "product": "tier3_task_032",
+      "tier": 3,
+      "stratum": [
+        7,
+        2,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "098d1366f4ef15ea7eed721949bf13f387b47b02f7f3b7145c3b032e2d809971"
+    },
+    {
+      "product": "tier3_task_034",
+      "tier": 3,
+      "stratum": [
+        4,
+        3,
+        0.0191,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "9c6b1d3fc52443d775f958641380e720d84f17dabc72d679414fd99e3c4f4b43"
+    },
+    {
+      "product": "tier3_task_035",
+      "tier": 3,
+      "stratum": [
+        6,
+        2,
+        0.0382,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "385e2ab633b906e9565ee72b30bd58991c278dd90d05636bb3c6e4b2b48c5b06"
+    },
+    {
+      "product": "tier3_task_037",
+      "tier": 3,
+      "stratum": [
+        8,
+        2,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "6376dfa6892a44ae844c9ae1283bab8bdc684c6acc3acf8d0f05d4fe6f696c1e"
+    },
+    {
+      "product": "tier3_task_038",
+      "tier": 3,
+      "stratum": [
+        7,
+        3,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "74b3d258db4ba64123dcbe165cf0ed8fbf0ac19f16058e98d22b562afb39b071"
+    },
+    {
+      "product": "tier3_task_040",
+      "tier": 3,
+      "stratum": [
+        5,
+        3,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "309ac4870a158fb6da3c125c26aa00e3397f8eeaf92bffe205933fb667101f61"
+    },
+    {
+      "product": "tier3_task_043",
+      "tier": 3,
+      "stratum": [
+        7,
+        2,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "41af126e15bef2588fa4fe85979a6726856f6f5960778aeb99bf6820888d7dfe"
+    },
+    {
+      "product": "tier3_task_045",
+      "tier": 3,
+      "stratum": [
+        8,
+        5,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "f349272f3ba3ffbbd2a12ba2109d0dad4a701163d0a82f88e021336d0bc2aa14"
+    },
+    {
+      "product": "tier3_task_047",
+      "tier": 3,
+      "stratum": [
+        4,
+        1,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "4a7369190e5f923be39920cbf413c51d8204925b44804ca3926840747cdd3719"
+    },
+    {
+      "product": "tier3_task_048",
+      "tier": 3,
+      "stratum": [
+        7,
+        4,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "105e6802522aa14837538fd281fe35c57afbd4a1331ec11274279b88a2856718"
+    },
+    {
+      "product": "tier3_task_052",
+      "tier": 3,
+      "stratum": [
+        5,
+        0,
+        0.0573,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "ea7eec0ad0498ffea4200cf3e6636536b81e353a9e568f72b8ec732a92d68764"
+    },
+    {
+      "product": "tier3_task_053",
+      "tier": 3,
+      "stratum": [
+        9,
+        4,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "a1bd497f57ee687d174db80038f9da26acadc2f60d7cd52eddc4b8c7b927461f"
+    },
+    {
+      "product": "tier3_task_054",
+      "tier": 3,
+      "stratum": [
+        9,
+        2,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "2f2f878215dc2a3f743983a70bf98fad66e587c53885f961e2acd2fc6704fbfa"
+    },
+    {
+      "product": "tier3_task_056",
+      "tier": 3,
+      "stratum": [
+        5,
+        3,
+        0.0191,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "e7b8bb3f5129cbec7c76e0297c943e2d7749ccee8bf4ce2042417a69eff5ddfd"
+    },
+    {
+      "product": "tier3_task_057",
+      "tier": 3,
+      "stratum": [
+        4,
+        4,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "117fcb8c3b113e2cd597f14cbce376384404990f22e4b50cbcdf854447581482"
+    },
+    {
+      "product": "tier3_task_060",
+      "tier": 3,
+      "stratum": [
+        7,
+        5,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "6f75d9d43f5336d6763777b8054b45f7b7eb9015806b3b2fe261e87f8eb9f1a8"
+    },
+    {
+      "product": "tier3_task_061",
+      "tier": 3,
+      "stratum": [
+        4,
+        3,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "1c0c289f12066952efc18d250909035e4512238448cf5176c2dbea8629b331be"
+    },
+    {
+      "product": "tier3_task_062",
+      "tier": 3,
+      "stratum": [
+        5,
+        2,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "5ddf3e7e83d3d69a5bf32c942f2dae949ded611d0f72418b6806a3c993a9763b"
+    },
+    {
+      "product": "tier3_task_064",
+      "tier": 3,
+      "stratum": [
+        5,
+        4,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "e86a72b86b4f157a7a0acc034c104759b466f9f64a8d88dcbb1f5f96d5fb9d6f"
+    },
+    {
+      "product": "tier3_task_065",
+      "tier": 3,
+      "stratum": [
+        9,
+        4,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "c8ad4d91e974e5500ee95ac6d4478ec3ceba12cbf794cd0db0792ebad9e2242f"
+    },
+    {
+      "product": "tier3_task_067",
+      "tier": 3,
+      "stratum": [
+        9,
+        5,
+        0.0764,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "35486066f1519ffbe541e14b416e2ed6a3cc4cf98e2e18dfbdcd1db1a3a4813b"
+    },
+    {
+      "product": "tier3_task_070",
+      "tier": 3,
+      "stratum": [
+        6,
+        4,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "84639a338eb06946c55aba69db15287a1a620630afbf8d8b0570ffc65e27073f"
+    },
+    {
+      "product": "tier3_task_071",
+      "tier": 3,
+      "stratum": [
+        8,
+        6,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "e6de049aaba53bce87501261ae423ea0b48132ded94af3ee40821ffd774c99f8"
+    },
+    {
+      "product": "tier3_task_073",
+      "tier": 3,
+      "stratum": [
+        11,
+        5,
+        0.0764,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "ea08ebe96790da6abc93d6a69111c89483dbd094e40a848b1c449a30bedf3291"
+    },
+    {
+      "product": "tier3_task_074",
+      "tier": 3,
+      "stratum": [
+        9,
+        5,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "09adb38b1d3175fc5539b081757cea3411bb794bff1e28d7ca12d02a75948426"
+    },
+    {
+      "product": "tier3_task_075",
+      "tier": 3,
+      "stratum": [
+        10,
+        5,
+        0.0764,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "417c68e640af725f611782d340affc501be6fdb28d68199a4ecb7d43a86cf84b"
+    },
+    {
+      "product": "tier3_task_077",
+      "tier": 3,
+      "stratum": [
+        5,
+        1,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "097840040e48d06a0ba81b5819e8cdba171b35fcc828b0585ba7f1418e7b0d47"
+    },
+    {
+      "product": "tier3_task_079",
+      "tier": 3,
+      "stratum": [
+        9,
+        6,
+        0.0382,
+        [
+          "blocked"
+        ]
+      ],
+      "input_sha256": "1b90f72fc0aa17c24e132bbff2b7ab6aa30857b7e95c1f7ba345175adb6c4789"
+    },
+    {
+      "product": "tier3_task_081",
+      "tier": 3,
+      "stratum": [
+        6,
+        2,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "1e8ad6c4fb31da2f259a003e6e5c3e0ea2a36ce4536e95ab44bd41d0ded11487"
+    },
+    {
+      "product": "tier3_task_082",
+      "tier": 3,
+      "stratum": [
+        11,
+        4,
+        0.0764,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "5d4ba7e1cea679fbf3f4531287573034fdcd980ad98e9564fd344aebd584877e"
+    },
+    {
+      "product": "tier3_task_084",
+      "tier": 3,
+      "stratum": [
+        4,
+        0,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "e3db263fae0c9e04264cb53cc37d2be89749f3263da5926a9246d82cc9491c3a"
+    },
+    {
+      "product": "tier3_task_085",
+      "tier": 3,
+      "stratum": [
+        8,
+        5,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "0f638b77b39245cfe808e0d3444914979b04bead33fa18710e0c103085d6fb94"
+    },
+    {
+      "product": "tier3_task_086",
+      "tier": 3,
+      "stratum": [
+        5,
+        4,
+        0.0573,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "46b18e14def3feb1a497a2e4a9689fa018a1f101fa03c8540368feefb297ae0b"
+    },
+    {
+      "product": "tier3_task_087",
+      "tier": 3,
+      "stratum": [
+        10,
+        6,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "77348074ae3297a7297bdfacbd42fcf452437a9b0a2b2bdf1017ca1758bd2402"
+    },
+    {
+      "product": "tier3_task_092",
+      "tier": 3,
+      "stratum": [
+        9,
+        3,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "f09489ee75f76a03e1e6e2522ac94d04c5496af7355df502f3c5a17c1f025a40"
+    },
+    {
+      "product": "tier3_task_094",
+      "tier": 3,
+      "stratum": [
+        5,
+        5,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "f5199611a18560a7897ee5775fc801fde1d38d4e6cfc86bfaf0d99d47b7ad73b"
+    },
+    {
+      "product": "tier3_task_097",
+      "tier": 3,
+      "stratum": [
+        4,
+        1,
+        0.0191,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "42fe720039a0a676d24f91dfbcf9ab3244e8085624d82eddf1d5252a7ab65276"
+    },
+    {
+      "product": "tier3_task_098",
+      "tier": 3,
+      "stratum": [
+        8,
+        4,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "da8b6f9a42e79dfeab5eee1056b48045d1e046ff7ff9912b0c9a5a16544eb815"
+    },
+    {
+      "product": "tier3_task_099",
+      "tier": 3,
+      "stratum": [
+        7,
+        5,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "c98aeba96eae3fa8583043ed8c2f62fd931e12dbc03f0a93694f2e4af6a22c2a"
+    },
+    {
+      "product": "tier3_task_100",
+      "tier": 3,
+      "stratum": [
+        8,
+        3,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "e503f1b7583184da04bf33d21b19bfdd331e4e1bf4b076d3b55ab1c9dc25ab24"
+    },
+    {
+      "product": "tier4_task_001",
+      "tier": 4,
+      "stratum": [
+        12,
+        8,
+        0.0764,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "758e00d89fdec3887e2d762cf72328cdc1e232fcc6bde663e614e7c7022966a0"
+    },
+    {
+      "product": "tier4_task_004",
+      "tier": 4,
+      "stratum": [
+        11,
+        7,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "30a5298c11aeb9c4992295f347c419fc668567469770f5fa18a02fdd6f4d0a9d"
+    },
+    {
+      "product": "tier4_task_005",
+      "tier": 4,
+      "stratum": [
+        11,
+        6,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "78a3da59d40d27068289fc1ed338150fc4d077306655a6542b2858b72fc44dac"
+    },
+    {
+      "product": "tier4_task_007",
+      "tier": 4,
+      "stratum": [
+        12,
+        7,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "f6d77eb8bef85e1b9d9b252dd50b5ce2a4e8c44bf83b98372c536eb17c598d8d"
+    },
+    {
+      "product": "tier4_task_008",
+      "tier": 4,
+      "stratum": [
+        12,
+        6,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "781e098587d84c6b02ebd738d44d4af3fb598db41b709e9f1b73bed0e840244a"
+    },
+    {
+      "product": "tier4_task_010",
+      "tier": 4,
+      "stratum": [
+        8,
+        3,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "cc2888ca731ccd2f06cb71837a7a1f160fab018de337f4f3f410405a14480b69"
+    },
+    {
+      "product": "tier4_task_011",
+      "tier": 4,
+      "stratum": [
+        7,
+        4,
+        0.0191,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "a9fda15b4f0a0703ec520e6feb3f97114b95cd3b8d63d3becc142796e362c021"
+    },
+    {
+      "product": "tier4_task_012",
+      "tier": 4,
+      "stratum": [
+        11,
+        4,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "eb91b0bc2d49f00967c41cd73ec2783fd9e56fd24a6151efafbe42779569768c"
+    },
+    {
+      "product": "tier4_task_013",
+      "tier": 4,
+      "stratum": [
+        9,
+        3,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "52b67797a4cf119ab95e51d374c434a7cbb05b69d46f1c3b3ff8d7d225ad68de"
+    },
+    {
+      "product": "tier4_task_014",
+      "tier": 4,
+      "stratum": [
+        12,
+        6,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "8d1e85945ed22c7b07754da18f80e42a3e118d17a908e6e09d8802a225493f43"
+    },
+    {
+      "product": "tier4_task_015",
+      "tier": 4,
+      "stratum": [
+        9,
+        5,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "3f219e674ba018513291a43ebd0b220ac4637a81aeb349d41037626e5d9cdae6"
+    },
+    {
+      "product": "tier4_task_016",
+      "tier": 4,
+      "stratum": [
+        10,
+        5,
+        0.0764,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "bc45911a9097ee45e7d29ff6c65e6a79a3c24a7824fa1a98e9e5eebb99db3bcb"
+    },
+    {
+      "product": "tier4_task_017",
+      "tier": 4,
+      "stratum": [
+        9,
+        7,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "3a90408fe9a423483d289a01edb04b579e1695c364a4ae5fa2f36c00e7006927"
+    },
+    {
+      "product": "tier4_task_019",
+      "tier": 4,
+      "stratum": [
+        11,
+        3,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "a2366a66d2df56ee30f715bef55a76e316e3543707077a136c74a4f3f442242a"
+    },
+    {
+      "product": "tier4_task_020",
+      "tier": 4,
+      "stratum": [
+        6,
+        2,
+        0.0382,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "cda9ca649388596f69fe43b9dd695562aef00d1bbc06ae495d0d39b5fad23c15"
+    },
+    {
+      "product": "tier4_task_021",
+      "tier": 4,
+      "stratum": [
+        6,
+        4,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "c5dce3ef068d9e4d973062f6b2c01eb84231fa6d92b952161e868fd640d45563"
+    },
+    {
+      "product": "tier4_task_022",
+      "tier": 4,
+      "stratum": [
+        12,
+        4,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "94564a93fe21adedb2e103270c5decb9d66ccec7c68c91edbe1a2cbc6dbc1d83"
+    },
+    {
+      "product": "tier4_task_023",
+      "tier": 4,
+      "stratum": [
+        10,
+        4,
+        0.0764,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "55025f3b1b93705b4f526f1c33369ed5bdbc193ed874539b605732637ea8bcca"
+    },
+    {
+      "product": "tier4_task_026",
+      "tier": 4,
+      "stratum": [
+        7,
+        2,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "ef09ac39dc22a17783aa999dfe3a4abf48a602c8abbe79347e85aff18aba7359"
+    },
+    {
+      "product": "tier4_task_027",
+      "tier": 4,
+      "stratum": [
+        6,
+        3,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "1b7357e2a3f75ead097e5572747c85a034a4f61aa9dc2ce5dd8b58c96fce9547"
+    },
+    {
+      "product": "tier4_task_028",
+      "tier": 4,
+      "stratum": [
+        10,
+        5,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "d5d54ce017783edcf9be70994ec288e7a83200c73c344e53ddb2fb81f40104a1"
+    },
+    {
+      "product": "tier4_task_029",
+      "tier": 4,
+      "stratum": [
+        11,
+        7,
+        0.0764,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "f9b4dd001166a84249b2633d14875752e75c2ed2ff88f16dc275b638e196672c"
+    },
+    {
+      "product": "tier4_task_030",
+      "tier": 4,
+      "stratum": [
+        12,
+        4,
+        0.0764,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "bd86fd69e37517f90e768591aab2004e9b7e339896e13b578b37270d928606ac"
+    },
+    {
+      "product": "tier4_task_031",
+      "tier": 4,
+      "stratum": [
+        6,
+        3,
+        0.0573,
+        [
+          90
+        ]
+      ],
+      "input_sha256": "1ff986e7891653ab1e1ad746abdadb49b70a769a7bc61b88ce603f077ea9790d"
+    },
+    {
+      "product": "tier4_task_032",
+      "tier": 4,
+      "stratum": [
+        11,
+        5,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "b760a39eaf2f4ef1d864efe649c9da3b2bf42b286fc536a9f3e49166468dd495"
+    },
+    {
+      "product": "tier4_task_033",
+      "tier": 4,
+      "stratum": [
+        9,
+        1,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "8b7eb5f8e6a255e29c9d85ac270f437a40b033c6270dd282d4fd81eb77317242"
+    },
+    {
+      "product": "tier4_task_036",
+      "tier": 4,
+      "stratum": [
+        6,
+        3,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "423602fbf7d951985f778df49f5caadd7100321f9e754a6c7327bae92d8b07b8"
+    },
+    {
+      "product": "tier4_task_038",
+      "tier": 4,
+      "stratum": [
+        11,
+        4,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "27b00b6d74d8c3378e786a30ae205d9d1b9d6da76d268d150fbdcf1cad596646"
+    },
+    {
+      "product": "tier4_task_039",
+      "tier": 4,
+      "stratum": [
+        12,
+        8,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "b1aeeb6d935d5451b85be0ee48a660f733884686665cd66c06c95f66977783ab"
+    },
+    {
+      "product": "tier4_task_042",
+      "tier": 4,
+      "stratum": [
+        6,
+        1,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "b6ca7b2d700c24d93de4481ba8f96a11ae103f69b4ebb2b212c6e4319242eceb"
+    },
+    {
+      "product": "tier4_task_043",
+      "tier": 4,
+      "stratum": [
+        6,
+        2,
+        0.0191,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "e5990af6846dc8fe05690bfce8d8c9bd4df93de7480bc12a89c07ba3d7dcbed7"
+    },
+    {
+      "product": "tier4_task_044",
+      "tier": 4,
+      "stratum": [
+        8,
+        6,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "069b2d2f587cbfc77e5802c9a88073a5880609a2803e5b7daf244c50ac895b37"
+    },
+    {
+      "product": "tier4_task_046",
+      "tier": 4,
+      "stratum": [
+        7,
+        4,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "a9ca1512b0c502fa4672eefa65c2f3ef862794b657f304633749a85d301c4159"
+    },
+    {
+      "product": "tier4_task_048",
+      "tier": 4,
+      "stratum": [
+        9,
+        6,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "2b78bd4081954d1f859a5b3a58ea9afc62a1c80738e8fe7044cde4fb5d05f916"
+    },
+    {
+      "product": "tier4_task_049",
+      "tier": 4,
+      "stratum": [
+        10,
+        5,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "2528397eeeb45bcedda5e6d0708cf81dc1251e428b9cacd08818e0a892d525ff"
+    },
+    {
+      "product": "tier4_task_051",
+      "tier": 4,
+      "stratum": [
+        12,
+        3,
+        0.0573,
+        [
+          "blocked"
+        ]
+      ],
+      "input_sha256": "a131200d773102e8df96d13edf4d2fd58272ccd91a6b30918cf6d9064ed69505"
+    },
+    {
+      "product": "tier4_task_052",
+      "tier": 4,
+      "stratum": [
+        8,
+        5,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "94489b9c8cde73c62c5eabe08c9e1dcc141721341fbc778e07f6c0a83f3524e0"
+    },
+    {
+      "product": "tier4_task_053",
+      "tier": 4,
+      "stratum": [
+        6,
+        1,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "e445935370713f16ddb7110e4aa8f0b340a7f67516f0ef90f2fcf486e6cd4d71"
+    },
+    {
+      "product": "tier4_task_054",
+      "tier": 4,
+      "stratum": [
+        12,
+        6,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "711b6c5b07ecf0658b094b84de1c303ed409f2091f3f5c4fc7cb4cf41038f2e6"
+    },
+    {
+      "product": "tier4_task_055",
+      "tier": 4,
+      "stratum": [
+        11,
+        4,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "f94189b7a0b778eb54b903772ebd45c72ab174d8881f6f64504f6326fdd3900b"
+    },
+    {
+      "product": "tier4_task_057",
+      "tier": 4,
+      "stratum": [
+        10,
+        7,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "9cc80f29fe9c8411b07f2fe592db4a8d24ad0eca64aa6f958bbf5c3ea3e7d052"
+    },
+    {
+      "product": "tier4_task_063",
+      "tier": 4,
+      "stratum": [
+        6,
+        2,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "435367a4e9fdad4b2f13ea20fd3e0f38e46cb4122c0845fd7b9a87a873bdb387"
+    },
+    {
+      "product": "tier4_task_066",
+      "tier": 4,
+      "stratum": [
+        11,
+        3,
+        0.0764,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "2c4f5f12a1b92d66543c97a825adaeb84e5eb8bc350eb82b727cbe00415475cf"
+    },
+    {
+      "product": "tier4_task_068",
+      "tier": 4,
+      "stratum": [
+        6,
+        1,
+        0.0191,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "228e11c38a68283cdfa3adac5ad722867a17d2cd5912af8043f1af694253a984"
+    },
+    {
+      "product": "tier4_task_069",
+      "tier": 4,
+      "stratum": [
+        6,
+        3,
+        0.0191,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "9e86326016d8dba5ccf7fbd045d8a0827eafed58338f5ff99d4672b4753b8eab"
+    },
+    {
+      "product": "tier4_task_072",
+      "tier": 4,
+      "stratum": [
+        6,
+        5,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "2ddff05965c7eb08a8c868b6ae5b6d52e6d18116dc6a2e695241314e6f9e5fb1"
+    },
+    {
+      "product": "tier4_task_076",
+      "tier": 4,
+      "stratum": [
+        8,
+        5,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "035675bf3a811b79a0249dc484fa8255ab87150b7098dd3b50358d4a8a7103fa"
+    },
+    {
+      "product": "tier4_task_079",
+      "tier": 4,
+      "stratum": [
+        6,
+        2,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "d3316aaaf41510e0e0f1039aa0fe7355cbb70cec34559942ff9d46da87648aad"
+    },
+    {
+      "product": "tier4_task_082",
+      "tier": 4,
+      "stratum": [
+        6,
+        2,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "8e2fe1c7272398c38a3591a6562f5e09330c158697d74365a0f931557a9b2365"
+    },
+    {
+      "product": "tier4_task_083",
+      "tier": 4,
+      "stratum": [
+        9,
+        5,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "e28cef99d92c95e5a6ffdf062d1f804e557d8d19977a57a52f89650e3e790366"
+    },
+    {
+      "product": "tier4_task_084",
+      "tier": 4,
+      "stratum": [
+        8,
+        4,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "13ce3a20a28fb610d3c8273a2a154093448a6a93e599d72cc7facde2711933c7"
+    },
+    {
+      "product": "tier4_task_085",
+      "tier": 4,
+      "stratum": [
+        6,
+        2,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "b0993f1b6d4ecb9b945a2c767d424c413759fa4adadf833f52eef4e8350ef455"
+    },
+    {
+      "product": "tier4_task_087",
+      "tier": 4,
+      "stratum": [
+        9,
+        4,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "c07a370e2dbb0b8c5d581e9011f545deac989373bb692c485706dcc12a1e0749"
+    },
+    {
+      "product": "tier4_task_088",
+      "tier": 4,
+      "stratum": [
+        8,
+        1,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "cdb32842f122378bd16f0a389dcec829440065b40e05bbb78ef205ea94200f2e"
+    },
+    {
+      "product": "tier4_task_090",
+      "tier": 4,
+      "stratum": [
+        9,
+        2,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "740edd29f74927bfde2c374679d8f74f6439744d6e73ba8f0b61509fcfaf3792"
+    },
+    {
+      "product": "tier4_task_091",
+      "tier": 4,
+      "stratum": [
+        10,
+        3,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "1c234a0a485fbec247087438043c94ee2ae2160f28a4ad11bebc02726ce5dd1d"
+    },
+    {
+      "product": "tier4_task_092",
+      "tier": 4,
+      "stratum": [
+        7,
+        3,
+        0.0382,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "d3ece71cd8f111a6badf57091ffb6e0f81378d537d755bfa24264cf2459d523a"
+    },
+    {
+      "product": "tier4_task_093",
+      "tier": 4,
+      "stratum": [
+        6,
+        3,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "d6dbad3ff333616d31a391e92bf053903328cdd33d22a1722a7388fe7dda490f"
+    },
+    {
+      "product": "tier4_task_096",
+      "tier": 4,
+      "stratum": [
+        12,
+        5,
+        0.0573,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "41c05fc2fec3033b77e6ad116de5a92badc6da7e6392fb69b7aa1a27925f4902"
+    },
+    {
+      "product": "tier4_task_099",
+      "tier": 4,
+      "stratum": [
+        11,
+        2,
+        0.0764,
+        [
+          0,
+          90
+        ]
+      ],
+      "input_sha256": "3987ffeb13d5173b66d8ac8b739704debbbb73a3979bd61c17156ce9e7885222"
+    }
+  ]
+}

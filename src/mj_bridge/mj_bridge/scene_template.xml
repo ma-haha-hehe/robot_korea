@@ -1,8 +1,16 @@
 <mujoco model="panda_scene">
 
   <include file="panda.xml"/>
+  <size memory="128M"/>
+
+  <visual>
+    <headlight ambient="0.18 0.18 0.18" diffuse="0.4 0.4 0.4" specular="0.1 0.1 0.1"/>
+    <rgba haze="0.85 0.90 0.95 1"/>
+  </visual>
 
   <asset>
+    <texture name="studio_sky" type="skybox" builtin="gradient"
+             rgb1="0.72 0.80 0.90" rgb2="0.95 0.97 1.0" width="512" height="3072"/>
     <mesh name="lego_2x2" file="LEGO_Duplo_brick_2x2.stl" scale="0.001 0.001 0.001"/>
     <mesh name="lego_2x4" file="LEGO_Duplo_brick_2x4.stl" scale="0.001 0.001 0.001"/>
   </asset>
@@ -10,13 +18,17 @@
   <worldbody>
 
     <camera name="realsense" pos="0.4 0 1.2" fovy="60"/>
-    <light pos="0 0 1.5" dir="0 0 -1"/>
+    <light name="key_light" pos="0.2 -0.4 1.8" dir="0.1 0.2 -1"
+           directional="true" diffuse="0.4 0.4 0.4" ambient="0.04 0.04 0.04" castshadow="false"/>
+    <light name="fill_light" pos="0.8 0.6 1.2" dir="-0.3 -0.2 -1"
+           directional="true" diffuse="0.18 0.18 0.18" castshadow="false"/>
 
-    <geom name="floor" type="plane" size="0 0 0.05"/>
+    <geom name="floor" type="plane" size="0 0 0.05" rgba="0.62 0.67 0.73 1"/>
 
     <body name="table" pos="0.40 0 0.02">
         <geom
             name="table_geom"
+            rgba="0.44 0.48 0.53 1"
             type="box"
             size="0.30 0.50 0.02"
             contype="1"
