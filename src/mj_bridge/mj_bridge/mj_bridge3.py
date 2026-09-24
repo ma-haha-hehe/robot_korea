@@ -297,6 +297,7 @@ class MuJoCoActionServer(Node):
 
         # 当前 actuator 目标
         self.gripper_target = GRIPPER_OPEN_VALUE
+        self.gripper_control = GRIPPER_OPEN_VALUE
 
         # 夹爪插值起点
         self.gripper_start_value = GRIPPER_OPEN_VALUE
@@ -468,6 +469,9 @@ class MuJoCoActionServer(Node):
         return defaults
 
     def reset_benchmark_state(self):
+        self.max_gripper_penetration_m = 0.0
+        self.max_part_penetration_m = 0.0
+        self.max_robot_environment_penetration_m = 0.0
         self.collision_count = 0
         self.stability_violations = 0
         self._active_safety_contacts = set()
@@ -502,12 +506,22 @@ class MuJoCoActionServer(Node):
                     z_tol=float(self.benchmark_config.get("position_tolerance_z_m", 0.004)),
                     yaw_tol_deg=float(self.benchmark_config.get("yaw_tolerance_deg", 8.0)),
                 )
-                scored["success"] = bool(scored["success"] and not self.episode_timeout)
+                contact_valid = self.max_gripper_penetration_m <= 0.0005
+                physical_contacts_valid = (self.max_part_penetration_m <= .0005 and
+                                           self.max_robot_environment_penetration_m <= .0005)
+                scored["success"] = bool(scored["success"] and not self.episode_timeout
+                                         and contact_valid and physical_contacts_valid)
                 scored.update({
                     "episode_id": self.episode_manifest["episode_id"],
                     "seed": self.episode_manifest["seed"],
                     "elapsed_s": elapsed,
                     "timeout": self.episode_timeout,
+                    "gripper_contact_valid": contact_valid,
+                    "physical_contacts_valid": physical_contacts_valid,
+                    "max_part_penetration_m": self.max_part_penetration_m,
+                    "max_robot_environment_penetration_m": self.max_robot_environment_penetration_m,
+                    "attachment_count": len(self.fake_welds),
+                    "max_gripper_penetration_m": self.max_gripper_penetration_m,
                     "collision_count": self.collision_count,
                     "stability_violations": self.stability_violations,
                     "observation_mode": self.observation_mode,
@@ -635,6 +649,8 @@ class MuJoCoActionServer(Node):
     def handle_reset(self, request, response):
         del request
         with self.mj_lock:
+            # Reset sleeping islands and solver history along with the poses.
+            mujoco.mj_resetData(self.model, self.data)
             self.data.qpos[:] = self.episode_initial_qpos
             self.data.qvel[:] = self.episode_initial_qvel
             self.target_qpos[:] = self.episode_initial_qpos
@@ -642,6 +658,7 @@ class MuJoCoActionServer(Node):
             self.trajectory = None
             self.is_executing = False
             self.gripper_target = GRIPPER_OPEN_VALUE
+            self.gripper_control = GRIPPER_OPEN_VALUE
             self.gripper_goal_value = GRIPPER_OPEN_VALUE
             self.gripper_moving = False
             self.fake_welds.clear()
@@ -988,6 +1005,12 @@ class MuJoCoActionServer(Node):
     def step_pid(self):
         with self.mj_lock:
             self.data.ctrl[:] = 0.0
+            if hasattr(self, 'gripper_target'):
+                # Bound the servo setpoint speed; an instantaneous zero-width
+                # command otherwise drives a force-limited finger into impact.
+                change = self.gripper_target - self.gripper_control
+                limit = 0.06 * self.model.opt.timestep
+                self.gripper_control += max(-limit, min(limit, change))
 
             for i in range(self.model.nu):
                 actuator_name = mujoco.mj_id2name(
@@ -1023,19 +1046,49 @@ class MuJoCoActionServer(Node):
                     # writing Nm directly into a radian target saturates them.
                     gain = float(self.model.actuator_gainprm[i, 0])
                     bias_params = self.model.actuator_biasprm[i]
+                    # These arm actuators transmit through hinge joints.
+                    # mj_step integrates qpos/qvel after computing actuator
+                    # fields, so actuator_length/velocity still describe the
+                    # previous state here. Cancel the affine bias using the
+                    # current joint state, matching the next force evaluation.
+                    gear = self.model.actuator_gear[i, 0]
                     bias = (bias_params[0]
-                            + bias_params[1] * self.data.actuator_length[i]
-                            + bias_params[2] * self.data.actuator_velocity[i])
+                            + bias_params[1] * gear * self.data.qpos[qadr]
+                            + bias_params[2] * gear * self.data.qvel[vadr])
                     self.data.ctrl[i] = (torque - bias) / gain
 
                 # 夹爪 position actuator
                 elif actuator_name == "finger_actuator1":
-                    self.data.ctrl[i] = self.gripper_target
+                    self.data.ctrl[i] = self.gripper_control
 
                 elif actuator_name == "finger_actuator2":
-                    self.data.ctrl[i] = self.gripper_target
+                    self.data.ctrl[i] = self.gripper_control
 
             mujoco.mj_step(self.model, self.data)
+            if self.episode_manifest and self.data.ncon:
+                if not hasattr(self, '_grasp_finger_mask'):
+                    names = [self.model.body(i).name for i in range(self.model.nbody)]
+                    self._grasp_finger_mask = np.array([name in {'left_finger', 'right_finger'} for name in names])
+                    self._grasp_part_mask = np.array([name.startswith('bench__') for name in names])
+                    robot_names = {'hand', 'left_finger', 'right_finger'} | {f'link{i}' for i in range(1,8)}
+                    self._contact_robot_mask = np.array([name in robot_names for name in names])
+                    self._contact_environment_mask = np.array([name in {'world', 'table', 'assembly_base_plate'} for name in names])
+                a = self.model.geom_bodyid[self.data.contact.geom1]
+                b = self.model.geom_bodyid[self.data.contact.geom2]
+                selected = ((self._grasp_finger_mask[a] & self._grasp_part_mask[b]) |
+                            (self._grasp_finger_mask[b] & self._grasp_part_mask[a]))
+                parts = self._grasp_part_mask[a] | self._grasp_part_mask[b]
+                environment = ((self._contact_robot_mask[a] & self._contact_environment_mask[b]) |
+                               (self._contact_robot_mask[b] & self._contact_environment_mask[a]))
+                if np.any(parts):
+                    self.max_part_penetration_m = max(self.max_part_penetration_m,
+                                                     float(-np.min(self.data.contact.dist[parts])))
+                if np.any(environment):
+                    self.max_robot_environment_penetration_m = max(self.max_robot_environment_penetration_m,
+                                                                  float(-np.min(self.data.contact.dist[environment])))
+                if np.any(selected):
+                    self.max_gripper_penetration_m = max(self.max_gripper_penetration_m,
+                                                        float(-np.min(self.data.contact.dist[selected])))
 
     def should_weld_bottom_to_top(self, upper_body_name: str, lower_body_name: str) -> bool:
         """
@@ -1232,6 +1285,15 @@ class MuJoCoActionServer(Node):
             body1 = self.model.geom_bodyid[self.data.contact.geom1]
             body2 = self.model.geom_bodyid[self.data.contact.geom2]
             selected = self._snap_body_mask[body1] & self._snap_body_mask[body2]
+            # Never snap a part while a finger is still touching it: the
+            # positional correction would push it through the closed gripper.
+            if not hasattr(self, '_snap_finger_mask'):
+                self._snap_finger_mask = np.array([
+                    name in {"left_finger", "right_finger"} for name in self._snap_body_names])
+            held = np.zeros(self.model.nbody, dtype=bool)
+            held[body2[self._snap_finger_mask[body1]]] = True
+            held[body1[self._snap_finger_mask[body2]]] = True
+            selected &= ~held[body1] & ~held[body2]
             contact_pairs = list(zip(body1[selected], body2[selected]))
             for body1_id, body2_id in contact_pairs:
                 body1_name = self._snap_body_names[body1_id]

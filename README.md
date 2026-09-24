@@ -26,7 +26,20 @@ lego-bench run --product examples/products/traffic_light.yaml --seed 42 \
   --headless --executor baseline --output-dir runs/traffic-light-42
 ```
 
-Full Panda + MoveIt pipeline (recommended for external executors):
+Interactive pure-physics preview (desktop display required):
+
+```bash
+source enter_sim_env.sh
+export PYTHONPATH="$PWD/src/mj_bridge:$PYTHONPATH"
+MUJOCO_GL=glfw LP_NUM_THREADS=2 python scripts/view_physics_episode.py \
+  --product examples/products/catalog/final_product_hammer.yaml --seed 42
+```
+
+Change `--product` to select another registered design. The window stays open
+when execution ends; `result.json` records failures as well as successes.
+`--speed-scale` accepts 0.25–2 (default 1.5); final insertion remains slower.
+
+Full Panda + MoveIt pipeline (for external executors):
 
 ```bash
 ros2 launch mj_bridge lego_bench.launch.py \
@@ -58,6 +71,20 @@ python -m mj_bridge.benchmark_cli run \
 python scripts/test_product_suite.py --seeds 0 17 42 --skip-invalid-products
 ```
 
+The executor uses assembly by disassembly, shared with the research
+`myplanner.py` adapter: remove accessible parts from the finished structure with
+a 0°/90° gripper approach, then reverse that order. It rejects an unavailable
+approach instead of forcing a grasp. Preview the plan before execution:
+
+```bash
+python scripts/plan_assembly.py examples/products/catalog/final_product_hammer.yaml
+```
+
+Every automatic episode saves `assembly_plan.json`. The planner's world-frame
+gripper angle is converted to a part-relative offset for picking randomly
+oriented source parts; the finished part's orientation is preserved. Geometric
+accessibility does not establish dynamic stability or collision-free arm travel.
+
 The torque-controlled Oracle baseline reports failed grasps and unreachable poses.
 It is not a complete collision-free planner. The 36 legacy product targets are
 preserved; some describe unsupported geometry or floating targets. See
@@ -65,7 +92,11 @@ preserved; some describe unsupported geometry or floating targets. See
 
 The [measured validation report](docs/validation/REPORT_ZH.md) records the tested
 products and seeds, with final states and per-part scores in its JSON evidence.
-The recorded Oracle/snap run passed 87 episodes across 29 original products and
+This historical report predates the gripper-contact fixes and does **not**
+validate the current physics controller or prove nonpenetrating grasps.
+Current contact criteria and limitations are documented in
+[physics validation](docs/PHYSICS_VALIDATION_ZH.md).
+The historical Oracle/snap run passed 87 episodes across 29 original products and
 three seeds, plus seven separately named corrected designs. The seven invalid
 original targets remain available for inspection and are not counted as successes.
 

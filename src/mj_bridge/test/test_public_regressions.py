@@ -77,7 +77,8 @@ def test_invalid_goal_fails_before_scene_generation(monkeypatch, capsys, tmp_pat
     assert not (tmp_path/'unused').exists()
 
 
-def test_contact_snapshot_survives_contact_array_rebuild():
+@pytest.mark.parametrize("gripped", [False, True])
+def test_contact_snapshot_survives_contact_array_rebuild(gripped):
     import ast
     import mujoco
     import threading
@@ -89,11 +90,12 @@ def test_contact_snapshot_survives_contact_array_rebuild():
                   and n.name == 'auto_weld_touching_bricks')
     namespace = {'np':np, 'mujoco':mujoco, 'ASSEMBLY_BASE_NAME':'assembly_base_plate'}
     exec(compile(ast.Module(body=[method], type_ignores=[]), str(source), 'exec'), namespace)
+    finger = '<body name="left_finger" pos="-.06 0 .025"><geom type="sphere" size=".006"/></body>' if gripped else ''
     model = mujoco.MjModel.from_xml_string('''<mujoco><worldbody>
       <body name="assembly_base_plate"><geom type="box" size=".2 .2 .01"/></body>
       <body name="brick_a" pos="-.04 0 .015"><freejoint/><geom type="box" size=".016 .016 .01"/></body>
       <body name="brick_b" pos=".04 0 .015"><freejoint/><geom type="box" size=".016 .016 .01"/></body>
-      </worldbody></mujoco>''')
+      ''' + finger + '</worldbody></mujoco>')
     data = mujoco.MjData(model)
     mujoco.mj_forward(model, data)
     original_ncon = data.ncon
@@ -108,7 +110,7 @@ def test_contact_snapshot_survives_contact_array_rebuild():
         should_weld_bottom_to_top=lambda *args:False)
     namespace['auto_weld_touching_bricks'](node)
     assert original_ncon > 0 and data.ncon == 0
-    assert set(called) == {'brick_a','brick_b'}
+    assert set(called) == ({'brick_b'} if gripped else {'brick_a','brick_b'})
 
 
 @pytest.mark.parametrize('value', [float('nan'), float('inf'), -float('inf')])
@@ -226,12 +228,19 @@ def test_torque_controller_converts_affine_actuator_units():
     data = mujoco.MjData(model)
     data.qpos[0] = .4
     mujoco.mj_forward(model, data)
-    node = SimpleNamespace(model=model, data=data, target_qpos=np.array([.401]), mj_lock=threading.RLock())
-    namespace['step_pid'](node)
-    assert data.actuator_force[0] == pytest.approx(1.5, abs=1e-8)
+    node = SimpleNamespace(model=model, data=data, target_qpos=np.array([.401]), episode_manifest=None, mj_lock=threading.RLock())
+    # mj_step leaves actuator_length/velocity at the pre-integration state.
+    # Repeated control updates must use the current joint state, without an
+    # extra mj_forward between steps masking stale derived quantities.
+    for _ in range(3):
+        expected = np.clip(1500. * (.401 - data.qpos[0])
+                           - 120. * data.qvel[0] + data.qfrc_bias[0], -150., 150.)
+        namespace['step_pid'](node)
+        assert data.actuator_force[0] == pytest.approx(expected, abs=1e-8)
 
 
-def test_timed_out_perfect_assembly_is_not_episode_success():
+@pytest.mark.parametrize("elapsed,penetration", [(301., 0.), (0., .0006)])
+def test_invalid_perfect_assembly_is_not_episode_success(elapsed, penetration):
     import ast
     import threading
     from types import SimpleNamespace
@@ -239,14 +248,380 @@ def test_timed_out_perfect_assembly_is_not_episode_success():
     tree = ast.parse(source.read_text())
     cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'MuJoCoActionServer')
     method = next(n for n in cls.body if isinstance(n, ast.FunctionDef) and n.name == 'benchmark_result')
-    namespace = {'time': SimpleNamespace(monotonic=lambda:301.), 'score_episode':score_episode}
+    namespace = {'time': SimpleNamespace(monotonic=lambda:elapsed), 'score_episode':score_episode}
     exec(compile(ast.Module(body=[method], type_ignores=[]), str(source), 'exec'), namespace)
     episode = generate_episode(product(), seed=42)
     node = SimpleNamespace(mj_lock=threading.RLock(), episode_manifest=episode,
         episode_start_time=0., episode_timeout=False, benchmark_config={'max_episode_time_s':300},
         current_block_state=lambda:{'blocks':{b['id']:b for b in episode['target_blocks']}},
-        collision_count=0, stability_violations=0, observation_mode='oracle', connection_mode='snap')
+        max_gripper_penetration_m=penetration, max_part_penetration_m=0.,
+        max_robot_environment_penetration_m=0., fake_welds=[], collision_count=0, stability_violations=0, observation_mode='oracle', connection_mode='snap')
     result = namespace['benchmark_result'](node)
     assert result['completion'] == 1.
-    assert result['timeout'] is True
+    assert result['timeout'] is (elapsed >= 300.)
+    assert result['gripper_contact_valid'] is (penetration <= .0005)
     assert result['success'] is False
+
+
+def test_fingers_hold_surface_with_bounded_force():
+    """Exercise the actual Panda finger model against a free rigid brick."""
+    import copy
+    import xml.etree.ElementTree as ET
+    import mujoco
+    source = Path(__file__).resolve().parents[1] / 'mj_bridge'
+    panda = ET.parse(source / 'panda.xml').getroot()
+    model_xml = ET.Element('mujoco')
+    ET.SubElement(model_xml, 'compiler', angle='radian', autolimits='true',
+                  meshdir=str(source / 'assets'))
+    ET.SubElement(model_xml, 'option', timestep='.001', gravity='0 0 0',
+                  integrator='implicitfast')
+    model_xml.append(copy.deepcopy(panda.find('default')))
+    model_xml.append(copy.deepcopy(panda.find('asset')))
+    world = ET.SubElement(model_xml, 'worldbody')
+    hand = copy.deepcopy(panda.find(".//body[@name='hand']"))
+    hand.set('pos', '0 0 0')
+    hand.set('quat', '1 0 0 0')
+    hand.set('childclass', 'panda')
+    world.append(hand)
+    contacts = ET.SubElement(model_xml, 'contact')
+    for finger_name in ('left_finger', 'right_finger'):
+        ET.SubElement(contacts, 'exclude', body1='hand', body2=finger_name)
+    brick = ET.SubElement(world, 'body', name='test_brick', pos='0 0 .1034')
+    ET.SubElement(brick, 'freejoint')
+    ET.SubElement(brick, 'geom', type='box', size='.016 .016 .0095', mass='.012',
+                  solref='.004 1', solimp='.90 .98 .002', friction='5 .2 .02')
+    actuators = ET.SubElement(model_xml, 'actuator')
+    for actuator in panda.find('actuator'):
+        if actuator.get('name', '').startswith('finger_actuator'):
+            actuators.append(copy.deepcopy(actuator))
+    model = mujoco.MjModel.from_xml_string(ET.tostring(model_xml, encoding='unicode'))
+    data = mujoco.MjData(model)
+    for name in ('panda_finger_joint1', 'panda_finger_joint2'):
+        data.qpos[model.jnt_qposadr[model.joint(name).id]] = .04
+    peak = 0.
+    for _ in range(1200):
+        mujoco.mj_step(model, data)
+        assert np.max(np.abs(data.actuator_force)) <= 5.00001
+        if data.ncon:
+            peak = max(peak, float(-np.min(data.contact.dist)))
+    opening = sum(data.qpos[model.jnt_qposadr[model.joint(name).id]]
+                  for name in ('panda_finger_joint1', 'panda_finger_joint2'))
+    assert .030 < opening < .033
+    assert peak < .0005
+    assert data.ncon > 0
+
+
+@pytest.mark.parametrize('part', ['brick_2x2', 'brick_4x2'])
+def test_hollow_physics_targets_have_no_solid_overlap(tmp_path, part):
+    import mujoco
+    from mj_bridge.benchmark_cli import generate
+    from mj_bridge.benchmark_core import dump_yaml
+    definition = {'schema_version':1, 'product':{'name':'two_layers'}, 'blocks':[
+        {'id':str(i), 'type':part, 'color':'red',
+         'target':{'position':[0,0,i*.0192], 'yaw_deg':0}} for i in range(2)]}
+    path = tmp_path/'product.yaml'
+    dump_yaml(path, definition)
+    episode, scene = generate(str(path), 42, str(tmp_path/'run'), connection_mode='physics')
+    assert episode['geometry'] == 'hollow_primitives_v1'
+    assert episode['target_blocks'][0]['position'][2] == pytest.approx(.0646)
+    model = mujoco.MjModel.from_xml_path(str(scene))
+    data = mujoco.MjData(model)
+    bodies = set()
+    for block in episode['target_blocks']:
+        body = model.body(block['body_name']).id
+        bodies.add(body)
+        q = model.jnt_qposadr[model.body_jntadr[body]]
+        data.qpos[q:q+3] = block['position']
+        data.qpos[q+3:q+7] = [1,0,0,0]
+    mujoco.mj_forward(model, data)
+    for contact in data.contact:
+        a,b = model.geom_bodyid[contact.geom1], model.geom_bodyid[contact.geom2]
+        if a in bodies and b in bodies:
+            assert contact.dist >= -1e-6
+
+
+def test_ik_kinematics_matches_full_forward(tmp_path):
+    import mujoco
+    from mj_bridge.benchmark_cli import generate
+    _, scene = generate(str(CATALOG/'final_product_hammer.yaml'), 42,
+                        str(tmp_path/'episode'), connection_mode='physics')
+    model = mujoco.MjModel.from_xml_path(str(scene))
+    full, kinematic = mujoco.MjData(model), mujoco.MjData(model)
+    body = model.body('hand').id
+    for angle in (0., .4, -.6):
+        full.qpos[0] = angle
+        kinematic.qpos[:] = full.qpos
+        mujoco.mj_forward(model, full)
+        mujoco.mj_kinematics(model, kinematic)
+        mujoco.mj_comPos(model, kinematic)
+        np.testing.assert_allclose(kinematic.xpos[body], full.xpos[body], atol=1e-12)
+        np.testing.assert_allclose(kinematic.xmat[body], full.xmat[body], atol=1e-12)
+        a, b = np.zeros((3, model.nv)), np.zeros((3, model.nv))
+        c, d = np.zeros_like(a), np.zeros_like(b)
+        point = full.xpos[body] + full.xmat[body].reshape(3,3) @ [0,0,.1034]
+        mujoco.mj_jac(model, full, a, b, point, body)
+        mujoco.mj_jac(model, kinematic, c, d, point, body)
+        np.testing.assert_allclose(a, c, atol=1e-12)
+        np.testing.assert_allclose(b, d, atol=1e-12)
+
+
+@pytest.mark.parametrize('patch', [
+    {'max_part_penetration_m': .00051},
+    {'max_part_penetration_m': float('nan')},
+    {'max_robot_environment_penetration_m': None},
+    {'attachment_count': 1}, {'timeout': True},
+    {'physical_contacts_valid': False}, {'connection_mode': 'snap'},
+])
+def test_physics_report_rejects_invalid_contact_evidence(patch):
+    import runpy
+    script = Path(__file__).resolve().parents[3] / 'scripts/write_validation_report.py'
+    validate = runpy.run_path(str(script))['require_physics_evidence']
+    result = dict(connection_mode='physics', max_part_penetration_m=.0001,
+                  max_gripper_penetration_m=.0001, max_robot_environment_penetration_m=0.,
+                  attachment_count=0, timeout=False, physical_contacts_valid=True,
+                  gripper_contact_valid=True, execution_error=None)
+    validate(result)
+    result.update(patch)
+    with pytest.raises(ValueError):
+        validate(result)
+
+
+def test_physics_executor_stops_on_first_excessive_contact():
+    from types import SimpleNamespace
+    import time
+    from mj_bridge.reference_executor import OracleExecutor, ExecutionFailure
+    calls = []
+    node = SimpleNamespace(episode_start_time=time.monotonic(), benchmark_config={},
+                           connection_mode='physics', max_part_penetration_m=0.,
+                           max_robot_environment_penetration_m=0.)
+    def step_pid():
+        calls.append(True)
+        node.max_robot_environment_penetration_m = .0006
+    node.step_pid = step_pid
+    executor = OracleExecutor.__new__(OracleExecutor)
+    executor.node = node
+    executor.model = SimpleNamespace(opt=SimpleNamespace(timestep=.0005))
+    with pytest.raises(ExecutionFailure, match='motion stopped'):
+        executor.step(.1)
+    assert len(calls) == 1
+
+
+def test_disassembly_plan_reverses_removals_and_keeps_grasp_frame():
+    from mj_bridge.assembly_planner import plan_assembly, accessible
+    from mj_bridge.benchmark_core import load_registry
+    targets = [
+        dict(id='left', type='brick_4x2', position=[-.016, 0, 0], yaw_rad=math.pi/2),
+        dict(id='right', type='brick_4x2', position=[.016, 0, 0], yaw_rad=math.pi/2),
+        dict(id='top', type='brick_2x2', position=[0, 0, .0192], yaw_rad=0.),
+    ]
+    plan = plan_assembly(targets)
+    assert plan[-1]['block_id'] == 'top'
+    remaining = list(targets)
+    for step in reversed(plan):
+        target = next(b for b in remaining if b['id'] == step['block_id'])
+        assert accessible(target, remaining, step['grasp_spin_deg'], load_registry())
+        assert target['yaw_rad'] + step['grasp_offset_rad'] == pytest.approx(
+            math.radians(step['grasp_spin_deg']))
+        remaining.remove(target)
+    # Opposing neighbouring rectangles require the alternative world-axis grip.
+    assert next(s for s in plan if s['block_id'] == 'left')['grasp_spin_deg'] == 0
+
+
+def test_disassembly_plan_rejects_overlapping_goals():
+    from mj_bridge.assembly_planner import plan_assembly, PlanningError
+    targets = [dict(id=str(i), type='brick_4x2', position=[0, 0, 0], yaw_rad=0.)
+               for i in range(2)]
+    with pytest.raises(PlanningError, match='overlapping target'):
+        plan_assembly(targets)
+
+
+def test_legacy_planner_and_simulation_share_the_same_plan(tmp_path):
+    import runpy, yaml
+    from mj_bridge.assembly_planner import plan_assembly
+    script = Path(__file__).resolve().parents[2] / 'panda_pick/src/myplanner.py'
+    if not script.exists():
+        pytest.skip('legacy research adapter is outside the public package')
+    process = runpy.run_path(str(script))['process_blueprint']
+    src, dest = tmp_path/'input.yaml', tmp_path/'plan.yaml'
+    src.write_text(yaml.safe_dump({'blocks': [
+        {'name': 'red_2x4', 'pos': [0, 0, 0], 'rotation': [0,0,90]}]}))
+    process(src, dest)
+    plan = plan_assembly([dict(id='red_2x4',type='brick_4x2',position=[0,0,0],yaw_rad=math.pi/2)])
+    task = yaml.safe_load(dest.read_text())['tasksh'][0]
+    assert task['name'] == plan[0]['block_id']
+    assert task['grasp_spin'] == plan[0]['grasp_spin_deg']
+    assert task['grasp_offset_rad'] == pytest.approx(plan[0]['grasp_offset_rad'])
+
+
+def test_disassembly_plan_refuses_when_clearance_check_fails(monkeypatch):
+    from mj_bridge import assembly_planner as planner
+    monkeypatch.setattr(planner, 'accessible', lambda *args: False)
+    with pytest.raises(planner.PlanningError, match='no collision-free'):
+        planner.plan_assembly([dict(id='part', type='brick_2x2', position=[0,0,0], yaw_rad=0.)])
+
+
+def test_grasp_clearance_checks_off_axis_neighbour_footprint():
+    from mj_bridge.assembly_planner import accessible
+    from mj_bridge.benchmark_core import load_registry
+    target = dict(id='target', type='brick_2x2', position=[0,0,0], yaw_rad=0.)
+    neighbour = dict(id='diagonal', type='brick_2x2', position=[.023,.035,0], yaw_rad=0.)
+    assert not accessible(target, [target, neighbour], 0, load_registry())
+    assert accessible(target, [target, neighbour], 90, load_registry())
+
+
+def test_disassembly_checks_covering_footprint_not_only_centres():
+    from mj_bridge.assembly_planner import plan_assembly
+    base = dict(id='base', type='brick_4x2', position=[0,0,0], yaw_rad=0.)
+    top = dict(id='top', type='brick_2x2', position=[.024,0,.0192], yaw_rad=0.)
+    assert [step['block_id'] for step in plan_assembly([base, top])] == ['base','top']
+
+
+@pytest.mark.parametrize('source,target,spin', [(0,0,0),(30,90,0),(-170,90,90),(45,0,90)])
+def test_grasp_angles_preserve_the_product_orientation(source, target, spin):
+    from mj_bridge.assembly_planner import resolve_grasp_yaws
+    pick, place = resolve_grasp_yaws(math.radians(source), math.radians(target), spin)
+    resulting_part_yaw = math.radians(source) + place - pick
+    error = (resulting_part_yaw - math.radians(target) + math.pi) % (2*math.pi) - math.pi
+    assert error == pytest.approx(0.)
+    assert place == pytest.approx(math.radians(spin))
+
+
+@pytest.mark.parametrize('initial_opening,blocked', [(.016,False),(.032,False),(.032,True)])
+def test_release_waits_for_both_measured_fingers(initial_opening, blocked):
+    import ast
+    import threading
+    import time
+    from types import SimpleNamespace, MethodType
+    import mujoco
+    from mj_bridge.reference_executor import OracleExecutor, ExecutionFailure
+    right_limit = .032 if blocked else .04
+    model = mujoco.MjModel.from_xml_string(f'''<mujoco>
+      <compiler autolimits="true"/>
+      <option timestep=".0005" gravity="0 0 0" integrator="implicitfast"/>
+      <worldbody>
+        <body name="left_finger" pos="-.1 0 0"><joint name="panda_finger_joint1" type="slide" axis="0 1 0" range="0 .04"/><geom type="sphere" size=".004" mass=".03"/></body>
+        <body name="right_finger" pos=".1 0 0"><joint name="panda_finger_joint2" type="slide" axis="0 1 0" range="0 {right_limit}"/><geom type="sphere" size=".004" mass=".03"/></body>
+        <body name="part" pos="1 0 0"><geom type="sphere" size=".004"/></body>
+      </worldbody>
+      <actuator>
+        <position name="finger_actuator1" joint="panda_finger_joint1" kp="5000" kv="80" forcerange="-5 5"/>
+        <position name="finger_actuator2" joint="panda_finger_joint2" kp="5000" kv="80" forcerange="-5 5"/>
+      </actuator></mujoco>''')
+    data = mujoco.MjData(model)
+    data.qpos[:] = initial_opening
+    mujoco.mj_forward(model,data)
+    source = Path(__file__).resolve().parents[1]/'mj_bridge/mj_bridge3.py'
+    tree = ast.parse(source.read_text())
+    cls = next(n for n in tree.body if isinstance(n,ast.ClassDef) and n.name=='MuJoCoActionServer')
+    method = next(n for n in cls.body if isinstance(n,ast.FunctionDef) and n.name=='step_pid')
+    namespace = {'np':np,'mujoco':mujoco}
+    exec(compile(ast.Module(body=[method],type_ignores=[]),str(source),'exec'),namespace)
+    node=SimpleNamespace(model=model,data=data,target_qpos=data.qpos.copy(),mj_lock=threading.RLock(),
+                         gripper_control=0.,gripper_target=0.,episode_manifest=None,
+                         episode_start_time=time.monotonic(),benchmark_config={},connection_mode='physics',
+                         max_part_penetration_m=0.,max_robot_environment_penetration_m=0.,update_safety_metrics=lambda:None)
+    node.step_pid=MethodType(namespace['step_pid'],node)
+    executor=OracleExecutor.__new__(OracleExecutor)
+    executor.node,executor.model,executor.data=node,model,data
+    target=dict(id='brick',body_name='part')
+    if blocked:
+        with pytest.raises(ExecutionFailure,match='retreat cancelled'):
+            executor.open_gripper_before_retreat(target)
+        assert data.qpos[0] >= .0395 and data.qpos[1] < .0395
+    else:
+        result=executor.open_gripper_before_retreat(target)
+        assert data.time > .67
+        assert min(result['finger_positions_m']) >= .0395
+        assert result['target_contact'] is False
+        executor.prepare_grasp_opening('brick_4x2', 0., 0.)
+        assert data.qpos == pytest.approx([.02, .02], abs=.0005)
+        executor.prepare_grasp_opening('brick_4x2', math.pi/2, 0.)
+        assert data.qpos == pytest.approx([.036, .036], abs=.0005)
+
+
+@pytest.mark.parametrize('failure', ['none', 'shift', 'tilt', 'missing'])
+def test_released_part_gate_stops_before_building_on_failed_placement(failure):
+    from types import SimpleNamespace
+    from mj_bridge.reference_executor import OracleExecutor, ExecutionFailure
+    target = dict(id='released', type='brick_2x2', position=[.35, .35, .0646], yaw_rad=0.)
+    observed = dict(position=target['position'][:], yaw_rad=0., quaternion_wxyz=[1., 0., 0., 0.])
+    if failure == 'shift': observed['position'][0] += .02
+    if failure == 'tilt': observed['quaternion_wxyz'] = [math.cos(.1), math.sin(.1), 0., 0.]
+    actual = {'blocks': {} if failure == 'missing' else {'released': observed}}
+    executor = OracleExecutor.__new__(OracleExecutor)
+    executor.perception = None
+    executor.events = [{'block': 'released'}]
+    # Pending blocks deliberately have no observation; the gate only checks released ones.
+    executor.node = SimpleNamespace(episode_manifest={'target_blocks': [target, dict(target, id='pending')]},
+                                    current_block_state=lambda: actual)
+    if failure == 'none':
+        executor.verify_released_parts()
+    else:
+        with pytest.raises(ExecutionFailure, match='released parts moved or tilted'):
+            executor.verify_released_parts()
+
+
+@pytest.mark.parametrize('part,yaw', [('brick_2x2', 0.), ('brick_4x2', math.pi/2)])
+def test_adjacent_drop_has_clearance_for_small_placement_error(part, yaw):
+    import xml.etree.ElementTree as ET
+    import mujoco
+    from mj_bridge.scene_builder import create_episode_brick_body
+    root = ET.Element('mujoco')
+    ET.SubElement(root, 'option', timestep='.0005', integrator='implicitfast')
+    world = ET.SubElement(root, 'worldbody')
+    ET.SubElement(world, 'geom', type='plane', size='.2 .2 .01')
+    fixed = create_episode_brick_body(dict(type='brick_2x2', body_name='placed',
+        geometry='hollow_primitives_v1', position=[.00005, 0., .0186]))
+    fixed.remove(fixed.find('freejoint'))
+    world.append(fixed)
+    world.append(create_episode_brick_body(dict(type=part, body_name='falling',
+        geometry='hollow_primitives_v1', position=[.032, 0., .05], yaw_rad=yaw)))
+    model = mujoco.MjModel.from_xml_string(ET.tostring(root, encoding='unicode'))
+    data = mujoco.MjData(model)
+    pair = {model.body('placed').id, model.body('falling').id}
+    for _ in range(1200):
+        mujoco.mj_step(model, data)
+        assert not any({int(model.geom_bodyid[c.geom1]), int(model.geom_bodyid[c.geom2])} == pair
+                       for c in data.contact)
+    body = model.body('falling').id
+    assert data.xpos[body] == pytest.approx([.032, 0., .0186], abs=.0001)
+    assert data.xmat[body, 8] > math.cos(math.radians(1.))
+
+
+@pytest.mark.parametrize('part,yaw,spin', [('brick_4x2',0.,0), ('brick_4x2',math.pi/2,90), ('brick_2x2',0.,90)])
+def test_planner_prefers_small_safe_jaw_span(part,yaw,spin):
+    from mj_bridge.assembly_planner import plan_assembly
+    target=dict(id='part',type=part,position=[0,0,0],yaw_rad=yaw)
+    assert plan_assembly([target])[0]['grasp_spin_deg']==spin
+
+
+def test_small_jaw_span_never_overrides_clearance():
+    from mj_bridge.assembly_planner import plan_assembly
+    target=dict(id='long',type='brick_4x2',position=[0,0,0],yaw_rad=0.)
+    neighbour=dict(id='adjacent',type='brick_2x2',position=[0,.032,0],yaw_rad=0.)
+    step=next(s for s in plan_assembly([target,neighbour]) if s['block_id']=='long')
+    assert step['grasp_spin_deg']==90
+
+
+@pytest.mark.parametrize('problem', ['position','flipped_orientation','settles'])
+def test_grasp_pose_confirmation_uses_measured_pose(problem):
+    from types import SimpleNamespace
+    from mj_bridge.reference_executor import OracleExecutor,ExecutionFailure
+    executor=OracleExecutor.__new__(OracleExecutor)
+    executor.hand=0
+    executor.tool_offset=np.zeros(3)
+    desired=np.diag([1.,-1.,-1.])
+    executor.data=SimpleNamespace(xmat=desired.reshape(1,9).copy(),xpos=np.zeros((1,3)))
+    elapsed=[]
+    if problem=='flipped_orientation':executor.data.xmat[:]=np.eye(3).reshape(1,9)
+    else:executor.data.xpos[0,0]=.01
+    def step(seconds):
+        elapsed.append(seconds)
+        if problem=='settles' and sum(elapsed)>.1:executor.data.xpos[:]=0.
+    executor.step=step
+    if problem=='settles':
+        executor.confirm_grasp_pose([0,0,0],0.)
+        assert sum(elapsed)>.1
+    else:
+        with pytest.raises(ExecutionFailure,match='closure cancelled'):
+            executor.confirm_grasp_pose([0,0,0],0.,timeout_s=.2)

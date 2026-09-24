@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import os
+import math
+import xml.etree.ElementTree as ET
 import shutil
 import json
 import importlib.util
@@ -29,15 +31,22 @@ def oracle_preflight():
     return {'backend': 'oracle', 'ready': not errors, 'errors': errors}
 
 
-def generate(product_path: str, seed: int, output_dir: str) -> tuple[dict, Path]:
+def generate(product_path: str, seed: int, output_dir: str, connection_mode="snap", robot_base_x=0., contact_profile="loose") -> tuple[dict, Path]:
+    if not math.isfinite(robot_base_x):
+        raise ValueError("robot base X must be finite")
     output = Path(output_dir).resolve()
     output.mkdir(parents=True, exist_ok=True)
     product = normalized_from_path(product_path)
-    episode = generate_episode(product, seed=seed)
+    episode = generate_episode(product, seed=seed, connection_mode=connection_mode, contact_profile=contact_profile)
+    episode["robot_base_position_m"] = [float(robot_base_x), 0., 0.]
     product_out = output / "product.normalized.yaml"
     manifest = output / "episode_manifest.yaml"
     scene = output / "scene.xml"
     shutil.copy2(Path(BASE_DIR) / "panda.xml", output / "panda.xml")
+    if robot_base_x != 0.:
+        tree = ET.parse(output / "panda.xml")
+        tree.find('.//body[@name="link0"]').set("pos", f"{robot_base_x} 0 0")
+        tree.write(output / "panda.xml")
     shutil.copy2(Path(BASE_DIR) / "hand.xml", output / "hand.xml")
     shutil.copytree(
         Path(BASE_DIR) / "assets", output / "assets", dirs_exist_ok=True,
@@ -66,6 +75,7 @@ def main(argv=None):
     generate_cmd = commands.add_parser("generate", help="generate a deterministic loose-parts scene")
     generate_cmd.add_argument("--product", required=True)
     generate_cmd.add_argument("--seed", type=int, default=0)
+    generate_cmd.add_argument("--connection-mode", choices=["snap", "physics"], default="snap")
     generate_cmd.add_argument("--output-dir", default="runs/latest")
 
     run_cmd = commands.add_parser("run", help="generate and run one benchmark episode")
@@ -73,6 +83,7 @@ def main(argv=None):
     run_cmd.add_argument("--seed", type=int, default=0)
     run_cmd.add_argument("--output-dir", default="runs/latest")
     run_cmd.add_argument("--headless", action="store_true")
+    run_cmd.add_argument("--speed-scale", type=float, default=1.5, help="baseline motion speed multiplier (0.25 to 2)")
     run_cmd.add_argument("--observation", choices=["oracle", "rgbd"], default="oracle")
     run_cmd.add_argument("--connection-mode", choices=["snap", "physics"], default="snap")
     run_cmd.add_argument("--executor", choices=["external", "baseline", "oracle-baseline"], default="external",
@@ -80,6 +91,10 @@ def main(argv=None):
     run_cmd.add_argument("--backend", choices=["oracle", "groundingdino-sam-foundationpose"], default="oracle")
     run_cmd.add_argument("--allow-invalid-product", action="store_true",
                          help="diagnostic only: execute a target rejected by nominal geometry checks")
+
+    for contact_parser in (generate_cmd, run_cmd):
+        contact_parser.add_argument('--contact-profile', choices=['loose', 'plastic'], default='loose',
+            help='physics contact model; plastic is an uncalibrated compliant stud fit')
 
     doctor_cmd = commands.add_parser("doctor", help="check optional perception dependencies")
     doctor_cmd.add_argument("--backend", choices=["oracle", "groundingdino-sam-foundationpose"], default="oracle")
@@ -102,7 +117,14 @@ def main(argv=None):
     summary_cmd = commands.add_parser("summarize", help="summarize result.json files under a run directory")
     summary_cmd.add_argument("run_dir")
 
+    for command in (generate_cmd, run_cmd):
+        command.add_argument("--robot-base-x", type=float, default=0.,
+                             help="world X position of the simulated robot base in metres")
     args = parser.parse_args(argv)
+    if hasattr(args, "robot_base_x") and not math.isfinite(args.robot_base_x):
+        parser.error("robot base X must be finite")
+    if args.command == "run" and args.robot_base_x != 0. and args.executor == "external":
+        parser.error("a shifted robot base currently requires the baseline executor; external MoveIt frame alignment is not configured")
     if args.command == "doctor":
         from .perception import vision_preflight
         status = (oracle_preflight()
@@ -132,7 +154,7 @@ def main(argv=None):
         dump_yaml(args.output, product)
         print(f"WROTE: {Path(args.output).resolve()}")
     elif args.command == "generate":
-        episode, scene = generate(args.product, args.seed, args.output_dir)
+        episode, scene = generate(args.product, args.seed, args.output_dir, connection_mode=args.connection_mode, robot_base_x=args.robot_base_x, contact_profile=args.contact_profile)
         print(f"EPISODE: {episode['episode_id']}")
         print(f"SCENE: {scene}")
     elif args.command == "score":
@@ -158,6 +180,8 @@ def main(argv=None):
         }
         print(json.dumps(summary, indent=2))
     elif args.command == "run":
+        if not .25 <= args.speed_scale <= 2.:
+            parser.error("--speed-scale must be between 0.25 and 2")
         if args.connection_mode == "snap" and not args.allow_invalid_product:
             from .product_geometry import audit_product
             report = audit_product(normalized_from_path(args.product))
@@ -175,7 +199,7 @@ def main(argv=None):
             args.observation = "rgbd"
         if args.executor == "oracle-baseline" and args.observation != "oracle":
             parser.error("oracle-baseline requires --observation oracle; it cannot validate visual perception")
-        episode, scene = generate(args.product, args.seed, args.output_dir)
+        episode, scene = generate(args.product, args.seed, args.output_dir, connection_mode=args.connection_mode, robot_base_x=args.robot_base_x, contact_profile=args.contact_profile)
         output = Path(args.output_dir).resolve()
         os.environ["MJ_BRIDGE_MODEL"] = str(scene)
         os.environ["LEGO_BENCH_MANIFEST"] = str(output / "episode_manifest.yaml")
@@ -191,7 +215,7 @@ def main(argv=None):
             if args.backend == "oracle" and args.observation != "oracle":
                 parser.error("the Oracle baseline requires --observation oracle")
             from .reference_executor import execute
-            result = execute(output, backend=args.backend)
+            result = execute(output, backend=args.backend, speed_scale=args.speed_scale)
             print(json.dumps(result, indent=2))
             return 0 if result["success"] else 1
         from .mj_bridge3 import main as bridge_main
