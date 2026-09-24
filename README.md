@@ -87,9 +87,9 @@ Then select a generated task YAML with `--product`. The importer preserves the
 original relative target geometry and recorded starting layout. Plastic parameters
 are simulation settings, not measured ABS properties; see
 [contact model and validation limits](docs/PLASTIC_CONTACT_ZH.md).
-This release checkpoint records 36 original tasks with verified Oracle physical
-execution and three unresolved cases; the 240-task sample is not complete. See
-[release status](docs/RELEASE_STATUS_ZH.md) and the linked measured evidence.
+The archived release checkpoint records 36 original tasks with verified Oracle
+physical execution. Validation is specific to the recorded controller version
+and task inputs; see [validation scope](docs/RELEASE_STATUS_ZH.md) and the linked evidence.
 Preview output is labelled separately from regression evidence.
 
 Full Panda + MoveIt pipeline (for external executors):
