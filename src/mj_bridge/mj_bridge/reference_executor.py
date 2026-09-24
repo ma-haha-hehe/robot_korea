@@ -313,12 +313,42 @@ class OracleExecutor:
             self.step(.01)
         self.step(.1)
 
+    def confirm_held_part(self, target):
+        """Hold the arm and stop if either fingertip loses its load."""
+        part = self.model.body(target['body_name']).id
+        fingers = {self.model.body(name).id for name in ('left_finger', 'right_finger')}
+        for attempt in range(9):
+            loaded = set()
+            if self.part_contacts_observable(part):
+                for index, contact in enumerate(self.data.contact):
+                    bodies = [int(self.model.geom_bodyid[g])
+                              for g in (contact.geom1, contact.geom2)]
+                    if part not in bodies or contact.dist > .0001:
+                        continue
+                    other = bodies[1] if bodies[0] == part else bodies[0]
+                    if other not in fingers:
+                        continue
+                    force = np.zeros(6)
+                    mujoco.mj_contactForce(self.model, self.data, index, force)
+                    if force[0] > .01:
+                        loaded.add(other)
+            if loaded == fingers:
+                return
+            # A brief contact transition may recover while the arm holds still.
+            # Never chase the measured pose of a falling or resting loose part.
+            if attempt == 0:
+                self.node.target_qpos[self.qadr] = self.data.qpos[self.qadr]
+            if attempt < 8:
+                self.step(.01)
+        raise ExecutionFailure(f"held-part alignment lost the two-finger grasp: {target['id']}")
+
     def align_held_part(self, target):
         """Correct the arm pose from the measured part pose, without moving the part directly."""
         if self.perception is not None:
             raise ExecutionFailure('physics insertion requires validated in-hand pose tracking')
         period = math.radians(load_registry()[target['type']]['yaw_symmetry_deg'])
         for _ in range(6):
+            self.confirm_held_part(target)
             observed = self.node.current_block_state()['blocks'][target['id']]
             position = np.asarray(observed['position'])
             delta = np.asarray(target['position'])[:2] - position[:2]
