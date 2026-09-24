@@ -642,8 +642,9 @@ def build(
     if episode_manifest:
         episode = load_benchmark_yaml(episode_manifest)
         if episode.get('connection_mode') == 'physics':
-            # Resting parts need not repeatedly solve hundreds of coplanar
-            # contacts. MuJoCo wakes sleeping islands on physical interaction.
+            # Unhandled supply parts may sleep. The Oracle executor permanently
+            # disables sleeping for each picked part so release and seating
+            # checks retain actual contacts throughout assembly.
             option = root.find('option')
             if option is None:
                 option = ET.SubElement(root, 'option')

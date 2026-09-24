@@ -14,6 +14,8 @@ from mj_bridge.reference_executor import OracleExecutor, ExecutionFailure
 def main():
     parser = argparse.ArgumentParser(description="Watch a torque-controlled Oracle physics episode.")
     parser.add_argument('--product', default='examples/products/catalog/final_product_hammer.yaml')
+    parser.add_argument('--contact-profile', choices=['loose', 'plastic'], default='loose')
+    parser.add_argument('--robot-base-x', type=float, default=0.)
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--speed-scale', type=float, default=1.5)
     parser.add_argument('--output-dir', default='runs/viewer/' + time.strftime('%Y%m%d-%H%M%S'))
@@ -21,7 +23,10 @@ def main():
     if not .25 <= args.speed_scale <= 2.:
         parser.error('--speed-scale must be between 0.25 and 2')
     out = Path(args.output_dir).resolve()
-    _, scene = generate(args.product, args.seed, str(out), connection_mode='physics')
+    if out.exists() and any(out.iterdir()):
+        parser.error('output directory is not empty; choose a new preview directory')
+    _, scene = generate(args.product, args.seed, str(out), connection_mode='physics',
+                        robot_base_x=args.robot_base_x, contact_profile=args.contact_profile)
     os.environ.update(MJ_BRIDGE_MODEL=str(scene), LEGO_BENCH_MANIFEST=str(out / 'episode_manifest.yaml'), LEGO_BENCH_RUN_DIR=str(out), LEGO_BENCH_OBSERVATION='oracle', LEGO_BENCH_CONNECTION_MODE='physics')
     from mj_bridge.mj_bridge3 import MuJoCoActionServer
     from rclpy.signals import SignalHandlerOptions
@@ -55,7 +60,7 @@ def main():
             error = None
             try:
                 executor.run()
-            except (ExecutionFailure, KeyboardInterrupt) as exc:
+            except (ExecutionFailure, KeyboardInterrupt, mujoco.FatalError) as exc:
                 error = str(exc) or 'viewer interrupted'
             result = node.benchmark_result()
             result['execution_error'] = error

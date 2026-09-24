@@ -34,6 +34,8 @@ def test_generated_plastic_assets_preserve_task_layout(tmp_path):
     # Each compliant rib or tube must have one continuous collision hull.
     compliant = [i for i in range(model.ngeom) if model.geom_priority[i] == 2]
     assert compliant
+    assert all(model.geom_condim[i] == 6 for i in compliant)
+    assert episode['contact_parameters']['contact_dimensions'] == 6
     assert all(model.geom_type[i] == mujoco.mjtGeom.mjGEOM_MESH for i in compliant)
     assert model.geom('table_geom').priority == 3
     assert model.geom('assembly_base_stud_0_0').priority < 3
@@ -73,10 +75,133 @@ def test_stalled_insertion_accumulates_bounded_command_travel():
     executor.ik = ik
     executor.step = lambda seconds: None  # Actuator stalled under an external load.
     with pytest.raises(ExecutionFailure, match='4 mm'):
-        executor.seat_plastic_part({'id': 'part', 'position': [0., 0., 0.]}, 0.)
+        executor._seat_plastic_part({'id': 'part', 'position': [0., 0., 0.]}, 0.)
     assert len(commands) == 16
     assert np.allclose(np.diff(np.array(commands)[:, 2]), -.00025)
     assert commands[-1][2] == pytest.approx(.001 - .004)
+
+
+@pytest.mark.parametrize('tilt,initial_support', [(1.9, .2), (0., 0.)])
+def test_top_press_waits_for_alignment_and_bottom_support(tilt, initial_support):
+    import numpy as np
+    executor = OracleExecutor.__new__(OracleExecutor)
+    executor._top_press_active = True
+    executor._requires_precise_support_alignment = lambda _: True
+    support = [initial_support]
+    executor.seating_support_evidence = lambda _: (dict(bottom_support_force_n=support[0]) if support[0] > .01 else None)
+    executor.hand = 0
+    executor.tool_offset = np.zeros(3)
+    executor.qadr = np.array([0])
+    executor.data = SimpleNamespace(xpos=np.array([[0., 0., .02]]),
+        xmat=np.eye(3).reshape(1, 9), qpos=np.zeros(1))
+    angle = math.radians(tilt) / 2
+    state = {'position': [0., 0., .0003],
+             'quaternion_wxyz': [math.cos(angle), math.sin(angle), 0., 0.]}
+    executor.node = SimpleNamespace(target_qpos=np.zeros(1),
+        current_block_state=lambda: {'blocks': {'part': state}})
+    commands = []
+    def ik(position, yaw):
+        commands.append(position.copy())
+        return np.zeros(1)
+    executor.ik = ik
+    def settle(_):
+        support[0] = .2
+        state.update(position=[0., 0., 0.], quaternion_wxyz=[1., 0., 0., 0.])
+    executor.step = settle
+    executor._seat_plastic_part({'id': 'part', 'position': [0., 0., 0.]}, 0.)
+    assert len(commands) == 1
+    assert executor.last_seating_confirmation['additional_travel_m'] == pytest.approx(.00025)
+    assert executor.last_seating_confirmation['bottom_support_force_n'] == pytest.approx(.2)
+
+
+@pytest.mark.parametrize('kind', ['floor', 'side', 'finger', 'compliant', 'air'])
+def test_bottom_support_is_measured_at_the_rigid_underside(kind):
+    support_name = 'left_finger' if kind == 'finger' else 'support'
+    finger = '' if kind == 'finger' else '<body name="left_finger" pos="2 0 0"/>'
+    gravity = '-9.81 0 0' if kind == 'side' else '0 0 -9.81'
+    rotation = 'quat="0.70710678 0 0.70710678 0"' if kind == 'side' else ''
+    model = mujoco.MjModel.from_xml_string(f'''<mujoco>
+      <option timestep=".001" gravity="{gravity}" integrator="implicitfast"/>
+      <worldbody>
+        <body name="{support_name}"><geom type="plane" size="1 1 .1" {rotation}/></body>
+        {finger}<body name="right_finger" pos="-2 0 0"/>
+        <body name="part" pos=".005 0 .005"><freejoint/>
+          <geom name="underside" type="box" size=".005 .005 .005" mass=".02"/>
+        </body>
+      </worldbody></mujoco>''')
+    data = mujoco.MjData(model)
+    for _ in range(300):
+        mujoco.mj_step(model, data)
+    if kind == 'compliant':
+        model.geom_priority[model.geom('underside').id] = 2
+    elif kind == 'air':
+        data.qpos[2] += .01
+    mujoco.mj_forward(model, data)
+    executor = OracleExecutor.__new__(OracleExecutor)
+    executor.model, executor.data = model, data
+    force = executor._rigid_bottom_support_force(dict(body_name='part'))
+    if kind == 'floor':
+        assert force == pytest.approx(.02 * 9.81, rel=.01)
+    else:
+        assert force == 0.
+
+
+def test_released_plastic_verification_keeps_the_contact_profile():
+    executor = OracleExecutor.__new__(OracleExecutor)
+    executor.perception = None
+    executor.events = [dict(block='part')]
+    executor.node = SimpleNamespace(episode_manifest={
+        'contact_profile': 'plastic', 'target_blocks': [dict(id='part', type='brick_2x2',
+            position=[0., 0., 0.], yaw_rad=0.)]}, current_block_state=lambda: {
+        'blocks': {'part': dict(position=[0., 0., .001], yaw_rad=0.,
+                               quaternion_wxyz=[1., 0., 0., 0.])}})
+    with pytest.raises(ExecutionFailure, match='released parts moved'):
+        executor.verify_released_parts()
+
+
+def test_full_support_does_not_require_partial_support_realignment():
+    executor = OracleExecutor.__new__(OracleExecutor)
+    executor._top_press_active = True
+    executor._requires_precise_support_alignment = lambda _: False
+    executor.seating_support_evidence = lambda _: dict(bottom_support_force_n=.2)
+    angle = math.radians(.3) / 2
+    executor.node = SimpleNamespace(current_block_state=lambda: {'blocks': {'p': {
+        'position': [.0003, 0., .00025],
+        'quaternion_wxyz': [math.cos(angle), math.sin(angle), 0., 0.]}}})
+    executor._seat_plastic_part(dict(id='p', position=[0., 0., 0.]), 0.)
+    assert executor.last_seating_confirmation['additional_travel_m'] == 0.
+    assert executor.last_seating_confirmation['bottom_support_force_n'] == .2
+
+
+@pytest.mark.parametrize('after_press,blocked', [(False, False), (True, False), (True, True)])
+def test_pressure_unloading_holds_actual_arm_pose_and_keeps_release_guard(after_press, blocked):
+    import numpy as np
+    executor = OracleExecutor.__new__(OracleExecutor)
+    executor.qadr = np.array([0])
+    executor._top_press_active = not after_press
+    executor.last_seating_confirmation = {'initial_release_confirmation': {'target_contact': False}}
+    names = {'left_finger': 1, 'right_finger': 2, 'part': 3}
+    executor.model = SimpleNamespace(
+        joint=lambda n: SimpleNamespace(id=0 if n.endswith('1') else 1),
+        jnt_qposadr=np.array([1, 2]), jnt_dofadr=np.array([1, 2]),
+        body=lambda n: SimpleNamespace(id=names[n]), opt=SimpleNamespace(enableflags=0))
+    executor.data = SimpleNamespace(qpos=np.array([.02, .03, .03]),
+                                    qvel=np.zeros(3), contact=[])
+    executor.node = SimpleNamespace(target_qpos=np.array([.04, .03, .03]))
+    snapshots = []
+    def step(_):
+        snapshots.append(executor.node.target_qpos[0])
+        executor.data.qpos[1] = .04
+        executor.data.qpos[2] = .03 if blocked else .04
+    executor.step = step
+    if blocked:
+        with pytest.raises(ExecutionFailure, match='retreat cancelled'):
+            executor.open_gripper_before_retreat(dict(id='p', body_name='part'), timeout_s=.2)
+    else:
+        released = executor.open_gripper_before_retreat(dict(id='p', body_name='part'))
+        assert released['wait_simulation_s'] >= .08
+    assert snapshots == pytest.approx([.02 if after_press else .04] * len(snapshots))
+    assert executor.data.qpos[0] == .02
 
 
 def test_coplanar_plastic_mesh_does_not_report_table_bottom_penetration(tmp_path):
@@ -189,3 +314,188 @@ def test_fast_grip_drift_interrupts_within_the_physics_step():
         executor.step(.02)
     assert len(steps) == 1  # Do not continue 39 more steps before noticing drift.
     assert executor.node.target_qpos.tolist() == [.2]
+
+
+def test_overhang_alignment_stops_when_measured_pose_does_not_respond():
+    import numpy as np
+    executor = OracleExecutor.__new__(OracleExecutor)
+    lower = {'id': 'lower', 'type': 'brick_2x2', 'position': [-.016, 0., 0.], 'yaw_rad': 0.}
+    upper = {'id': 'upper', 'type': 'brick_2x2', 'position': [0., 0., .0191], 'yaw_rad': 0.}
+    angle = math.radians(1.) / 2
+    executor.perception = None
+    executor.events = [{'block': 'lower'}]
+    executor.node = SimpleNamespace(episode_manifest={'target_blocks': [lower, upper]},
+        current_block_state=lambda: {'blocks': {'upper': {
+            'position': [0., 0., .0191], 'quaternion_wxyz': [math.cos(angle), math.sin(angle), 0., 0.]}}},
+        target_qpos=np.zeros(1))
+    executor.hand = 0
+    executor.tool_offset = np.zeros(3)
+    executor.qadr = np.array([0])
+    executor.data = SimpleNamespace(xpos=np.array([[0., 0., .0161]]),
+        xmat=np.eye(3).reshape(1, 9), qpos=np.zeros(1))
+    corrections = []
+    def ik(position, yaw, target_rotation=None):
+        corrections.append(position)
+        return np.zeros(1)
+    executor.ik = ik
+    executor.step = lambda seconds: None
+    with pytest.raises(ExecutionFailure, match='did not converge'):
+        executor.refine_overhang_pose(upper, 0.)
+    assert len(corrections) == 20
+
+
+def test_contact_dimension_configuration_is_explicit():
+    from mj_bridge.plastic_contact import PlasticContact
+    assert PlasticContact().attributes()['condim'] == '6'
+    with pytest.raises(ValueError, match='dimensions'):
+        PlasticContact(contact_dimensions=5).attributes()
+
+
+def test_manipulated_part_stays_awake_with_measurable_support():
+    import numpy as np
+    model = mujoco.MjModel.from_xml_string('''<mujoco>
+      <option timestep=".001"><flag sleep="enable"/></option>
+      <worldbody><geom type="plane" size="1 1 .1"/>
+        <body name="part" pos="0 0 .01"><freejoint/>
+          <geom type="box" size=".01 .01 .01" mass=".02"/>
+        </body>
+        <body name="supply" pos=".2 0 .01"><freejoint/>
+          <geom type="box" size=".01 .01 .01" mass=".02"/>
+        </body>
+      </worldbody></mujoco>''')
+    data = mujoco.MjData(model)
+    def step(seconds):
+        for _ in range(round(seconds / model.opt.timestep)):
+            mujoco.mj_step(model, data)
+    step(5.)
+    part, supply = model.body('part').id, model.body('supply').id
+    assert not data.body_awake[part] and not data.body_awake[supply]
+    assert data.ncon == 0
+    executor = OracleExecutor.__new__(OracleExecutor)
+    executor.model, executor.data, executor.step = model, data, step
+    applied_before = data.xfrc_applied.copy()
+    assert not executor.part_contacts_observable(part)
+    executor.keep_part_awake(dict(body_name='part'))
+    assert executor.part_contacts_observable(part) is True
+    import json
+    assert json.loads(json.dumps(dict(observable=executor.part_contacts_observable(part)))) == {"observable": True}
+    step(5.)
+    assert data.body_awake[part] and not data.body_awake[supply]
+    assert np.array_equal(data.xfrc_applied, applied_before)
+    upward = 0.
+    for index, contact in enumerate(data.contact):
+        force = np.zeros(6)
+        mujoco.mj_contactForce(model, data, index, force)
+        world = contact.frame.reshape(3, 3).T @ force[:3]
+        a, b = model.geom_bodyid[[contact.geom1, contact.geom2]]
+        if b == part:
+            upward += world[2]
+        elif a == part:
+            upward -= world[2]
+    assert upward == pytest.approx(.02 * 9.81, rel=.01)
+    executor.node = SimpleNamespace(episode_manifest={'target_blocks': [
+        dict(id='p', body_name='part'), dict(id='s', body_name='supply')]})
+    executor.events = []
+    with pytest.raises(ExecutionFailure, match='unverified release'):
+        executor.allow_resting_part_sleep(dict(id='p', body_name='part'))
+    assert executor.part_contacts_observable(part)
+    executor.events = [dict(block='p', status='released', release_confirmation={
+        'target_contacts_observable': True, 'target_contact': False})]
+    verified = []
+    executor.verify_released_parts = lambda: verified.append(True)
+    executor.allow_resting_part_sleep(dict(id='p', body_name='part'))
+    assert verified == [True]
+    step(5.)
+    assert not data.body_awake[part]
+    executor.wake_supports_before_approach()
+    assert executor.part_contacts_observable(part) and not data.body_awake[supply]
+    executor.settle_awake_parts([dict(id='p', body_name='part'), dict(id='s', body_name='supply')])
+    assert executor.final_contact_observation == {
+        'awake_parts': {'p': True, 's': True}, 'settle_simulation_s': 1.}
+    assert data.body_awake[part] and data.body_awake[supply]
+    # A later downward load must still be solved, not hidden by resting sleep.
+    data.xfrc_applied[part, 2] = -.1
+    step(.2)
+    assert data.body_awake[part] and data.ncon > 0
+    assert np.isfinite(data.qpos).all()
+
+
+def test_fixed_part_cannot_supply_awake_manipulation_evidence():
+    model = mujoco.MjModel.from_xml_string('''<mujoco><worldbody>
+      <body name="fixed"><geom type="box" size=".01 .01 .01"/></body>
+    </worldbody></mujoco>''')
+    executor = OracleExecutor.__new__(OracleExecutor)
+    executor.model, executor.data = model, mujoco.MjData(model)
+    with pytest.raises(ExecutionFailure, match='dynamic tree'):
+        executor.keep_part_awake(dict(body_name='fixed'))
+
+
+@pytest.mark.parametrize('gap', [.00001, .0002])
+def test_load_bearing_fit_requires_a_nearly_closed_bottom_gap(gap):
+    model = mujoco.MjModel.from_xml_string(f'''<mujoco>
+      <option timestep=".0001" gravity="0 0 -9.81" integrator="implicitfast"/>
+      <default><geom friction="1 .001 .0001" solref=".001 1" solimp=".9999 .9999 .0001"/></default>
+      <worldbody>
+        <geom type="plane" size="1 1 .1"/>
+        <body name="left_finger" pos="1 0 0"/>
+        <body name="right_finger" pos="-1 0 0"/>
+        <body name="assembly_base_wall_left" pos="-.00998 0 .005">
+          <geom type="box" size=".005 .02 .02"/>
+        </body>
+        <body name="assembly_base_wall_right" pos=".00998 0 .005">
+          <geom type="box" size=".005 .02 .02"/>
+        </body>
+        <body name="part" pos="0 0 {.005+gap}"><freejoint/>
+          <geom type="box" size=".005 .005 .005" mass=".02"/>
+        </body>
+      </worldbody></mujoco>''')
+    data = mujoco.MjData(model)
+    for _ in range(2000):
+        mujoco.mj_step(model, data)
+    executor = OracleExecutor.__new__(OracleExecutor)
+    executor.model, executor.data = model, data
+    executor.node = SimpleNamespace(episode_manifest={'target_blocks': [dict(id='p', body_name='part')]})
+    assert executor._rigid_bottom_support_force(dict(body_name='part')) == 0.
+    evidence = executor.seating_support_evidence(dict(id='p', body_name='part'))
+    if gap < .00002:
+        assert 0 < evidence['clutch_seating']['bottom_gap_m'] < .00002
+        assert evidence['clutch_seating']['upward_contact_force_n'] == pytest.approx(.02*9.81, rel=.02)
+    else:
+        assert evidence is None
+
+
+def test_parallel_shell_hulls_preserve_geometry_and_contact_depth():
+    import json
+    import xml.etree.ElementTree as ET
+    import numpy as np
+    from mj_bridge.plastic_contact import convex_box_asset
+    fixture = json.loads((Path(__file__).parent / 'fixtures/near_parallel_shells.json').read_text())
+    root = ET.Element('mujoco')
+    ET.SubElement(root, 'option', gravity='0 0 0')
+    assets, world = ET.SubElement(root, 'asset'), ET.SubElement(root, 'worldbody')
+    for index, row in enumerate(fixture):
+        quaternion = np.zeros(4)
+        mujoco.mju_mat2Quat(quaternion, np.array(row['geom_rotation']))
+        body = ET.SubElement(world, 'body', pos=' '.join(map(str, row['geom_position'])),
+                             quat=' '.join(map(str, quaternion)))
+        ET.SubElement(body, 'freejoint')
+        geom = ET.SubElement(body, 'geom', type='box', size=' '.join(map(str, row['size'])), mass='.02')
+        asset = convex_box_asset(geom, f'shell{index}')
+        vertices = np.fromstring(asset.get('vertex'), sep=' ').reshape(-1, 3)
+        assert vertices.max(axis=0) == pytest.approx(row['size'])
+        assert vertices.min(axis=0) == pytest.approx(-np.array(row['size']))
+        assets.append(asset)
+    model = mujoco.MjModel.from_xml_string(ET.tostring(root, encoding='unicode'))
+    data = mujoco.MjData(model)
+    mujoco.mj_forward(model, data)
+    # Preserve the captured rotation matrices exactly: converting through a
+    # quaternion hides the floating-point condition that caused the bad depth.
+    for index, row in enumerate(fixture):
+        body = model.geom_bodyid[index]
+        mesh_rotation = data.xmat[body].reshape(3, 3).T @ data.geom_xmat[index].reshape(3, 3)
+        data.geom_xmat[index] = (np.array(row['geom_rotation']).reshape(3, 3) @ mesh_rotation).ravel()
+        data.geom_xpos[index] = row['geom_position']
+    mujoco.mj_collision(model, data)
+    assert data.ncon > 0
+    assert all(abs(contact.dist) < .000001 for contact in data.contact)
+    assert sum(model.body_mass) == pytest.approx(.04)

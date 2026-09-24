@@ -39,6 +39,39 @@ Change `--product` to select another registered design. The window stays open
 when execution ends; `result.json` records failures as well as successes.
 `--speed-scale` accepts 0.25–2 (default 1.5); final insertion remains slower.
 
+Workbenchmark plastic-contact tasks use a compliant interference fit and sliding,
+torsional and rolling friction. Run a bundled example with the tested robot-base
+position. The dedicated configuration allows up to 3600 seconds of wall-clock
+time for dense CPU simulations; reaching the limit is a failed run. It does not
+change the physics timestep or acceptance thresholds:
+
+```bash
+export MJ_BRIDGE_BENCHMARK_CONFIG="$PWD/examples/config/plastic_benchmark.yaml"
+python -m mj_bridge.benchmark_cli run \
+  --product examples/products/workbenchmark/tier2_task_001.yaml \
+  --seed 42 --headless --executor oracle-baseline \
+  --connection-mode physics --contact-profile plastic --robot-base-x=-.05 \
+  --output-dir runs/workbenchmark-plastic-example
+
+MUJOCO_GL=glfw LP_NUM_THREADS=2 python scripts/view_physics_episode.py \
+  --product examples/products/workbenchmark/tier2_task_001.yaml \
+  --seed 42 --contact-profile plastic --robot-base-x=-.05
+```
+
+To use the full task collection from a neighbouring Workbenchmark checkout:
+
+```bash
+python scripts/import_workbenchmark.py --repository ../Workbenchmark \
+  --initial-layout recorded --output runs/workbenchmark-recorded
+```
+
+Then select a generated task YAML with `--product`. The importer preserves the
+original relative target geometry and recorded starting layout. Plastic parameters
+are simulation settings, not measured ABS properties; see
+[contact model and validation limits](docs/PLASTIC_CONTACT_ZH.md).
+The current 240-task stratified validation is still in progress. Preview output is
+labelled separately from regression evidence.
+
 Full Panda + MoveIt pipeline (for external executors):
 
 ```bash

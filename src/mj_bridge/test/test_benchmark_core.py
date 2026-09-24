@@ -1,4 +1,5 @@
 import math
+import pytest
 
 from mj_bridge.benchmark_core import generate_episode, normalize_product, score_episode
 
@@ -33,6 +34,37 @@ def test_perfect_target_state_scores_success():
     result = score_episode(episode, actual)
     assert result["success"] is True
     assert result["completion"] == 1.0
+
+
+@pytest.mark.parametrize('dx,dz,tilt,quaternion,expected', [
+    (.0009, .0003, 2.9, True, True),
+    (.0011, 0., 0., True, False),
+    (0., .00041, 0., True, False),
+    (0., 0., 3.1, True, False),
+    (0., 0., 0., False, False),
+])
+def test_plastic_score_uses_seating_limits(dx, dz, tilt, quaternion, expected):
+    episode = generate_episode(sample_product(), seed=2, connection_mode='physics',
+                               contact_profile='plastic')
+    actual = {'blocks': {}}
+    for b in episode['target_blocks']:
+        state = dict(position=[b['position'][0] + dx, b['position'][1],
+                               b['position'][2] + dz], yaw_rad=b['yaw_rad'])
+        if quaternion:
+            angle = math.radians(tilt) / 2
+            state['quaternion_wxyz'] = [math.cos(angle), math.sin(angle), 0., 0.]
+        actual['blocks'][b['id']] = state
+    # Same loose tolerances the normal runtime caller supplies.
+    assert score_episode(episode, actual, xy_tol=.006, z_tol=.004)['success'] is expected
+
+
+def test_plastic_score_preserves_stricter_caller_limits():
+    episode = generate_episode(sample_product(), seed=2, connection_mode='physics',
+                               contact_profile='plastic')
+    actual = {'blocks': {b['id']: dict(position=[b['position'][0] + .0005,
+        b['position'][1], b['position'][2]], yaw_rad=b['yaw_rad'],
+        quaternion_wxyz=[1., 0., 0., 0.]) for b in episode['target_blocks']}}
+    assert not score_episode(episode, actual, xy_tol=.0001)['success']
 
 
 def test_legacy_radians_are_normalized_to_degrees():

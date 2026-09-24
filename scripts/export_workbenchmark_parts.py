@@ -60,7 +60,8 @@ def export_parts(repository, output, contact_profile="loose"):
         entries.append({'type': part, 'instances': count, 'mjcf': filename,
                         'sha256': hashlib.sha256(text.encode()).hexdigest(),
                         'mass_kg': float(model.body_mass[body_id]),
-                        'outer_body_dimensions_m': (model.geom_size[1] * 2).tolist()[:2] + [.0192],
+                        'outer_body_dimensions_m': [float(2 * half - .0002) for half in
+                                                    scene_builder.BRICK_SPECS[part]['body_half_size'][:2]] + [.0192],
                         'nominal_axis_clearance_m': .0002,
                         'resting_test_seconds': 1., 'max_contact_penetration_m': peak})
     manifest = {'geometry': geometry, 'task_count': len(paths),
@@ -113,7 +114,8 @@ original benchmark task YAML files.
     if contact_profile == 'plastic':
         artifacts['README.md'] = artifacts['README.md'].replace(
             'The experimental internal ribs are not included.',
-            'This variant includes compliant internal ribs and lead-ins. The fit uses '            'contact forces and friction, without attachment constraints. Copy the asset '            'meshes as well as the body when reusing this model. Parameters are uncalibrated; '            'see manifest.json. Generate this variant with --contact-profile plastic.')
+            'This variant includes compliant internal ribs and lead-ins. Its shell uses '
+            'equivalent convex hulls to avoid near-parallel analytic box contact artifacts. The fit uses '            'contact forces and friction, without attachment constraints. Copy the asset '            'meshes as well as the body when reusing this model. Parameters are uncalibrated; '            'see manifest.json. Generate this variant with --contact-profile plastic.')
     artifacts['README.md'] = artifacts['README.md'].replace(
         '--output ../Workbenchmark/parts`',
         f'--output ../Workbenchmark/parts --contact-profile {contact_profile}`')

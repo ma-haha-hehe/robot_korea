@@ -1,6 +1,7 @@
 <mujoco model="panda_scene">
 
   <include file="panda.xml"/>
+  <size memory="128M"/>
 
   <visual>
     <headlight ambient="0.18 0.18 0.18" diffuse="0.4 0.4 0.4" specular="0.1 0.1 0.1"/>

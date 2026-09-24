@@ -12,7 +12,8 @@ import time
 import numpy as np
 import mujoco
 from .benchmark_core import dump_json, load_registry, score_episode
-from .assembly_planner import plan_assembly, resolve_grasp_yaws, PlanningError
+from .assembly_planner import (plan_assembly, resolve_grasp_yaws, PlanningError,
+                               RELEASE_ABOVE_M, RAISED_GRASP_OFFSET_M)
 
 
 def placement_yaw(target, placed_targets):
@@ -111,8 +112,64 @@ class OracleExecutor:
         self.events = []
         self.perception = perception
 
+    def keep_part_awake(self, target):
+        """Retain contact solving for this part until verified release and retreat."""
+        body = self.model.body(target['body_name']).id
+        tree = int(self.model.body_treeid[body])
+        if tree < 0:
+            raise ExecutionFailure('assembly part must belong to a dynamic tree')
+        self.model.tree_sleep_policy[tree] = mujoco.mjtSleepPolicy.mjSLEEP_NEVER
+        # A policy change takes effect through an ordinary physics step. Do not
+        # move the part or add a fictitious force to wake it.
+        self.step(.01)
+        if not self.data.body_awake[body]:
+            raise ExecutionFailure('part remained asleep; contact evidence unavailable')
+
+    def wake_supports_before_approach(self):
+        """Restore support contacts before the held part enters the assembly area."""
+        released = {event['block'] for event in self.events}
+        bodies = [self.model.body(block['body_name']).id
+                  for block in self.node.episode_manifest['target_blocks']
+                  if block['id'] in released]
+        for body in bodies:
+            tree = int(self.model.body_treeid[body])
+            self.model.tree_sleep_policy[tree] = mujoco.mjtSleepPolicy.mjSLEEP_NEVER
+        self.step(.01)
+        if not all(self.part_contacts_observable(body) for body in bodies):
+            raise ExecutionFailure('support contacts unavailable before assembly approach')
+
+    def allow_resting_part_sleep(self, target):
+        """Restore ordinary resting sleep only after completed release and retreat."""
+        event = self.events[-1] if self.events else {}
+        confirmation = event.get('release_confirmation', {})
+        if (event.get('block') != target['id'] or event.get('status') != 'released'
+                or confirmation.get('target_contacts_observable') is not True
+                or confirmation.get('target_contact') is not False):
+            raise ExecutionFailure('unverified release cannot enter resting sleep')
+        self.verify_released_parts()
+        released = {event['block'] for event in self.events}
+        for block in self.node.episode_manifest['target_blocks']:
+            if block['id'] in released:
+                body = self.model.body(block['body_name']).id
+                tree = int(self.model.body_treeid[body])
+                self.model.tree_sleep_policy[tree] = mujoco.mjtSleepPolicy.mjSLEEP_ALLOWED
+
+    def settle_awake_parts(self, targets):
+        """Check the completed assembly with every part actively integrated."""
+        for target in targets:
+            self.keep_part_awake(target)
+        self.step(1.)
+        awake = {target['id']: self.part_contacts_observable(
+            self.model.body(target['body_name']).id) for target in targets}
+        if not all(awake.values()):
+            raise ExecutionFailure('final contact observation unavailable')
+        self.final_contact_observation = {'awake_parts': awake, 'settle_simulation_s': 1.}
+        self.verify_released_parts()
+
     def observe_target(self, target):
         if self.perception is None:
+            if self.node.connection_mode == 'physics':
+                self.keep_part_awake(target)
             return self.node.current_block_state()['blocks'][target['id']]
         from .perception import capture_frame
         frame = capture_frame(self.node.model, self.node.data, self.node.camera_renderer)
@@ -275,6 +332,9 @@ class OracleExecutor:
         raise ExecutionFailure(f"held-part alignment did not converge: {target['id']}")
 
     def place_physical(self, target):
+        if target.get("placement_mode") == "release_above_press":
+            return self.place_with_release_above(target)
+
         endpoint, yaw = self.align_held_part(target)
         self.move_vertical(endpoint + [0, 0, .04], yaw)
         endpoint, yaw = self.align_held_part(target)
@@ -293,7 +353,15 @@ class OracleExecutor:
                     and abs(math.sin(target['yaw_rad'] - yaw)) > .7):
                 self._descent_guard_target = target
             try:
-                self.move_vertical(endpoint, yaw)
+                if self.node.episode_manifest.get('contact_profile') == 'plastic':
+                    # Unload the grasp before the final interference fit: jaw
+                    # compression can tilt a part as the studs enter its cavity.
+                    self.move_vertical(endpoint + [0, 0, .001], yaw)
+                    self._descent_guard_target = None
+                    self.release_and_press(target, yaw, 'release_at_insertion_entry')
+                    recovered = True
+                else:
+                    self.move_vertical(endpoint, yaw)
             except _GripDrift:
                 self._descent_guard_target = None
                 self.descend_with_pose_feedback(target, yaw)
@@ -302,8 +370,11 @@ class OracleExecutor:
                 self._descent_guard_target = None
         finally:
             self.speed_scale = travel_speed
-        if self.node.episode_manifest.get('contact_profile') == 'plastic' and not recovered:
-            self.seat_plastic_part(target, yaw)
+        if self.node.episode_manifest.get('contact_profile') == 'plastic':
+            if not recovered:
+                self.seat_plastic_part(target, yaw)
+            if self.perception is None:
+                self.refine_overhang_pose(target, yaw)
         return yaw
 
     def descend_with_pose_feedback(self, target, yaw):
@@ -321,9 +392,26 @@ class OracleExecutor:
             tilt = math.acos(float(np.clip(1 - 2*(q[1]**2 + q[2]**2), -1, 1)))
             maximum_tilt = max(maximum_tilt, tilt)
             if tilt > math.radians(3):
-                raise ExecutionFailure('feedback insertion exceeded 3 degree tilt')
-            if position[2] - goal[2] < .0004:
-                self.seat_plastic_part(target, yaw)
+                if tilt > math.radians(8) or position[2] - goal[2] <= .020:
+                    raise ExecutionFailure('feedback insertion exceeded 3 degree tilt near placement')
+                part = self.model.body(target['body_name']).id
+                fingers = {self.model.body(n).id for n in ('left_finger', 'right_finger')}
+                held = set()
+                for contact_index, contact in enumerate(self.data.contact):
+                    bodies = [int(self.model.geom_bodyid[g]) for g in (contact.geom1, contact.geom2)]
+                    if part not in bodies or contact.dist > .0001:
+                        continue
+                    other = bodies[1] if bodies[0] == part else bodies[0]
+                    if other not in fingers:
+                        raise ExecutionFailure('airborne recovery has an external contact')
+                    force = np.zeros(6)
+                    mujoco.mj_contactForce(self.model, self.data, contact_index, force)
+                    if force[0] > .01:
+                        held.add(other)
+                if held != fingers:
+                    raise ExecutionFailure('airborne recovery lost the two-finger grasp')
+            if position[2] - goal[2] < .0015:
+                self.release_and_press(target, yaw, 'release_before_seating')
                 self.last_seating_confirmation['pose_feedback'] = {
                     'steps': attempt, 'max_observed_tilt_deg': math.degrees(maximum_tilt),
                     'max_step_m': .002}
@@ -335,7 +423,7 @@ class OracleExecutor:
             tip = self.data.xpos[self.hand] + rotation @ self.tool_offset
             stage = goal.copy()
             # Correct measured tilt and lateral error before further descent.
-            stage[2] = (max(goal[2], position[2] - .002)
+            stage[2] = (max(goal[2] + .001, position[2] - .002)
                         if tilt < math.radians(.3) and np.linalg.norm(position[:2]-goal[:2]) < .0001
                         else position[2])
             start = self.data.qpos[self.qadr].copy()
@@ -348,8 +436,246 @@ class OracleExecutor:
             self.step(.04)
         raise ExecutionFailure('feedback insertion did not seat within 80 bounded steps')
 
+    def refine_overhang_pose(self, target, yaw):
+        """Remove residual insertion tilt before unloading a partial support."""
+        if self.perception is not None:
+            raise ExecutionFailure('support alignment requires validated in-hand tracking')
+        targets = self.node.episode_manifest['target_blocks']
+        placed = {event['block'] for event in self.events}
+        if insertion_speed_scale(target, [b for b in targets if b['id'] in placed],
+                                 min(b['position'][2] for b in targets)) != .2:
+            return
+        seating = dict(getattr(self, 'last_seating_confirmation', None) or {})
+        already_released = 'initial_release_confirmation' in seating
+        goal = np.asarray(target['position'])
+        c, s = math.cos(target['yaw_rad']), math.sin(target['yaw_rad'])
+        desired = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])
+        for attempt in range(20):
+            observed = self.node.current_block_state()['blocks'][target['id']]
+            position = np.asarray(observed['position'])
+            q = np.asarray(observed['quaternion_wxyz'])
+            tilt = math.acos(float(np.clip(1 - 2*(q[1]**2 + q[2]**2), -1, 1)))
+            lateral = float(np.linalg.norm(position[:2] - goal[:2]))
+            if tilt > math.radians(3) or abs(position[2] - goal[2]) > .004:
+                raise ExecutionFailure('supported pose alignment exceeded bounds')
+            if tilt < math.radians(.2) and lateral < .0001:
+                self.seat_plastic_part(target, yaw)
+                seating.update(self.last_seating_confirmation)
+                self.last_seating_confirmation = seating
+                self.last_seating_confirmation['support_alignment_steps'] = attempt
+                return
+            if already_released:
+                raise ExecutionFailure('released overhang requires realignment before further assembly')
+            part_rotation = np.empty(9)
+            mujoco.mju_quat2Mat(part_rotation, q)
+            rotation = self.data.xmat[self.hand].reshape(3, 3).copy()
+            tip = self.data.xpos[self.hand] + rotation @ self.tool_offset
+            correction = desired @ part_rotation.reshape(3, 3).T
+            stage = goal.copy()
+            stage[2] = max(position[2], goal[2])
+            start = self.data.qpos[self.qadr].copy()
+            end = self.ik(stage + correction @ (tip-position), yaw,
+                          target_rotation=correction @ rotation)
+            for index in range(1, 11):
+                t = index / 10
+                self.node.target_qpos[self.qadr] = start + (end-start)*(3*t*t-2*t*t*t)
+                self.step(.01)
+            self.step(.04)
+        raise ExecutionFailure('supported pose alignment did not converge')
+
+    def place_with_release_above(self, target):
+        """Place a blocked part by releasing above it, then pressing its top."""
+        endpoint, yaw = self.align_held_part(target)
+        self.move_vertical(endpoint + [0, 0, .06], yaw)
+        endpoint, yaw = self.align_held_part(target)
+        speed = self.speed_scale
+        try:
+            self.speed_scale = .2
+            self.move_vertical(endpoint + [0, 0, RELEASE_ABOVE_M], yaw)
+            self.release_and_press(target, yaw, 'release_above_press')
+        finally:
+            self.speed_scale = speed
+        return yaw
+
+    def release_and_press(self, target, yaw, placement_mode):
+        """Unload the jaws before applying pressure through closed fingertips."""
+        if (self.perception is not None or self.node.connection_mode != 'physics'
+                or self.node.episode_manifest.get('contact_profile') != 'plastic'):
+            raise ExecutionFailure('top pressing requires Oracle plastic contact physics')
+        if getattr(self, '_top_press_active', False):
+            raise ExecutionFailure('top pressing did not seat the part')
+        self._top_press_active = True
+        speed = self.speed_scale
+        try:
+            release = self.open_gripper_before_retreat(target)
+            rotation = self.data.xmat[self.hand].reshape(3, 3)
+            tip = self.data.xpos[self.hand] + rotation @ self.tool_offset
+            self.move_vertical(tip + [0, 0, .06], yaw)
+            self.node.gripper_target = 0.
+            self.step(.7)
+            qadr = [self.model.joint(f'panda_finger_joint{i}').qposadr[0]
+                    for i in (1, 2)]
+            if max(self.data.qpos[qadr]) > .0005:
+                raise ExecutionFailure('press fingers did not close above the assembly')
+            fingers = {self.model.body(n).id for n in ('left_finger', 'right_finger')}
+            bottom = math.inf
+            for geom in range(self.model.ngeom):
+                if (self.model.geom_bodyid[geom] not in fingers
+                        or not (self.model.geom_contype[geom]
+                                or self.model.geom_conaffinity[geom])):
+                    continue
+                rotation = self.data.geom_xmat[geom].reshape(3, 3)
+                center = (self.data.geom_xpos[geom]
+                          + rotation @ self.model.geom_aabb[geom, :3])
+                bottom = min(bottom, center[2]
+                             - np.abs(rotation[2]) @ self.model.geom_aabb[geom, 3:])
+            if not math.isfinite(bottom):
+                raise ExecutionFailure('no collision fingertip available for top pressing')
+            rotation = self.data.xmat[self.hand].reshape(3, 3)
+            tip = self.data.xpos[self.hand] + rotation @ self.tool_offset
+            offset = float(tip[2] - bottom)
+            observed = self.node.current_block_state()['blocks'][target['id']]
+            if np.linalg.norm(np.asarray(observed['position'])[:2]
+                              - target['position'][:2]) > .001:
+                raise ExecutionFailure('released part drifted before pressing')
+            part = self.model.body(target['body_name']).id
+            part_top = -math.inf
+            for geom in range(self.model.ngeom):
+                if (self.model.geom_bodyid[geom] != part
+                        or not (self.model.geom_contype[geom]
+                                or self.model.geom_conaffinity[geom])):
+                    continue
+                rotation = self.data.geom_xmat[geom].reshape(3, 3)
+                center = (self.data.geom_xpos[geom]
+                          + rotation @ self.model.geom_aabb[geom, :3])
+                part_top = max(part_top, center[2]
+                               + np.abs(rotation[2]) @ self.model.geom_aabb[geom, 3:])
+            if not math.isfinite(part_top):
+                raise ExecutionFailure('no physical part surface for top pressing')
+            q = observed['quaternion_wxyz']
+            if 1 - 2*(q[1]**2 + q[2]**2) < math.cos(math.radians(3)):
+                raise ExecutionFailure('released part tilted before top pressing')
+            # Approach the measured surface first. Moving straight to nominal
+            # seated height can strike a still raised part before bounded pressing.
+            press_start = np.asarray(target['position']).copy()
+            press_start[2] = part_top + offset + .0001
+            self.move_vertical(press_start, yaw)
+            self._seat_plastic_part(target, yaw)
+            self.last_seating_confirmation.update(
+                placement_mode=placement_mode, initial_release_confirmation=release)
+        finally:
+            self._top_press_active = False
+            self.speed_scale = speed
+
     def seat_plastic_part(self, target, yaw):
+        """Retry a captured, aligned fit once with unloaded jaws if it jams."""
+        try:
+            self._seat_plastic_part(target, yaw)
+        except ExecutionFailure as error:
+            if (str(error) != 'part not seated within 4 mm bounded insertion travel'
+                    or self.perception is not None
+                    or getattr(self, '_top_press_active', False)):
+                raise
+            observed = self.node.current_block_state()['blocks'][target['id']]
+            delta = np.asarray(observed['position']) - target['position']
+            q = observed['quaternion_wxyz']
+            if not (0 < delta[2] < .004 and np.linalg.norm(delta[:2]) < .001
+                    and 1 - 2*(q[1]**2 + q[2]**2) > math.cos(math.radians(3))):
+                raise
+            self.release_and_press(target, yaw, 'release_after_stalled_insertion')
+
+    def _rigid_bottom_support_force(self, target):
+        """Measured upward support at the rigid underside, excluding the jaws."""
+        part = self.model.body(target['body_name']).id
+        fingers = {self.model.body(n).id for n in ('left_finger', 'right_finger')}
+        rigid = set()
+        bottom = math.inf
+        for geom in range(self.model.ngeom):
+            if (self.model.geom_bodyid[geom] != part or self.model.geom_priority[geom] == 2
+                    or not (self.model.geom_contype[geom] or self.model.geom_conaffinity[geom])):
+                continue
+            rigid.add(geom)
+            rotation = self.data.geom_xmat[geom].reshape(3, 3)
+            center = self.data.geom_xpos[geom] + rotation @ self.model.geom_aabb[geom, :3]
+            bottom = min(bottom, center[2] - np.abs(rotation[2]) @ self.model.geom_aabb[geom, 3:])
+        support_force = 0.
+        for i, contact in enumerate(self.data.contact):
+            own = contact.geom1 if contact.geom1 in rigid else contact.geom2 if contact.geom2 in rigid else None
+            if own is None:
+                continue
+            other = contact.geom2 if own == contact.geom1 else contact.geom1
+            if (self.model.geom_bodyid[other] in fingers or contact.dist > .00002
+                    or abs(contact.frame[2]) < .9 or abs(contact.pos[2] - bottom) > .0002):
+                continue
+            force = np.zeros(6)
+            mujoco.mj_contactForce(self.model, self.data, i, force)
+            support_force += max(0., force[0])
+        return support_force
+
+    def seating_support_evidence(self, target):
+        """Measure rigid bearing or clutch load at a nearly closed underside gap."""
+        support_force = self._rigid_bottom_support_force(target)
+        if support_force > .01:
+            return {'bottom_support_force_n': float(support_force)}
+        part = self.model.body(target['body_name']).id
+        rigid = set()
+        bottom = math.inf
+        for geom in range(self.model.ngeom):
+            if (self.model.geom_bodyid[geom] != part or self.model.geom_priority[geom] == 2
+                    or not (self.model.geom_contype[geom] or self.model.geom_conaffinity[geom])):
+                continue
+            rigid.add(geom)
+            rotation = self.data.geom_xmat[geom].reshape(3, 3)
+            center = self.data.geom_xpos[geom] + rotation @ self.model.geom_aabb[geom, :3]
+            bottom = min(bottom, center[2] - np.abs(rotation[2]) @ self.model.geom_aabb[geom, 3:])
+        supports = {0} | {self.model.body(b['body_name']).id for b in self.node.episode_manifest['target_blocks'] if b['id'] != target['id']}
+        supports.update(i for i in range(self.model.nbody) if self.model.body(i).name.startswith('assembly_base'))
+        upward = 0.
+        for i, contact in enumerate(self.data.contact):
+            bodies = [int(self.model.geom_bodyid[g]) for g in (contact.geom1, contact.geom2)]
+            if part not in bodies:
+                continue
+            other = bodies[1] if bodies[0] == part else bodies[0]
+            if other not in supports:
+                continue
+            force = np.zeros(6)
+            mujoco.mj_contactForce(self.model, self.data, i, force)
+            world = contact.frame.reshape(3,3).T @ force[:3]
+            upward += float(world[2]) * (1 if bodies[1] == part else -1)
+        if upward < .8 * self.model.body_mass[part] * abs(self.model.opt.gravity[2]):
+            return None
+        support_geoms = []
+        for other in range(self.model.ngeom):
+            if (self.model.geom_bodyid[other] not in supports or self.model.geom_priority[other] == 2
+                    or not (self.model.geom_contype[other] or self.model.geom_conaffinity[other])):
+                continue
+            rotation = self.data.geom_xmat[other].reshape(3,3)
+            center = self.data.geom_xpos[other] + rotation @ self.model.geom_aabb[other,:3]
+            top = center[2] + np.abs(rotation[2]) @ self.model.geom_aabb[other,3:]
+            if abs(top - bottom) < .0002:
+                support_geoms.append(other)
+        for own in rigid:
+            for other in support_geoms:
+                points = np.zeros(6)
+                gap = mujoco.mj_geomDistance(self.model, self.data, own, other, .00002, points)
+                if (0 < gap < .00002 and abs(points[2] - bottom) < .0002
+                        and points[2] - points[5] > .9 * gap):
+                    return {'bottom_support_force_n': float(support_force),
+                            'clutch_seating': dict(bottom_gap_m=float(gap),
+                                                   upward_contact_force_n=upward)}
+        return None
+
+    def _requires_precise_support_alignment(self, target):
+        targets = self.node.episode_manifest['target_blocks']
+        placed = {event['block'] for event in self.events}
+        return insertion_speed_scale(
+            target, [block for block in targets if block['id'] in placed],
+            min(block['position'][2] for block in targets)) == .2
+
+    def _seat_plastic_part(self, target, yaw):
         """Bounded insertion driven by measured part height, never object motion."""
+        pressing = getattr(self, '_top_press_active', False)
+        partial_support = pressing and self._requires_precise_support_alignment(target)
         travelled = 0.
         insertion_origin = None
         for attempt in range(17):
@@ -359,13 +685,20 @@ class OracleExecutor:
             upright = 1 - 2 * (q[1]**2 + q[2]**2)
             if delta[2] < -.0004 or upright < math.cos(math.radians(3)):
                 raise ExecutionFailure('plastic insertion left height/orientation bounds')
-            if abs(delta[2]) < .0004:
+            support = self.seating_support_evidence(target) if pressing else None
+            if (abs(delta[2]) < .0004
+                    and (not pressing or (support is not None
+                         and (not partial_support or (
+                             upright > math.cos(math.radians(.2))
+                             and np.linalg.norm(delta[:2]) < .0001))))):
                 if np.linalg.norm(delta[:2]) > .001:
                     raise ExecutionFailure('plastic insertion lateral alignment exceeded 1 mm')
                 self.last_seating_confirmation = {
                     'height_error_m': float(delta[2]),
                     'lateral_error_m': float(np.linalg.norm(delta[:2])),
                     'additional_travel_m': travelled}
+                if pressing:
+                    self.last_seating_confirmation.update(support)
                 return
             if attempt == 16:
                 break
@@ -387,6 +720,13 @@ class OracleExecutor:
             travelled += .00025
         raise ExecutionFailure('part not seated within 4 mm bounded insertion travel')
 
+    def part_contacts_observable(self, body):
+        if not self.model.opt.enableflags & int(mujoco.mjtEnableBit.mjENBL_SLEEP):
+            return True
+        tree = int(self.model.body_treeid[body])
+        return bool(tree >= 0 and self.data.body_awake[body]
+                    and self.model.tree_sleep_policy[tree] == mujoco.mjtSleepPolicy.mjSLEEP_NEVER)
+
     def open_gripper_before_retreat(self, target, timeout_s=2.):
         """Hold the arm until both measured fingers are fully open and clear."""
         joints = [self.model.joint(f'panda_finger_joint{i}').id for i in (1, 2)]
@@ -394,6 +734,12 @@ class OracleExecutor:
         dadr = self.model.jnt_dofadr[joints]
         fingers = {self.model.body(name).id for name in ('left_finger', 'right_finger')}
         part = self.model.body(target['body_name']).id
+        if (not getattr(self, '_top_press_active', False)
+                and (getattr(self, 'last_seating_confirmation', None) or {}).get(
+                    'initial_release_confirmation')):
+            # Remove commanded press overtravel while holding the measured arm
+            # posture. Retreat still waits for fully open, contact-free fingers.
+            self.node.target_qpos[self.qadr] = self.data.qpos[self.qadr].copy()
         self.node.gripper_target = .04
         stable_time = 0.
         elapsed = 0.
@@ -408,12 +754,14 @@ class OracleExecutor:
                 if contact.dist <= .0001 and ((a in fingers and b == part) or (b in fingers and a == part)):
                     touching = True
                     break
-            ready = (np.all(positions >= .0395) and np.all(np.abs(velocities) < .002)
+            observable = self.part_contacts_observable(part)
+            ready = (observable and np.all(positions >= .0395) and np.all(np.abs(velocities) < .002)
                      and not touching)
             stable_time = stable_time + .01 if ready else 0.
             if stable_time >= .08:
                 return {'finger_positions_m': positions.tolist(),
-                        'wait_simulation_s': elapsed, 'target_contact': False}
+                        'wait_simulation_s': elapsed, 'target_contact': False,
+                        'target_contacts_observable': observable}
         raise ExecutionFailure(f"gripper did not fully release {target['id']}; retreat cancelled")
 
     def verify_released_parts(self):
@@ -424,79 +772,97 @@ class OracleExecutor:
         targets = [b for b in self.node.episode_manifest['target_blocks'] if b['id'] in released]
         if not targets:
             return
-        report = score_episode({'target_blocks': targets}, self.node.current_block_state())
+        manifest = dict(self.node.episode_manifest, target_blocks=targets)
+        report = score_episode(manifest, self.node.current_block_state())
         if not report['success']:
             failed = [row['id'] for row in report['blocks'] if not row['success']]
             raise ExecutionFailure('released parts moved or tilted; assembly stopped: ' + ', '.join(failed))
 
     def run(self):
-        self.node.gripper_target = .04
-        self.step(.5)
-        targets = self.node.episode_manifest['target_blocks']
-        try:
-            plan = plan_assembly(targets)
-        except PlanningError as exc:
-            raise ExecutionFailure(f'assembly planning failed: {exc}') from exc
-        run_dir = os.environ.get('LEGO_BENCH_RUN_DIR')
-        if run_dir:
-            dump_json(Path(run_dir) / 'assembly_plan.json', {
-                'method': 'assembly_by_disassembly', 'steps': plan})
-        by_id = {target['id']: target for target in targets}
-        for planned in plan:
-            self.verify_released_parts()
-            target = by_id[planned['block_id']]
-            self.node.get_logger().info(f"[EXECUTE] picking {target['id']}")
-            observed = self.observe_target(target)
-            pos = np.array(observed['position'])
-            yaw, place_yaw = resolve_grasp_yaws(
-                observed['yaw_rad'], target['yaw_rad'], planned['grasp_spin_deg'])
-            # Grip the upper sidewall, leaving the fingertips clear of supporting studs.
-            grasp = pos + [0, 0, -.003]
-            hover = grasp + [0, 0, .16]
-            self.move(hover, yaw)
-            self.prepare_grasp_opening(target['type'], observed['yaw_rad'], yaw)
-            # A joint-space shortcut can sweep sideways through a loose part.
-            # Preserve the measured XY while entering and leaving the grasp.
-            self.move_vertical(grasp, yaw)
-            self.confirm_grasp_pose(grasp, yaw)
-            self.node.gripper_target = 0.
-            self.step(.7)
-            self.move_vertical(hover, yaw)
-            if self.perception is None:
-                lifted = self.node.current_block_state()['blocks'][target['id']]['position'][2]
-                if lifted < pos[2] + .06:
-                    raise ExecutionFailure(f"grasp failed: {target['id']} (lift {lifted-pos[2]:.4f} m)")
-            goal = np.array(target['position']) + [0, 0, -.003]
-            placed_ids = {event['block'] for event in self.events}
-            placed_targets = [b for b in self.node.episode_manifest['target_blocks']
-                              if b['id'] in placed_ids]
-            self.move(goal + [0, 0, .16], place_yaw)
-            # Release at the nominal height; pressing down traps the fingertips
-            # against supporting bricks. Gravity seats the released part.
-            vertical = requires_vertical_approach(target, placed_targets)
-            approach = self.move_vertical if vertical else self.move
-            if self.node.connection_mode == 'physics':
-                place_yaw = self.place_physical(target)
-                vertical = True
-            else:
-                approach(goal, place_yaw)
-            release = self.open_gripper_before_retreat(target)
-            self.move(goal + [0, 0, .16], place_yaw)
-            self.events.append({'block': target['id'], 'status': 'released',
-                                'approach': 'vertical' if vertical else 'joint',
-                                'placement_yaw_rad': float(place_yaw),
-                                'planned_grasp_spin_deg': planned['grasp_spin_deg'],
-                                'release_confirmation': release,
-                                'seating_confirmation': getattr(self, 'last_seating_confirmation', None)})
+            self.node.gripper_target = .04
+            self.step(.5)
+            targets = self.node.episode_manifest['target_blocks']
+            try:
+                if (self.perception is None and self.node.connection_mode == 'physics'
+                        and self.node.episode_manifest.get('contact_profile') == 'plastic'):
+                    from .assembly_planner import plan_with_release_above
+                    plan = plan_with_release_above(targets)
+                else:
+                    plan = plan_assembly(targets)
+            except PlanningError as exc:
+                raise ExecutionFailure(f'assembly planning failed: {exc}') from exc
             run_dir = os.environ.get('LEGO_BENCH_RUN_DIR')
             if run_dir:
-                dump_json(Path(run_dir) / 'progress.json', {
-                    'finished':False, 'events':self.events,
-                    'score_at_checkpoint':self.node.benchmark_result(),
-                    'actual_state':self.node.current_block_state()})
-            self.node.get_logger().info(f"[EXECUTE] released {target['id']}")
-        self.step(1.)
-        self.verify_released_parts()
+                dump_json(Path(run_dir) / 'assembly_plan.json', {
+                    'method': ('geometric_reverse_order_with_release_above_fallback'
+                               if any(p.get('placement_mode') == 'release_above_press' for p in plan)
+                               else 'assembly_by_disassembly'), 'steps': plan})
+            by_id = {target['id']: target for target in targets}
+            for planned in plan:
+                self.verify_released_parts()
+                target = dict(by_id[planned['block_id']],
+                              placement_mode=planned.get('placement_mode', 'direct'))
+                self.last_seating_confirmation = None
+                self.node.get_logger().info(f"[EXECUTE] picking {target['id']}")
+                observed = self.observe_target(target)
+                pos = np.array(observed['position'])
+                yaw, place_yaw = resolve_grasp_yaws(
+                    observed['yaw_rad'], target['yaw_rad'], planned['grasp_spin_deg'])
+                # Grip the upper sidewall, leaving the fingertips clear of supporting studs.
+                grasp = pos + [0, 0, RAISED_GRASP_OFFSET_M
+                                   if target['placement_mode'] == 'release_above_press' else -.003]
+                hover = grasp + [0, 0, .16]
+                self.move(hover, yaw)
+                self.prepare_grasp_opening(target['type'], observed['yaw_rad'], yaw)
+                # A joint-space shortcut can sweep sideways through a loose part.
+                # Preserve the measured XY while entering and leaving the grasp.
+                self.move_vertical(grasp, yaw)
+                self.confirm_grasp_pose(grasp, yaw)
+                self.node.gripper_target = 0.
+                self.step(.7)
+                self.move_vertical(hover, yaw)
+                if self.perception is None:
+                    lifted = self.node.current_block_state()['blocks'][target['id']]['position'][2]
+                    if lifted < pos[2] + .06:
+                        raise ExecutionFailure(f"grasp failed: {target['id']} (lift {lifted-pos[2]:.4f} m)")
+                goal = np.array(target['position']) + [0, 0, -.003]
+                placed_ids = {event['block'] for event in self.events}
+                placed_targets = [b for b in self.node.episode_manifest['target_blocks']
+                                  if b['id'] in placed_ids]
+                if self.perception is None and self.node.connection_mode == 'physics':
+                    self.wake_supports_before_approach()
+                self.move(goal + [0, 0, .16], place_yaw)
+                # Release at the nominal height; pressing down traps the fingertips
+                # against supporting bricks. Gravity seats the released part.
+                vertical = requires_vertical_approach(target, placed_targets)
+                approach = self.move_vertical if vertical else self.move
+                if self.node.connection_mode == 'physics':
+                    place_yaw = self.place_physical(target)
+                    vertical = True
+                else:
+                    approach(goal, place_yaw)
+                release = self.open_gripper_before_retreat(target)
+                self.move(goal + [0, 0, .16], place_yaw)
+                self.events.append({'block': target['id'], 'status': 'released',
+                                    'approach': 'vertical' if vertical else 'joint',
+                                    'placement_yaw_rad': float(place_yaw),
+                                    'planned_grasp_spin_deg': planned['grasp_spin_deg'],
+                                    'release_confirmation': release,
+                                    'seating_confirmation': getattr(self, 'last_seating_confirmation', None)})
+                if self.perception is None and self.node.connection_mode == 'physics':
+                    self.allow_resting_part_sleep(target)
+                run_dir = os.environ.get('LEGO_BENCH_RUN_DIR')
+                if run_dir:
+                    dump_json(Path(run_dir) / 'progress.json', {
+                        'finished':False, 'events':self.events,
+                        'score_at_checkpoint':self.node.benchmark_result(),
+                        'actual_state':self.node.current_block_state()})
+                self.node.get_logger().info(f"[EXECUTE] released {target['id']}")
+            if self.perception is None and self.node.connection_mode == 'physics':
+                self.settle_awake_parts(targets)
+            else:
+                self.step(1.)
+                self.verify_released_parts()
 
 
 def execute(output_dir, backend='oracle', speed_scale=1.5):
@@ -523,7 +889,7 @@ def execute(output_dir, backend='oracle', speed_scale=1.5):
         error = None
         try:
             executor.run()
-        except ExecutionFailure as exc:
+        except (ExecutionFailure, mujoco.FatalError) as exc:
             error = str(exc)
         result = node.benchmark_result()
         result.update({'executor': 'torque_baseline', 'perception_backend': backend,
@@ -535,7 +901,9 @@ def execute(output_dir, backend='oracle', speed_scale=1.5):
                                   'timestep_s': float(node.model.opt.timestep),
                                   'iterations': int(node.model.opt.iterations)},
                        'simulation_time_s': float(node.data.time), 'speed_scale': speed_scale,
+                       'wall_clock_limit_s': float(node.benchmark_config.get('max_episode_time_s', 300)),
                        'events': executor.events, 'execution_error': error,
+                       'final_contact_observation': getattr(executor, 'final_contact_observation', None),
                        'robot_base_position_m': node.episode_manifest.get('robot_base_position_m', [0.,0.,0.]),
                        'generated_model_sha256': {name: hashlib.sha256((Path(output_dir)/name).read_bytes()).hexdigest()
                                                   for name in ('scene.xml','panda.xml')}})

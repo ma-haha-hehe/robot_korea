@@ -10,6 +10,7 @@ import xml.etree.ElementTree as ET
 
 @dataclass(frozen=True)
 class PlasticContact:
+    contact_dimensions: int = 6
     sliding_friction: float = .3
     torsional_friction_m: float = .001
     rolling_friction_m: float = .00005
@@ -17,14 +18,32 @@ class PlasticContact:
     damping_ratio: float = 1.
 
     def attributes(self):
+        if self.contact_dimensions not in (3, 4, 6):
+            raise ValueError('plastic contact dimensions must be 3, 4 or 6')
         values = (self.sliding_friction, self.torsional_friction_m,
                   self.rolling_friction_m, self.contact_time_constant_s,
                   self.damping_ratio)
         if not all(math.isfinite(v) and v > 0 for v in values):
             raise ValueError('plastic contact parameters must be finite and positive')
-        return dict(solref=f'{self.contact_time_constant_s} {self.damping_ratio}',
+        return dict(condim=str(self.contact_dimensions), solref=f'{self.contact_time_constant_s} {self.damping_ratio}',
                     solimp='.9 .95 .001', priority='2',
                     friction=' '.join(map(str, values[:3])))
+
+
+
+def convex_box_asset(geom, name):
+    """Represent the identical box with a convex hull for robust near-parallel contact."""
+    if geom.get('type') != 'box':
+        raise ValueError('convex box conversion requires a box geom')
+    size = tuple(map(float, geom.attrib.pop('size').split()))
+    if len(size) != 3 or not all(math.isfinite(x) and x > 0 for x in size):
+        raise ValueError('box half sizes must be finite and positive')
+    vertices = [(x*size[0], y*size[1], z*size[2])
+                for x in (-1, 1) for y in (-1, 1) for z in (-1, 1)]
+    geom.set('type', 'mesh')
+    geom.set('mesh', name)
+    return ET.Element('mesh', name=name,
+                      vertex=' '.join(str(v) for point in vertices for v in point))
 
 
 def add_clutch_fit(body, brick_type, parameters=PlasticContact()):
@@ -89,4 +108,11 @@ def add_clutch_fit(body, brick_type, parameters=PlasticContact()):
             ET.SubElement(body, 'geom', type='mesh', mesh=mesh,
                 pos=f'{sign*(hx-.00265)} {y} -.0176',
                 euler=f'0 0 {-sign*math.pi/2}', **contact)
+    # Analytic box-box contact is numerically unstable for some nearly parallel
+    # shell faces in MuJoCo 3.11. Use equivalent convex hulls without changing
+    # the wall thickness, roof, mass, contact parameters, or collision masks.
+    for index, geom in enumerate(body.findall('geom')):
+        if geom.get('type') == 'box':
+            name = f'clutch_shell_{brick_type}_{index}'
+            meshes[name] = convex_box_asset(geom, name)
     return list(meshes.values())

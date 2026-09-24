@@ -297,6 +297,12 @@ def angular_error(actual: float, target: float, symmetry_deg: float) -> float:
 
 def score_episode(manifest: dict, actual: dict, registry: dict | None = None,
                   xy_tol=0.006, z_tol=0.004, yaw_tol_deg=8.0) -> dict:
+    plastic = manifest.get("contact_profile") == "plastic"
+    # Plastic acceptance must agree with the insertion controller and report.
+    # A caller may tighten these limits, but loose-brick defaults cannot relax them.
+    if plastic:
+        xy_tol, z_tol = min(xy_tol, .001), min(z_tol, .0004)
+    tilt_limit = math.cos(math.radians(3 if plastic else 8))
     registry = registry or load_registry()
     if not manifest.get("target_blocks"):
         raise ProductError("cannot score an episode without target blocks")
@@ -313,12 +319,12 @@ def score_episode(manifest: dict, actual: dict, registry: dict | None = None,
             xy = math.hypot(dx, dy)
             yaw_error = angular_error(float(observed.get("yaw_rad", 0.0)), target["yaw_rad"],
                                       registry[target["type"]]["yaw_symmetry_deg"])
-            upright = True
+            upright = not plastic
             if "quaternion_wxyz" in observed:
                 q = observed["quaternion_wxyz"]
                 norm = sum(float(v) ** 2 for v in q)
                 upright = (len(q) == 4 and math.isfinite(norm) and norm > 0
-                           and 1 - 2 * (q[1] ** 2 + q[2] ** 2) / norm >= math.cos(math.radians(8)))
+                           and 1 - 2 * (q[1] ** 2 + q[2] ** 2) / norm >= tilt_limit)
             ok = (xy <= xy_tol and abs(dz) <= z_tol
                   and yaw_error <= math.radians(yaw_tol_deg) and upright)
             item = {"id": target["id"], "success": ok, "xy_error_m": xy,

@@ -30,6 +30,42 @@ def test_report_rejects_partial_or_inconsistent_suite(summary):
         validate(summary)
 
 
+@pytest.mark.parametrize('fault', ['none', 'substituted_task', 'wrong_seed', 'changed_input',
+                                  'changed_execution', 'not_run'])
+def test_report_matches_fixed_sample_inputs_and_execution(tmp_path, fault):
+    import hashlib
+    import json
+    import runpy
+    import yaml
+    sample = product()
+    path = tmp_path / 'selected.yaml'
+    path.write_text(yaml.safe_dump(sample))
+    selection = dict(population=2, selected=1, seed=42, tasks=[dict(
+        product='selected', input_sha256=hashlib.sha256(path.read_bytes()).hexdigest())])
+    (tmp_path / 'selection.json').write_text(json.dumps(selection))
+    row = dict(product='selected', seed=42, success=True,
+               **{'episode_manifest.yaml': dict(seed=42, product=sample)})
+    if fault == 'substituted_task':
+        row['product'] = 'different_task'
+    elif fault == 'wrong_seed':
+        row['seed'] = 43
+    elif fault == 'changed_input':
+        path.write_text(path.read_text() + '\n')
+    elif fault == 'changed_execution':
+        row['episode_manifest.yaml']['product'] = {}
+    elif fault == 'not_run':
+        row['not_run'] = True
+    script = Path(__file__).resolve().parents[3] / 'scripts/write_validation_report.py'
+    verify = runpy.run_path(str(script))['require_selected_coverage']
+    if fault == 'none':
+        coverage = verify(tmp_path, [row, dict(product='extra', seed=42, success=False)])
+        assert coverage['selected_tasks'] == coverage['selected_successes'] == 1
+        assert coverage['additional_episodes'] == 1
+    else:
+        with pytest.raises(ValueError):
+            verify(tmp_path, [row])
+
+
 def test_square_placement_avoids_adjacent_finger_collision():
     from mj_bridge.reference_executor import placement_yaw
     target = {'type':'brick_2x2', 'position':[0, .016, .0384], 'yaw_rad':0.}
@@ -596,11 +632,21 @@ def test_planner_prefers_small_safe_jaw_span(part,yaw,spin):
 
 
 def test_small_jaw_span_never_overrides_clearance():
-    from mj_bridge.assembly_planner import plan_assembly
+    from mj_bridge.assembly_planner import accessible, load_registry, plan_assembly
     target=dict(id='long',type='brick_4x2',position=[0,0,0],yaw_rad=0.)
     neighbour=dict(id='adjacent',type='brick_2x2',position=[0,.032,0],yaw_rad=0.)
-    step=next(s for s in plan_assembly([target,neighbour]) if s['block_id']=='long')
-    assert step['grasp_spin_deg']==90
+    registry = load_registry()
+    assert not accessible(target, [target, neighbour], 0, registry)
+    assert accessible(target, [target, neighbour], 90, registry)
+    plan = plan_assembly([target, neighbour])
+    # Narrow placement is safe only before the neighbouring block is installed.
+    assert [step['block_id'] for step in plan] == ['long', 'adjacent']
+    assert plan[0]['grasp_spin_deg'] == 0
+    remaining = [target, neighbour]
+    for step in reversed(plan):
+        part = next(b for b in remaining if b['id'] == step['block_id'])
+        assert accessible(part, remaining, step['grasp_spin_deg'], registry)
+        remaining.remove(part)
 
 
 @pytest.mark.parametrize('problem', ['position','flipped_orientation','settles'])

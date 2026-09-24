@@ -1,0 +1,110 @@
+[
+  {
+    "id": "4x2_brick_1",
+    "type": "brick_4x2",
+    "color": "green",
+    "body_name": "bench__brick_4x2__4x2_brick_1__69b5fff0",
+    "position": [
+      0.31,
+      0.33399999999999996,
+      0.06459999999999999
+    ],
+    "yaw_rad": 1.5707963267948966
+  },
+  {
+    "id": "4x2_brick_2",
+    "type": "brick_4x2",
+    "color": "yellow",
+    "body_name": "bench__brick_4x2__4x2_brick_2__e08b907e",
+    "position": [
+      0.34199999999999997,
+      0.382,
+      0.06459999999999999
+    ],
+    "yaw_rad": 0.0
+  },
+  {
+    "id": "4x2_brick_3",
+    "type": "brick_4x2",
+    "color": "blue",
+    "body_name": "bench__brick_4x2__4x2_brick_3__a4cf9314",
+    "position": [
+      0.38999999999999996,
+      0.35,
+      0.06459999999999999
+    ],
+    "yaw_rad": 1.5707963267948966
+  },
+  {
+    "id": "4x2_brick_4",
+    "type": "brick_4x2",
+    "color": "red",
+    "body_name": "bench__brick_4x2__4x2_brick_4__2b643c5d",
+    "position": [
+      0.32599999999999996,
+      0.35,
+      0.0837
+    ],
+    "yaw_rad": 0.0
+  },
+  {
+    "id": "2x2_brick_5",
+    "type": "brick_2x2",
+    "color": "blue",
+    "body_name": "bench__brick_2x2__2x2_brick_5__97d87b23",
+    "position": [
+      0.374,
+      0.366,
+      0.0837
+    ],
+    "yaw_rad": 0.0
+  },
+  {
+    "id": "4x2_brick_6",
+    "type": "brick_4x2",
+    "color": "yellow",
+    "body_name": "bench__brick_4x2__4x2_brick_6__0c886354",
+    "position": [
+      0.32599999999999996,
+      0.382,
+      0.0837
+    ],
+    "yaw_rad": 0.0
+  },
+  {
+    "id": "2x2_brick_7",
+    "type": "brick_2x2",
+    "color": "red",
+    "body_name": "bench__brick_2x2__2x2_brick_7__22b67831",
+    "position": [
+      0.374,
+      0.33399999999999996,
+      0.0837
+    ],
+    "yaw_rad": 0.0
+  },
+  {
+    "id": "2x2_brick_8",
+    "type": "brick_2x2",
+    "color": "green",
+    "body_name": "bench__brick_2x2__2x2_brick_8__c18c2464",
+    "position": [
+      0.32599999999999996,
+      0.31799999999999995,
+      0.0837
+    ],
+    "yaw_rad": 1.5707963267948966
+  },
+  {
+    "id": "4x2_brick_9",
+    "type": "brick_4x2",
+    "color": "green",
+    "body_name": "bench__brick_4x2__4x2_brick_9__ef341096",
+    "position": [
+      0.34199999999999997,
+      0.35,
+      0.10279999999999999
+    ],
+    "yaw_rad": 0.0
+  }
+]
