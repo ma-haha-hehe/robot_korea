@@ -47,7 +47,7 @@ def verify_direct_plan_reuse(baseline_file, current_file, recorded, manifest, pl
 def _non_planning_module(source):
     """Keep geometry, yaw conversion, imports and every non-planning definition."""
     tree = ast.parse(source)
-    planning = {'plan_assembly', 'plan_with_release_above', 'prefer_narrow_plan'}
+    planning = {'plan_assembly', 'plan_with_release_above', 'prefer_narrow_plan', 'prefer_braced_order'}
     tree.body = [node for node in tree.body
                  if not (isinstance(node, ast.FunctionDef) and node.name in planning)]
     return ast.dump(tree)

@@ -125,7 +125,11 @@ python scripts/test_product_suite.py --seeds 0 17 42 --skip-invalid-products
 The executor uses assembly by disassembly, shared with the research
 `myplanner.py` adapter: remove accessible parts from the finished structure with
 a 0°/90° gripper approach, then reverse that order. It rejects an unavailable
-approach instead of forcing a grasp. Preview the plan before execution:
+approach instead of forcing a grasp. For adjacent steps on the same layer,
+connecting a loaded support to another lower branch takes priority over a
+narrow-side hold. Any reordered pair must still have clear 0°/90° removal
+grasps; this support heuristic does not certify physical stability.
+Preview the plan before execution:
 
 ```bash
 python scripts/plan_assembly.py examples/products/catalog/final_product_hammer.yaml

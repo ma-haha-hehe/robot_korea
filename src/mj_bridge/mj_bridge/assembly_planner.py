@@ -116,7 +116,7 @@ def plan_assembly(targets):
                          'grasp_offset_rad': math.radians(spin) - block['yaw_rad']})
         remaining = [b for b in remaining if b['id'] != block['id']]
     original = list(reversed(removals))
-    return prefer_narrow_plan(targets, original, registry)
+    return prefer_braced_order(targets, prefer_narrow_plan(targets, original, registry), registry)
 
 
 def plan_with_release_above(targets):
@@ -234,3 +234,64 @@ def prefer_narrow_plan(targets, original, registry):
     return [dict(block_id=targets[i]['id'],grasp_spin_deg=spin,
                  grasp_offset_rad=math.radians(spin)-targets[i]['yaw_rad'])
             for i,spin in reversed(removals)]
+
+
+def prefer_braced_order(targets, original, registry):
+    """Place a connecting brace before loading its shared support further.
+
+    Improve adjacent same-layer pairs only when both new removal grasps are
+    geometrically clear. A narrower jaw span is secondary to this support
+    heuristic. This does not establish dynamic stability or change targets.
+    """
+    by_id = {block['id']: block for block in targets}
+    polygons = {block['id']: _polygon(block, registry) for block in targets}
+    bottom = min(block['position'][2] for block in targets)
+    lower_supports = {block['id']: {other['id'] for other in targets
+        if .015 < block['position'][2] - other['position'][2] < .025
+        and intersection_area(polygons[block['id']], polygons[other['id']]) > 1e-8}
+        for block in targets}
+    support = {}
+    for block in sorted(targets, key=lambda block: block['position'][2]):
+        if block['position'][2] <= bottom + .001:
+            support[block['id']] = 1.0
+            continue
+        area = float(np.prod(registry[block['type']]['size_m'][:2]))
+        support[block['id']] = min(1.0, sum(
+            intersection_area(polygons[block['id']], polygons[other['id']])
+            * support[other['id']]
+            for other in targets
+            if .015 < block['position'][2] - other['position'][2] < .025) / area)
+
+    def grasp(block, remaining):
+        hx, hy = np.asarray(registry[block['type']]['size_m'][:2]) / 2
+        def span(spin):
+            angle = block['yaw_rad'] - math.radians(spin)
+            return round(abs(math.sin(angle))*hx + abs(math.cos(angle))*hy, 8)
+        for spin in sorted((90, 0), key=span):
+            if accessible(block, remaining, spin, registry):
+                return dict(block_id=block['id'], grasp_spin_deg=spin,
+                            grasp_offset_rad=math.radians(spin)-block['yaw_rad'])
+        return None
+
+    plan = list(original)
+    changed = True
+    while changed:
+        changed = False
+        for i in range(len(plan) - 1):
+            first, second = (by_id[row['block_id']] for row in plan[i:i+2])
+            if (abs(first['position'][2] - second['position'][2]) > .001
+                    or support[first['id']] >= support[second['id']] - 1e-6):
+                continue
+            first_supports = lower_supports[first['id']]
+            second_supports = lower_supports[second['id']]
+            # A brace connects the loaded support to another lower branch.
+            # Leave unrelated peers in their existing validated order.
+            if not (first_supports & second_supports and second_supports - first_supports):
+                continue
+            prefix = [by_id[row['block_id']] for row in plan[:i]]
+            second_grasp = grasp(second, prefix + [second])
+            first_grasp = grasp(first, prefix + [second, first])
+            if first_grasp is not None and second_grasp is not None:
+                plan[i:i+2] = [second_grasp, first_grasp]
+                changed = True
+    return plan
