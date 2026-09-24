@@ -179,13 +179,27 @@ def test_reuse_proof_rejects_changed_direct_code_and_fallback_runs(tmp_path):
         verify(baseline, current, recorded, manifest, plan)
 
 
-def test_release_ranking_accounts_for_support_below_the_landing_part():
+def test_supported_landing_avoids_releasing_the_half_supported_edge():
+    from mj_bridge.assembly_planner import accessible, load_registry, RELEASE_TOOL_CLEARANCE_M
     targets = json.loads((Path(__file__).parent / 'fixtures' / 'tier4_task_051_targets.json').read_text())
+    before = copy.deepcopy(targets)
     plan = plan_with_release_above(targets)
     released = [row['block_id'] for row in plan if row.get('placement_mode') == 'release_above_press']
-    assert released == ['2x2_brick_7']
-    # Part 10 is fully covered by part 8, but part 8 itself overhangs its base.
-    assert next(row for row in plan if row['block_id'] == '2x2_brick_10')['placement_mode'] == 'direct'
+    # The old greedy sequence released part 7 onto a half-supported edge and
+    # it fell. Part 10 has full face coverage; dynamic stability needs a run.
+    assert released == ['2x2_brick_10']
+    assert next(row for row in plan if row['block_id'] == '2x2_brick_7')['placement_mode'] == 'direct'
+    remaining = list(targets)
+    for row in reversed(plan):
+        block = next(b for b in remaining if b['id'] == row['block_id'])
+        candidate = block
+        if row['placement_mode'] == 'release_above_press':
+            candidate = dict(block, position=[*block['position'][:2],
+                                             block['position'][2] + RELEASE_TOOL_CLEARANCE_M])
+        assert accessible(candidate, remaining, row['grasp_spin_deg'], load_registry())
+        remaining.remove(block)
+    assert not remaining
+    assert targets == before
 
 
 def test_direct_search_avoids_wide_holds_without_unsafe_removals():

@@ -188,7 +188,82 @@ def plan_with_release_above(targets):
         (b, spin, mode) = choice
         removals.append({'block_id': b['id'], 'grasp_spin_deg': spin, 'placement_mode': mode, 'grasp_offset_rad': math.radians(spin) - b['yaw_rad']})
         remaining = [b2 for b2 in remaining if b2['id'] != b['id']]
-    return list(reversed(removals))
+    original = list(reversed(removals))
+    if len(targets) > 12:
+        return original
+
+    # Greedy removal can leave an edge-supported part as the only drop.
+    # Search the small benchmark layouts for a supported landing instead,
+    # retaining the original plan whenever the landing score cannot improve.
+    import functools
+    by_id = {block['id']: i for i, block in enumerate(targets)}
+    polygons = [_polygon(block, registry) for block in targets]
+    landing = {}
+    for i, block in enumerate(targets):
+        area = float(np.prod(registry[block['type']]['size_m'][:2]))
+        coverage = sum(intersection_area(polygons[i], polygons[j])
+                       for j, other in enumerate(targets)
+                       if .015 < block['position'][2] - other['position'][2] < .025)
+        landing[i] = (1.0 if block['position'][2] <= bottom_z + .001
+                      else min(1.0, coverage / area))
+
+    def release_cost(i, mode):
+        if mode == 'direct':
+            return (0, 0, 0)
+        return (int(landing[i] < .99), 1,
+                round(1 - load_path_support(targets[i]), 6))
+
+    original_cost = tuple(sum(release_cost(by_id[row['block_id']],
+                                           row['placement_mode'])[k]
+                              for row in original) for k in range(3))
+    if not original_cost[0]:
+        return original
+    choices = []
+    for row in reversed(original):
+        i = by_id[row['block_id']]
+        block = targets[i]
+        hx, hy = np.asarray(registry[block['type']]['size_m'][:2]) / 2
+        def span(spin):
+            angle = block['yaw_rad'] - math.radians(spin)
+            return round(abs(math.sin(angle))*hx + abs(math.cos(angle))*hy, 8)
+        for mode in ('direct', 'release_above_press'):
+            raised = mode != 'direct'
+            candidate = (dict(block, position=[*block['position'][:2],
+                         block['position'][2] + RELEASE_TOOL_CLEARANCE_M])
+                         if raised else block)
+            for spin in sorted((90, 0), key=span):
+                if not accessible(candidate, [candidate], spin, registry):
+                    continue
+                blockers = 0
+                for j, other in enumerate(targets):
+                    if i == j:
+                        continue
+                    covered = (raised and other['position'][2] > block['position'][2] + .01
+                               and intersection_area(polygons[i], polygons[j]) > 1e-8)
+                    if covered or not accessible(candidate, [candidate, other], spin, registry):
+                        blockers |= 1 << j
+                choices.append((i, spin, mode, blockers, release_cost(i, mode)))
+
+    @functools.lru_cache(None)
+    def search(mask):
+        if not mask:
+            return (0, 0, 0), ()
+        best = ((math.inf, math.inf, math.inf), ())
+        for i, spin, mode, blockers, cost in choices:
+            if not mask & (1 << i) or mask & blockers:
+                continue
+            tail, sequence = search(mask ^ (1 << i))
+            total = tuple(a + b for a, b in zip(cost, tail))
+            if total < best[0]:
+                best = total, ((i, spin, mode),) + sequence
+        return best
+
+    cost, sequence = search((1 << len(targets)) - 1)
+    if cost >= original_cost:
+        return original
+    return [dict(block_id=targets[i]['id'], grasp_spin_deg=spin, placement_mode=mode,
+                 grasp_offset_rad=math.radians(spin)-targets[i]['yaw_rad'])
+            for i, spin, mode in reversed(sequence)]
 
 
 def prefer_narrow_plan(targets, original, registry):
