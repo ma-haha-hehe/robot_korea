@@ -58,14 +58,59 @@ def select(products, per_tier, seed, include):
     return inventory, sorted(chosen), coverage
 
 
+def restore_selection(products, selection_manifest, output_dir):
+    """Restore exact sampled inputs without consulting the current planner."""
+    output = Path(output_dir)
+    if output.exists():
+        raise ValueError('output directory already exists; preserve previous selections')
+    manifest_bytes = Path(selection_manifest).read_bytes()
+    manifest = json.loads(manifest_bytes)
+    tasks = manifest['tasks']
+    if (not tasks or manifest['selected'] != len(tasks)
+            or manifest['population'] < len(tasks)):
+        raise ValueError('selection counts do not match the recorded tasks')
+    names, payloads = set(), []
+    for row in tasks:
+        name = row['product']
+        if not re.fullmatch(r'tier[1-4]_task_\d+', name) or name in names:
+            raise ValueError('selection contains an invalid or duplicate task name')
+        names.add(name)
+        path = Path(products) / (name + '.yaml')
+        data = path.read_bytes()
+        if hashlib.sha256(data).hexdigest() != row['input_sha256']:
+            raise ValueError(f'sampled input checksum mismatch: {name}')
+        payloads.append((path.name, data))
+    # Validate every file before creating the destination. Keep the original
+    # bytes so a later input edit cannot slip between validation and copying.
+    output.mkdir(parents=True, exist_ok=False)
+    for name, data in payloads:
+        (output / name).write_bytes(data)
+    (output / 'selection.json').write_bytes(manifest_bytes)
+    return manifest
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--products', required=True)
     parser.add_argument('--output-dir', type=Path, required=True)
-    parser.add_argument('--per-tier', type=int, default=60)
-    parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--per-tier', type=int, help='new selection size per tier (default: 60)')
+    parser.add_argument('--seed', type=int, help='new selection seed (default: 42)')
     parser.add_argument('--include', nargs='*', default=[])
+    parser.add_argument('--selection-manifest', type=Path,
+                        help='restore a recorded selection and verify each input hash')
     args = parser.parse_args()
+    if args.selection_manifest:
+        if args.per_tier is not None or args.seed is not None or args.include:
+            parser.error('a recorded selection cannot be combined with new sampling options')
+        try:
+            manifest = restore_selection(args.products, args.selection_manifest, args.output_dir)
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            parser.error(str(exc))
+        print(json.dumps(dict(selected=manifest['selected'], population=manifest['population'],
+                              restored=True, seed=manifest['seed']), indent=2))
+        return
+    args.per_tier = 60 if args.per_tier is None else args.per_tier
+    args.seed = 42 if args.seed is None else args.seed
     if args.output_dir.exists():
         parser.error('output directory already exists; preserve previous selections')
     inventory, chosen, coverage = select(args.products, args.per_tier, args.seed, args.include)

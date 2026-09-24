@@ -65,6 +65,24 @@ python scripts/import_workbenchmark.py --repository ../Workbenchmark \
   --initial-layout recorded --output runs/workbenchmark-recorded
 ```
 
+Restore the committed regression sample of 240 tasks (60 per difficulty tier):
+
+```bash
+python scripts/select_workbenchmark_sample.py --products runs/workbenchmark-recorded \
+  --selection-manifest examples/validation/workbenchmark_selection.json \
+  --output-dir runs/workbenchmark-selected
+export MJ_BRIDGE_BENCHMARK_CONFIG="$PWD/examples/config/plastic_benchmark.yaml"
+python scripts/test_product_suite.py --products runs/workbenchmark-selected \
+  --seeds 42 --jobs 4 --timeout 3650 --connection-mode physics \
+  --contact-profile plastic --backend oracle --robot-base-x=-.05 \
+  --output-dir runs/workbenchmark-regression
+```
+
+Restoration checks every input hash and preserves the original selection metadata.
+The strata record part count, rectangular-part count, height and planned grasp
+angles at selection time. A fresh draw can change after planner updates, even
+with the same random seed. A saved selection records inputs, not successful tests.
+
 Then select a generated task YAML with `--product`. The importer preserves the
 original relative target geometry and recorded starting layout. Plastic parameters
 are simulation settings, not measured ABS properties; see
