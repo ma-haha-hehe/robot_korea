@@ -52,8 +52,34 @@ def test_failed_release_prevents_retreat_or_press():
     executor.open_gripper_before_retreat = fail_release
     with pytest.raises(ExecutionFailure, match='fingers not open'):
         executor.place_with_release_above({})
-    assert [p[2] for p in moves] == [.06, .010]
+    assert [p[2] for p in moves] == [.06, .016]
     assert executor.node.gripper_target == .02
+    assert executor.speed_scale == 1.5
+
+
+@pytest.mark.parametrize('height,support_x,release_height', [
+    (0., .1, .001), (.0192, 0., .001), (.0192, .02, .002),
+])
+def test_direct_release_uses_support_geometry_and_stops_on_release_failure(
+        height, support_x, release_height):
+    target = dict(id='part', type='brick_2x2', position=[0., 0., height], yaw_rad=0.)
+    support = dict(target, id='support', position=[support_x, 0., 0.])
+    executor = OracleExecutor.__new__(OracleExecutor)
+    executor.perception = None
+    executor.speed_scale = 1.5
+    executor.events = [dict(block='support')]
+    executor.node = SimpleNamespace(episode_manifest={
+        'contact_profile': 'plastic', 'target_blocks': [support, target]})
+    executor.align_held_part = lambda _: (np.array(target['position']), 0.)
+    moves = []
+    executor.move_vertical = lambda position, yaw: moves.append(position.copy())
+    def failed_release(*_):
+        raise ExecutionFailure('fingers not open')
+    executor.release_and_press = failed_release
+    executor.descend_to_insertion_entry = lambda target, endpoint, yaw: executor.move_vertical(endpoint, yaw)
+    with pytest.raises(ExecutionFailure, match='fingers not open'):
+        executor.place_physical(target)
+    assert [p[2] - height for p in moves] == pytest.approx([.04, release_height])
     assert executor.speed_scale == 1.5
 
 

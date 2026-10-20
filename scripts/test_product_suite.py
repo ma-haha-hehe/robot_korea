@@ -66,6 +66,27 @@ def main():
     def fingerprint():
         return {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in source_files}
     frozen_source = fingerprint()
+    config_path = Path(os.environ.get('MJ_BRIDGE_BENCHMARK_CONFIG',
+                                     str(package / 'benchmark.yaml'))).resolve()
+    input_products = tuple(products)
+    def input_fingerprint():
+        return {'products': {str(p.resolve()): hashlib.sha256(p.read_bytes()).hexdigest()
+                             for p in input_products},
+                'configuration': {str(config_path): hashlib.sha256(config_path.read_bytes()).hexdigest()}}
+    try:
+        frozen_inputs = input_fingerprint()
+    except OSError as exc:
+        parser.error(f'cannot read execution inputs: {exc}')
+
+    def inputs_changed():
+        try:
+            if fingerprint() != frozen_source:
+                return 'source changed'
+            if input_fingerprint() != frozen_inputs:
+                return 'product or execution configuration changed'
+        except OSError:
+            return 'execution input or source became unavailable'
+        return None
     input_count = len(products)
     invalid_products = []
     if args.skip_invalid_products:
@@ -87,9 +108,10 @@ def main():
     expected_episodes = len(products) * len(args.seeds)
     def run_episode(product, seed):
         run = output / product.stem / f'seed-{seed}'
-        if fingerprint() != frozen_source:
+        changed = inputs_changed()
+        if changed:
             return dict(product=product.stem, seed=seed, success=False, not_run=True,
-                        completion=0, error='source changed; execution cancelled', run_dir=str(run))
+                        completion=0, error=f'{changed}; execution cancelled', run_dir=str(run))
         run.mkdir(parents=True, exist_ok=True)
         # A previous result must never be mistaken for this attempt's output.
         for name in ('result.json', 'actual_state.json', 'progress.json'):
@@ -107,6 +129,7 @@ def main():
                 code = proc.returncode
             except subprocess.TimeoutExpired:
                 code = 124
+        changed = inputs_changed()
         result_error = None
         try:
             result = json.loads((run / 'result.json').read_text()) if (run / 'result.json').is_file() else {}
@@ -116,10 +139,11 @@ def main():
             result = {}
             result_error = f'invalid result artifact: {exc}'
         row = {'product': product.stem, 'seed': seed, 'returncode': code,
-               'success': code == 0 and result.get('success') is True,
+               'success': code == 0 and result.get('success') is True and changed is None,
                'completion': result.get('completion', 0),
                'max_gripper_penetration_m': result.get('max_gripper_penetration_m'),
-               'error': result_error or result.get('execution_error') or
+               'error': (f'{changed}; result cannot be accepted' if changed else None) or
+                        result_error or result.get('execution_error') or
                         ('gripper penetration limit exceeded' if result.get('gripper_contact_valid') is False else None) or
                         ('physical contact penetration limit exceeded' if result.get('physical_contacts_valid') is False else None) or
                         ('final assembly outside tolerance' if result and not result.get('success') else
@@ -136,6 +160,7 @@ def main():
             summary = {'kind': 'physical_execution', 'backend': args.backend,
                        'connection_mode': args.connection_mode, 'contact_profile': args.contact_profile,
                        'robot_base_x': args.robot_base_x, 'source_sha256': frozen_source,
+                       'execution_inputs_sha256': frozen_inputs,
                        'priority_products': priorities,
                        'executed_episodes': sum(not r.get('not_run', False) for r in rows),
                        'input_products': input_count, 'invalid_products': invalid_products,

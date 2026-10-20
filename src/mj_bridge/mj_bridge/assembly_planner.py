@@ -10,10 +10,10 @@ from .benchmark_core import load_registry
 from .product_geometry import footprint, intersection_area
 
 
-RELEASE_ABOVE_M = .010
-RAISED_GRASP_OFFSET_M = .003
+RELEASE_ABOVE_M = .016
+FALLBACK_GRASP_OFFSET_M = -.003
 # Accessibility assumes a normal grasp at -3 mm relative to the part origin.
-RELEASE_TOOL_CLEARANCE_M = RELEASE_ABOVE_M + RAISED_GRASP_OFFSET_M + .003
+RELEASE_TOOL_CLEARANCE_M = RELEASE_ABOVE_M + FALLBACK_GRASP_OFFSET_M + .003
 
 
 class PlanningError(ValueError):

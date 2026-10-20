@@ -31,6 +31,9 @@ rsync -a --delete --delete-excluded \
   --include '/src/mj_bridge/launch/' --include '/src/mj_bridge/launch/lego_bench.launch.py' \
   --include '/src/mj_bridge/test/' --include '/src/mj_bridge/test/test_benchmark_core.py' --include '/src/mj_bridge/test/test_public_regressions.py' \
   --include '/src/mj_bridge/test/test_recorded_layout.py' --include '/src/mj_bridge/test/test_plastic_contact.py' \
+  --include '/src/mj_bridge/test/test_dense_assembly.py' --include '/src/mj_bridge/test/test_braced_order.py' \
+  --include '/src/mj_bridge/test/test_held_part_guard.py' --include '/src/mj_bridge/test/test_sample_restore.py' \
+  --include '/src/mj_bridge/test/test_suite_input_freeze.py' --include '/src/mj_bridge/test/fixtures/***' \
   --include '/src/mj_bridge/mj_bridge/' \
   --include '/src/mj_bridge/mj_bridge/assets/' --include '/src/mj_bridge/mj_bridge/assets/***' \
   --include '/src/mj_bridge/mj_bridge/__init__.py' \
@@ -58,6 +61,7 @@ rsync -a --delete --delete-excluded \
   --include '/scripts/import_workbenchmark.py' --include '/scripts/audit_workbenchmark.py' \
   --include '/scripts/check_target_stability.py' --include '/scripts/export_workbenchmark_parts.py' \
   --include '/scripts/check_plastic_contact.py' --include '/scripts/select_workbenchmark_sample.py' \
+  --include '/scripts/direct_plan_reuse.py' --include '/scripts/unused_feedback_reuse.py' \
   --include '/.gitignore' --include '/pytest.ini' --include '/conftest.py' --include '/README.md' --include '/THIRD_PARTY_NOTICES.md' \
   --include '/LICENSE' --include '/.dockerignore' \
   --include '/requirements-sim.txt' --include '/Dockerfile.benchmark' \

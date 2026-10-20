@@ -13,7 +13,7 @@ import numpy as np
 import mujoco
 from .benchmark_core import dump_json, load_registry, score_episode
 from .assembly_planner import (plan_assembly, resolve_grasp_yaws, PlanningError,
-                               RELEASE_ABOVE_M, RAISED_GRASP_OFFSET_M)
+                               RELEASE_ABOVE_M, FALLBACK_GRASP_OFFSET_M)
 
 
 def placement_yaw(target, placed_targets):
@@ -73,10 +73,15 @@ class _GripDrift(Exception):
     """Interrupt descent while there is still clearance to restore the grip."""
 
 
+class _SupportContact(Exception):
+    """Stop insertion when a placed support starts loading the held part."""
+
+
 def free_space_grip_drift(observed, target):
     q = observed['quaternion_wxyz']
     tilt = math.degrees(math.acos(float(np.clip(1 - 2*(q[1]**2 + q[2]**2), -1, 1))))
-    return observed['position'][2] > target['position'][2] + .020 and tilt > 1.
+    # Monitor the final airborne descent too, before reaching the stud lead-in.
+    return observed['position'][2] > target['position'][2] + .008 and tilt > 1.
 
 
 def insertion_speed_scale(target, placed_targets, base_height):
@@ -197,6 +202,25 @@ class OracleExecutor:
                 self.node.maintain_fake_welds()
             if not np.isfinite(self.data.qpos).all():
                 raise ExecutionFailure('non-finite simulation state')
+            insertion = getattr(self, '_insertion_contact_guard', None)
+            if insertion is not None:
+                part, supports = insertion
+                normal_force = 0.
+                for index, contact in enumerate(self.data.contact):
+                    bodies = set(int(self.model.geom_bodyid[g])
+                                 for g in (contact.geom1, contact.geom2))
+                    if part in bodies and bodies & supports and contact.dist <= .0001:
+                        force = np.zeros(6)
+                        mujoco.mj_contactForce(self.model, self.data, index, force)
+                        normal_force += max(0., float(force[0]))
+                if normal_force > .01:
+                    self.node.target_qpos[self.qadr] = self.data.qpos[self.qadr].copy()
+                    self._insertion_contact_observation = {
+                        'simulation_time_s': float(self.data.time),
+                        'normal_force_sum_n': normal_force,
+                        'position_m': self.data.xpos[part].tolist(),
+                        'quaternion_wxyz': self.data.xquat[part].tolist()}
+                    raise _SupportContact()
             target = getattr(self, '_descent_guard_target', None)
             if target is not None:
                 body = self.model.body(target['body_name']).id
@@ -361,6 +385,25 @@ class OracleExecutor:
             self.move(tip + np.r_[delta, 0.], yaw + angle)
         raise ExecutionFailure(f"held-part alignment did not converge: {target['id']}")
 
+    def descend_to_insertion_entry(self, target, endpoint, yaw):
+        """Unload at measured support contact, or at the bounded entry height."""
+        released = {event['block'] for event in self.events}
+        supports = {self.model.body(block['body_name']).id
+                    for block in self.node.episode_manifest['target_blocks']
+                    if block['id'] in released and abs(
+                        target['position'][2] - block['position'][2] - .0192) < .004}
+        part = self.model.body(target['body_name']).id
+        self._insertion_contact_guard = (part, supports)
+        self._insertion_contact_observation = None
+        try:
+            try:
+                self.move_vertical(endpoint, yaw)
+            except _SupportContact:
+                pass
+        finally:
+            self._insertion_contact_guard = None
+        return self._insertion_contact_observation
+
     def place_physical(self, target):
         if target.get("placement_mode") == "release_above_press":
             return self.place_with_release_above(target)
@@ -384,11 +427,17 @@ class OracleExecutor:
                 self._descent_guard_target = target
             try:
                 if self.node.episode_manifest.get('contact_profile') == 'plastic':
-                    # Unload the grasp before the final interference fit: jaw
-                    # compression can tilt a part as the studs enter its cavity.
-                    self.move_vertical(endpoint + [0, 0, .001], yaw)
+                    # Partial support lets lateral jaw compression tip the part
+                    # at the lead-in. Unload earlier there; retain the lower
+                    # release for fully supported fits to limit free settling.
+                    unload_height = (.002 if self._requires_precise_support_alignment(target)
+                                     else .001)
+                    contact = self.descend_to_insertion_entry(
+                        target, endpoint + [0, 0, unload_height], yaw)
                     self._descent_guard_target = None
                     self.release_and_press(target, yaw, 'release_at_insertion_entry')
+                    if contact is not None:
+                        self.last_seating_confirmation['insertion_contact'] = contact
                     recovered = True
                 else:
                     self.move_vertical(endpoint, yaw)
@@ -764,11 +813,11 @@ class OracleExecutor:
         dadr = self.model.jnt_dofadr[joints]
         fingers = {self.model.body(name).id for name in ('left_finger', 'right_finger')}
         part = self.model.body(target['body_name']).id
-        if (not getattr(self, '_top_press_active', False)
-                and (getattr(self, 'last_seating_confirmation', None) or {}).get(
+        if (getattr(self, '_top_press_active', False)
+                or (getattr(self, 'last_seating_confirmation', None) or {}).get(
                     'initial_release_confirmation')):
-            # Remove commanded press overtravel while holding the measured arm
-            # posture. Retreat still waits for fully open, contact-free fingers.
+            # Unload residual insertion pressure before opening, including the
+            # first release. Retreat still waits for measured, clear fingers.
             self.node.target_qpos[self.qadr] = self.data.qpos[self.qadr].copy()
         self.node.gripper_target = .04
         stable_time = 0.
@@ -838,8 +887,9 @@ class OracleExecutor:
                 pos = np.array(observed['position'])
                 yaw, place_yaw = resolve_grasp_yaws(
                     observed['yaw_rad'], target['yaw_rad'], planned['grasp_spin_deg'])
-                # Grip the upper sidewall, leaving the fingertips clear of supporting studs.
-                grasp = pos + [0, 0, RAISED_GRASP_OFFSET_M
+                # Keep sidewall overlap during transport; the fallback releases higher
+                # to preserve the planned fingertip clearance above the assembly.
+                grasp = pos + [0, 0, FALLBACK_GRASP_OFFSET_M
                                    if target['placement_mode'] == 'release_above_press' else -.003]
                 hover = grasp + [0, 0, .16]
                 self.move(hover, yaw)

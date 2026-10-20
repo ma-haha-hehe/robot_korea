@@ -173,7 +173,7 @@ def test_full_support_does_not_require_partial_support_realignment():
     assert executor.last_seating_confirmation['bottom_support_force_n'] == .2
 
 
-@pytest.mark.parametrize('after_press,blocked', [(False, False), (True, False), (True, True)])
+@pytest.mark.parametrize('after_press,blocked', [(False, False), (False, True), (True, False), (True, True)])
 def test_pressure_unloading_holds_actual_arm_pose_and_keeps_release_guard(after_press, blocked):
     import numpy as np
     executor = OracleExecutor.__new__(OracleExecutor)
@@ -200,7 +200,7 @@ def test_pressure_unloading_holds_actual_arm_pose_and_keeps_release_guard(after_
     else:
         released = executor.open_gripper_before_retreat(dict(id='p', body_name='part'))
         assert released['wait_simulation_s'] >= .08
-    assert snapshots == pytest.approx([.02 if after_press else .04] * len(snapshots))
+    assert snapshots == pytest.approx([.02] * len(snapshots))
     assert executor.data.qpos[0] == .02
 
 
@@ -240,7 +240,8 @@ def test_partial_support_slows_only_final_upper_insertion():
 
 
 @pytest.mark.parametrize('tilt_deg,height,trigger', [
-    (.1, .04, False), (2., .04, True), (2., .01, False), (2., .02, False)])
+    (.1, .04, False), (2., .04, True), (2., .01, True), (2., .02, True),
+    (2., .008, False), (2., .0081, True), (2., .005, False), (.1, .015, False)])
 def test_grip_recovery_requires_observed_tilt_and_free_space(tilt_deg, height, trigger):
     from mj_bridge.reference_executor import free_space_grip_drift
     angle = math.radians(tilt_deg) / 2
@@ -499,3 +500,57 @@ def test_parallel_shell_hulls_preserve_geometry_and_contact_depth():
     assert data.ncon > 0
     assert all(abs(contact.dist) < .000001 for contact in data.contact)
     assert sum(model.body_mass) == pytest.approx(.04)
+
+
+@pytest.mark.parametrize('force,support_height,released,penetration,expected', [
+    (.02, 0., True, 0., 'contact'),
+    (.01, 0., True, 0., 'endpoint'),
+    (.02, .0192, True, 0., 'endpoint'),
+    (.02, 0., False, 0., 'endpoint'),
+    (.02, 0., True, .0006, 'failure'),
+])
+def test_insertion_contact_interrupts_only_for_loaded_supports(
+        monkeypatch, force, support_height, released, penetration, expected):
+    import time
+    import numpy as np
+    import mj_bridge.reference_executor as module
+    executor = OracleExecutor.__new__(OracleExecutor)
+    target = dict(id='part', body_name='part', position=[0., 0., .0192])
+    support = dict(id='support', body_name='support', position=[0., 0., support_height])
+    executor.events = [dict(block='support')] if released else []
+    executor.qadr = np.array([0])
+    executor.model = SimpleNamespace(
+        opt=SimpleNamespace(timestep=.0005), geom_bodyid=np.array([1, 2]),
+        body=lambda name: SimpleNamespace(id={'part': 1, 'support': 2}[name]))
+    executor.data = SimpleNamespace(
+        qpos=np.array([.12]), time=1., xpos=np.zeros((3, 3)),
+        xquat=np.array([[1., 0., 0., 0.]]*3),
+        contact=[SimpleNamespace(geom1=0, geom2=1, dist=0.)])
+    stepped = []
+    executor.node = SimpleNamespace(
+        episode_manifest={'target_blocks': [target, support]},
+        episode_start_time=time.monotonic(), benchmark_config={},
+        connection_mode='physics', max_part_penetration_m=penetration,
+        max_robot_environment_penetration_m=0., target_qpos=np.array([.2]),
+        step_pid=lambda: stepped.append(True), update_safety_metrics=lambda: None)
+    monkeypatch.setattr(module.mujoco, 'mj_contactForce',
+                        lambda model, data, index, out: out.__setitem__(0, force))
+    finished_move = []
+    def move(endpoint, yaw):
+        executor.step(.001)
+        finished_move.append(True)
+    executor.move_vertical = move
+    if expected == 'failure':
+        with pytest.raises(ExecutionFailure, match='penetration limit'):
+            executor.descend_to_insertion_entry(target, [0., 0., .0212], 0.)
+    else:
+        observation = executor.descend_to_insertion_entry(target, [0., 0., .0212], 0.)
+        if expected == 'contact':
+            assert observation['normal_force_sum_n'] == pytest.approx(force)
+            assert not finished_move and len(stepped) == 1
+            assert executor.node.target_qpos[0] == .12
+        else:
+            assert observation is None and finished_move
+            assert executor.node.target_qpos[0] == .2
+    assert executor._insertion_contact_guard is None
+    assert executor.data.qpos[0] == .12
