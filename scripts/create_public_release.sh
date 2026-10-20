@@ -34,6 +34,7 @@ rsync -a --delete --delete-excluded \
   --include '/src/mj_bridge/test/test_dense_assembly.py' --include '/src/mj_bridge/test/test_braced_order.py' \
   --include '/src/mj_bridge/test/test_held_part_guard.py' --include '/src/mj_bridge/test/test_sample_restore.py' \
   --include '/src/mj_bridge/test/test_suite_input_freeze.py' --include '/src/mj_bridge/test/fixtures/***' \
+  --include '/src/mj_bridge/test/test_latest_workbenchmark.py' \
   --include '/src/mj_bridge/mj_bridge/' \
   --include '/src/mj_bridge/mj_bridge/assets/' --include '/src/mj_bridge/mj_bridge/assets/***' \
   --include '/src/mj_bridge/mj_bridge/__init__.py' \
@@ -59,6 +60,7 @@ rsync -a --delete --delete-excluded \
   --include '/examples/***' --include '/docs/***' --include '/.github/***' \
   --include '/scripts/' --include '/scripts/plan_assembly.py' --include '/scripts/view_physics_episode.py' --include '/scripts/test_product_suite.py' --include '/scripts/audit_product_geometry.py' --include '/scripts/create_public_release.sh' --include '/scripts/write_validation_report.py' \
   --include '/scripts/import_workbenchmark.py' --include '/scripts/audit_workbenchmark.py' \
+  --include '/scripts/import_workbenchmark_latest.py' \
   --include '/scripts/check_target_stability.py' --include '/scripts/export_workbenchmark_parts.py' \
   --include '/scripts/check_plastic_contact.py' --include '/scripts/select_workbenchmark_sample.py' \
   --include '/scripts/direct_plan_reuse.py' --include '/scripts/unused_feedback_reuse.py' \

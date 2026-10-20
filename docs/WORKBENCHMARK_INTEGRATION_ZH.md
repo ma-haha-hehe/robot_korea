@@ -1,8 +1,30 @@
 # Workbenchmark 导入与验证
 
-Workbenchmark 的 400 个任务使用 `brick_2x2` 和 `brick_4x2` 两种零件，共 2009 个零件实例。原始任务保留在独立仓库；导入器不修改原文件。
+Workbenchmark 使用 `brick_2x2` 和 `brick_4x2` 两种零件。任务保留在独立的 [benchmark_lego 仓库](https://github.com/ma-haha-hehe/benchmark_lego)；导入器不修改源文件。最新版包含 400 个任务，各 Tier 100 个。旧数据与最新版分别使用以下导入入口。
 
-## 导入原始散料布局
+## 导入最新版三文件任务
+
+最新版使用 `versions/latest/tasks/<类别>/<实例>/` 下的 `final_product.yaml`、`scene_init.yaml`、`metadata.yaml`。在本仓库根目录运行，将 `--tasks-root` 替换为 benchmark_lego 本地副本中的实际路径：
+
+```bash
+source enter_sim_env.sh
+export PYTHONPATH="$PWD/src/mj_bridge:$PYTHONPATH"
+python scripts/import_workbenchmark_latest.py \
+  --tasks-root ../benchmark_lego/versions/latest/tasks \
+  --output runs/workbenchmark-latest
+python scripts/import_workbenchmark_latest.py \
+  --output runs/workbenchmark-latest --verify-task two_brick_stack_001.yaml
+python -m mj_bridge.benchmark_cli run \
+  --product runs/workbenchmark-latest/two_brick_stack_001.yaml \
+  --connection-mode physics --contact-profile plastic --executor oracle-baseline \
+  --headless --robot-base-x=-.05 --output-dir runs/workbenchmark-latest-tier1
+```
+
+导入器检查三文件清单、显式单位、直角朝向、20 mm 层距和元数据，并保留源文件快照及 SHA-256。目标 XY 相对底层整体包络中心平移，源数据的 20 mm 层索引显式映射到仿真模型的 19.2 mm 层距；XY 尺度和每块砖的相对朝向不变。初始布局整体平移到仿真料盘，不逐块重排。该几何适配须与原始任务结果分别记录。
+
+输出目录必须不存在。运行前执行 `--verify-task`，可检测导入产物、冻结快照及仍可访问的源任务是否变化；源任务不可访问时会明确标记仅使用冻结快照。导入通过只证明数据转换和完整性，不证明物理装配成功。
+
+## 导入旧版原始散料布局
 
 ```bash
 source enter_sim_env.sh

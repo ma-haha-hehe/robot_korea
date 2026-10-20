@@ -58,14 +58,31 @@ MUJOCO_GL=glfw LP_NUM_THREADS=2 python scripts/view_physics_episode.py \
   --seed 42 --contact-profile plastic --robot-base-x=-.05
 ```
 
-To use the full task collection from a neighbouring Workbenchmark checkout:
+For the current 400-task dataset in `benchmark_lego`, import the three-file
+instances from `versions/latest/tasks/`:
+
+```bash
+python scripts/import_workbenchmark_latest.py \
+  --tasks-root ../benchmark_lego/versions/latest/tasks \
+  --output runs/workbenchmark-latest
+python scripts/import_workbenchmark_latest.py \
+  --output runs/workbenchmark-latest --verify-task two_brick_stack_001.yaml
+```
+
+Use a fresh output directory. The importer freezes all three source files and
+their hashes. It preserves relative XY geometry and explicitly maps the source
+20 mm layer spacing to the simulator's 19.2 mm layer spacing. See the
+[import conventions](docs/WORKBENCHMARK_INTEGRATION_ZH.md) before execution.
+
+The older `benchmark_tasks/*.yaml` collection uses a separate importer:
 
 ```bash
 python scripts/import_workbenchmark.py --repository ../Workbenchmark \
   --initial-layout recorded --output runs/workbenchmark-recorded
 ```
 
-Restore the committed regression sample of 240 tasks (60 per difficulty tier):
+For that older collection, restore the committed regression sample of 240 tasks
+(60 per difficulty tier):
 
 ```bash
 python scripts/select_workbenchmark_sample.py --products runs/workbenchmark-recorded \
@@ -83,8 +100,8 @@ The strata record part count, rectangular-part count, height and planned grasp
 angles at selection time. A fresh draw can change after planner updates, even
 with the same random seed. A saved selection records inputs, not successful tests.
 
-Then select a generated task YAML with `--product`. The importer preserves the
-original relative target geometry and recorded starting layout. Plastic parameters
+Then select a generated task YAML with `--product`. Each importer records its
+geometry transform and preserves the recorded starting layout. Plastic parameters
 are simulation settings, not measured ABS properties; see
 [contact model and validation limits](docs/PLASTIC_CONTACT_ZH.md).
 The archived release checkpoint records 36 original tasks with verified Oracle
