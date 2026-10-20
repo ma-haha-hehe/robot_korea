@@ -7,6 +7,11 @@ exposes standard control/observation interfaces, and scores the final assembly.
 
 中文完整说明见 [docs/PUBLIC_BENCHMARK_ZH.md](docs/PUBLIC_BENCHMARK_ZH.md).
 
+The independent Ubuntu robot workspace is preserved under the
+[`ubuntu-workspace-20261020` tag](https://github.com/ma-haha-hehe/robot_korea/tree/ubuntu-workspace-20261020).
+See [workspace contents and validation](docs/WORKSPACE_SNAPSHOT_ZH.md) before
+choosing between that development line and the public benchmark on `main`.
+
 ## Quick start
 
 Requires Ubuntu 22.04 with ROS 2 Humble base already installed and its apt
