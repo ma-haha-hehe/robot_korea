@@ -9,6 +9,11 @@ from xml.dom import minidom
 import yaml
 import numpy as np
 
+try:
+    from .benchmark_core import load_yaml as load_benchmark_yaml
+except ImportError:  # Allow `python scene_builder.py` during local development.
+    from benchmark_core import load_yaml as load_benchmark_yaml
+
 
 # ============================================================
 # 1. 文件路径
@@ -172,6 +177,8 @@ COLOR_MAP = {
     "grey": "0.5 0.5 0.5 1",
     "white": "1 1 1 1",
     "black": "0.1 0.1 0.1 1",
+    "orange": "1.0 0.45 0.0 1",
+    "purple": "0.55 0.2 0.75 1",
 }
 
 
@@ -218,7 +225,7 @@ def find_and_remove_old_dynamic_bricks(worldbody: ET.Element) -> None:
 
         name = child.get("name", "")
 
-        if "brick" in name:
+        if "brick" in name or name.startswith("lego_figure"):
             to_remove.append(child)
 
         if name == ASSEMBLY_BASE_NAME:
@@ -454,6 +461,139 @@ def create_brick_body(block: dict, yaml_parts_center: np.ndarray) -> ET.Element:
     return body
 
 
+def add_hollow_brick_geoms(body, brick_type):
+    """Primitive open underside for gravity/contact-only assembly (no clutch fit)."""
+    spec = BRICK_SPECS[brick_type]
+    # Nominal registry dimensions describe the stud grid. Leave a 0.2 mm
+    # seam between adjacent bodies; a zero-clearance sharp box jams even for
+    # tens of micrometres of placement error. This is not a measured CAD fit.
+    hx, hy = spec['body_half_size'][:2] - .0001
+    half_height, wall, roof = .0096, .0015, .002
+    bottom = COLLISION_Z_OFFSET - half_height
+    ceiling = COLLISION_Z_OFFSET + half_height - roof
+    def geom(kind, size, pos, **attrs):
+        return ET.SubElement(body, 'geom', type=kind,
+            size=' '.join(map(str, size)), pos=' '.join(map(str, pos)),
+            solref='.001 1', solimp='.9999 .9999 .0001',
+            friction='1 .005 .0001', priority='1', **attrs)
+    geom('box', [hx, hy, roof/2], [0, 0, ceiling + roof/2])
+    wall_half = (ceiling - bottom)/2
+    wall_z = (ceiling + bottom)/2
+    for sign in (-1, 1):
+        geom('box', [wall/2, hy, wall_half], [sign*(hx-wall/2), 0, wall_z])
+        geom('box', [hx-wall, wall/2, wall_half], [0, sign*(hy-wall/2), wall_z])
+    # Underside tubes sit between studs. Deliberate clearance models loose
+    # rigid placement; it does not claim elastic interference/clutch forces.
+    for ix in range(spec['studs_x'] - 1):
+        x = -(spec['studs_x']-2)*STUD_PITCH/2 + ix*STUD_PITCH
+        for segment in range(16):
+            angle = segment * 2*np.pi/16
+            radius, thickness = .0061, .0012
+            geom('box', [thickness/2, radius*np.tan(np.pi/16), wall_half],
+                 [x + radius*np.cos(angle), radius*np.sin(angle), wall_z],
+                 euler=f'0 0 {angle}')
+    for ix in range(spec['studs_x']):
+        for iy in range(spec['studs_y']):
+            geom('cylinder', [STUD_RADIUS, STUD_HALF_HEIGHT],
+                 [(ix-(spec['studs_x']-1)/2)*STUD_PITCH,
+                  (iy-(spec['studs_y']-1)/2)*STUD_PITCH,
+                  COLLISION_Z_OFFSET + half_height + STUD_HALF_HEIGHT])
+    mass = .012 if brick_type == 'brick_2x2' else .022
+    sx, sy, sz = 2*hx, 2*hy, 2*half_height
+    inertia = [mass*(sy*sy+sz*sz)/12, mass*(sx*sx+sz*sz)/12, mass*(sx*sx+sy*sy)/12]
+    ET.SubElement(body, 'inertial', pos=f'0 0 {COLLISION_Z_OFFSET}',
+                  mass=str(mass), diaginertia=' '.join(map(str, inertia)))
+
+
+def create_episode_brick_body(block: dict, mesh_assets=None) -> ET.Element:
+    """Create one loose source part from a benchmark episode manifest."""
+    if block.get('geometry') == 'hollow_plastic_clutch_v1':
+        raise ValueError('retired plastic geometry v1: replay its saved scene or generate a new episode')
+    brick_type = block["type"]
+    if brick_type not in BRICK_SPECS:
+        raise ValueError(f"未知积木类型: {brick_type}")
+    body = ET.Element("body", {
+        "name": block["body_name"],
+        "quat": quat_from_yaw(float(block.get("yaw_rad", 0.0))),
+    })
+    ET.SubElement(body, "freejoint")
+    if block.get("geometry") in {"hollow_primitives_v1", "hollow_plastic_clutch_v2"}:
+        add_hollow_brick_geoms(body, brick_type)
+    else:
+        add_duplo_collision_geoms(body, brick_type)
+    if block.get('geometry') == 'hollow_plastic_clutch_v2':
+        if mesh_assets is None:
+            raise ValueError('plastic contact requires a mesh asset collector')
+        from .plastic_contact import add_clutch_fit
+        for mesh in add_clutch_fit(body, brick_type):
+            mesh_assets[mesh.get('name')] = mesh
+    # Public episodes render the same self-authored primitives used for collision.
+    # This keeps release artifacts independent from unverified LEGO mesh files.
+    rgba = get_rgba(block.get("color", "gray"))
+    for geom in body.findall("geom"):
+        geom.set("rgba", rgba)
+    p = block["position"]
+    body.set("pos", f"{float(p[0]):.6f} {float(p[1]):.6f} {float(p[2]):.6f}")
+    return body
+
+
+def add_figure_geom(body, *, name, geom_type, size, pos=None, rgba="0.8 0.8 0.8 1", **attrs):
+    """添加同时参与显示和碰撞的乐高人物几何体。"""
+    geom = ET.SubElement(body, "geom")
+    geom.set("name", name)
+    geom.set("type", geom_type)
+    geom.set("size", size)
+    if pos is not None:
+        geom.set("pos", pos)
+    geom.set("rgba", rgba)
+    geom.set("friction", "1.2 0.08 0.005")
+    geom.set("solref", "0.006 1")
+    geom.set("solimp", "0.92 0.98 0.002")
+    geom.set("density", "650")
+    for key, value in attrs.items():
+        geom.set(key, str(value))
+    return geom
+
+
+def create_lego_figure_body(spec: dict) -> ET.Element:
+    """用稳定的基本碰撞体创建单刚体乐高人物，适合第一阶段抓取对比。"""
+    name = spec.get("name", "lego_figure_1")
+    x, y, yaw = [float(v) for v in spec.get("pose", [0.48, -0.12, 0.0])]
+
+    body = ET.Element("body")
+    body.set("name", name)
+    body.set("pos", f"{x:.5f} {y:.5f} {TABLE_TOP_Z:.5f}")
+    body.set("quat", quat_from_yaw(yaw))
+    ET.SubElement(body, "freejoint")
+
+    # 尺寸接近经典 minifigure，但整体略放大，便于 Panda 双指夹爪实验。
+    add_figure_geom(body, name=f"{name}_left_leg", geom_type="box",
+                    size="0.0038 0.0040 0.0060", pos="-0.0043 0 0.0060",
+                    rgba="0.12 0.22 0.75 1")
+    add_figure_geom(body, name=f"{name}_right_leg", geom_type="box",
+                    size="0.0038 0.0040 0.0060", pos="0.0043 0 0.0060",
+                    rgba="0.12 0.22 0.75 1")
+    add_figure_geom(body, name=f"{name}_hip", geom_type="box",
+                    size="0.0082 0.0042 0.0022", pos="0 0 0.0138",
+                    rgba="0.12 0.22 0.75 1")
+    add_figure_geom(body, name=f"{name}_torso", geom_type="box",
+                    size="0.0090 0.0045 0.0070", pos="0 0 0.0230",
+                    rgba="0.82 0.10 0.08 1")
+    add_figure_geom(body, name=f"{name}_left_arm", geom_type="capsule",
+                    size="0.0022", rgba="0.82 0.10 0.08 1",
+                    fromto="-0.0105 0 0.0280 -0.0125 0 0.0170")
+    add_figure_geom(body, name=f"{name}_right_arm", geom_type="capsule",
+                    size="0.0022", rgba="0.82 0.10 0.08 1",
+                    fromto="0.0105 0 0.0280 0.0125 0 0.0170")
+    add_figure_geom(body, name=f"{name}_head", geom_type="cylinder",
+                    size="0.0052 0.0052", pos="0 0 0.0352",
+                    rgba="1.0 0.72 0.18 1")
+    add_figure_geom(body, name=f"{name}_head_stud", geom_type="cylinder",
+                    size="0.0030 0.0012", pos="0 0 0.0416",
+                    rgba="1.0 0.72 0.18 1")
+    return body
+
+
 # ============================================================
 # 10. 生成 scene.xml
 # ============================================================
@@ -462,6 +602,7 @@ def build(
     initial_yaml: str = INITIAL_YAML,
     template_xml: str = SCENE_TEMPLATE_XML,
     output_xml: str = SCENE_OUTPUT_XML,
+    episode_manifest: str | None = None,
 ) -> str:
     """
     读取：
@@ -498,11 +639,57 @@ def build(
         dtype=float,
     )
 
-    blocks = data.get("blocks", [])
-
-    for block in blocks:
-        brick_body = create_brick_body(block, yaml_parts_center)
-        worldbody.append(brick_body)
+    if episode_manifest:
+        episode = load_benchmark_yaml(episode_manifest)
+        if episode.get('connection_mode') == 'physics':
+            # Unhandled supply parts may sleep. The Oracle executor permanently
+            # disables sleeping for each picked part so release and seating
+            # checks retain actual contacts throughout assembly.
+            option = root.find('option')
+            if option is None:
+                option = ET.SubElement(root, 'option')
+            ET.SubElement(option, 'flag', sleep='enable')
+        asset = root.find("asset")
+        if asset is not None:
+            for mesh in list(asset.findall("mesh")):
+                if mesh.get("name", "").startswith("lego_"):
+                    asset.remove(mesh)
+        if episode.get('contact_profile') == 'plastic':
+            offset = episode.get('assembly_fixture', {}).get('position_offset_xy_m', [0., 0.])
+            if len(offset) != 2 or not all(np.isfinite(v) and abs(v) <= STUD_PITCH/2 for v in offset):
+                raise ValueError('invalid plastic mounting fixture offset')
+            plate = worldbody.find(f'body[@name="{ASSEMBLY_BASE_NAME}"]')
+            if plate is not None:
+                plate.set('pos', f"{ASSEMBLY_BASE_CENTER_X + offset[0]:.6f} "
+                          f"{ASSEMBLY_BASE_CENTER_Y + offset[1]:.6f} {BASE_PLATE_CENTER_Z:.6f}")
+            # Internal rib compliance describes the stud fit. A rigid support
+            # plane must not inherit that compliance when a rib touches it.
+            for support_name in ('floor', 'table_geom', 'assembly_base_plate_body'):
+                support = root.find(f'.//geom[@name="{support_name}"]')
+                if support is not None:
+                    support.set('priority', '3')
+                    support.set('solref', '.0011 1')
+                    support.set('solimp', '.9999 .9999 .0001')
+                    if support_name == 'table_geom':
+                        # A positive micron-scale margin avoids degenerate
+                        # coplanar box/mesh contacts at initial tabletop rest.
+                        support.set('margin', '0.000001')
+        blocks = episode.get("spawned_blocks", [])
+        figures = []
+        clutch_assets = {}
+        for block in blocks:
+            worldbody.append(create_episode_brick_body(block, clutch_assets))
+        if clutch_assets:
+            if asset is None:
+                asset = ET.SubElement(root, 'asset')
+            asset.extend(clutch_assets.values())
+    else:
+        blocks = data.get("blocks", [])
+        for block in blocks:
+            worldbody.append(create_brick_body(block, yaml_parts_center))
+        figures = data.get("figures", [])
+        for figure in figures:
+            worldbody.append(create_lego_figure_body(figure))
 
     xml_text = prettify_xml(root)
 
@@ -514,13 +701,22 @@ def build(
     print(f"initial  : {initial_yaml}")
     print(f"output   : {output_xml}")
     print(f"blocks   : {len(blocks)}")
-    print(f"parts center mapped to world: {DESIRED_PARTS_CENTER.tolist()}")
-    print(f"collision z offset: {COLLISION_Z_OFFSET}")
-    print(f"brick body half height: {BRICK_BODY_HALF_HEIGHT}")
-    print(f"stud radius: {STUD_RADIUS}")
-    print(f"friction: {FRICTION}")
-    print(f"solref: {SOLREF}")
-    print(f"solimp: {SOLIMP}")
+    print(f"figures  : {len(figures)}")
+    if episode_manifest:
+        # Episode geometry supplies its own per-geom materials. Reporting the
+        # legacy constants here incorrectly labels them as the active physics.
+        print(f"connection mode: {episode.get('connection_mode', 'snap')}")
+        print(f"geometry: {episode.get('geometry')}")
+        print(f"contact profile: {episode.get('contact_profile', 'loose')}")
+        print("contact parameters: see generated MJCF geoms and contact-pair mixing")
+    else:
+        print(f"parts center mapped to world: {DESIRED_PARTS_CENTER.tolist()}")
+        print(f"collision z offset: {COLLISION_Z_OFFSET}")
+        print(f"brick body half height: {BRICK_BODY_HALF_HEIGHT}")
+        print(f"stud radius: {STUD_RADIUS}")
+        print(f"friction: {FRICTION}")
+        print(f"solref: {SOLREF}")
+        print(f"solimp: {SOLIMP}")
 
     return output_xml
 

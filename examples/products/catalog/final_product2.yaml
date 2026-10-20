@@ -1,0 +1,67 @@
+schema_version: 1
+product:
+  name: final_product2
+blocks:
+- id: leg_left
+  type: brick_2x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - 0.03
+    - 0.045
+    yaw_deg: 0.0
+- id: leg_right
+  type: brick_2x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - -0.03
+    - 0.045
+    yaw_deg: 0.0
+- id: hips
+  type: brick_4x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.105
+    yaw_deg: 0.0
+- id: torso
+  type: brick_4x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.135
+    yaw_deg: 0.0
+- id: hand_left
+  type: brick_2x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - 0.06
+    - 0.165
+    yaw_deg: 0.0
+- id: hand_right
+  type: brick_2x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - -0.06
+    - 0.165
+    yaw_deg: 0.0
+- id: head
+  type: brick_2x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.195
+    yaw_deg: 0.0

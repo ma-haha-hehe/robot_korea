@@ -2,9 +2,13 @@
 build/
 install/
 log/
+runs/
+dist/
 
 # Python 缓存
 __pycache__/
+.venv/
+.ros_deps/
 *.pyc
 *.pyo
 
@@ -17,3 +21,11 @@ __pycache__/
 .DS_Store
 .idea/
 .history/
+
+# Panda OBJ files are source geometry, not compiler object files.
+!src/mj_bridge/mj_bridge/assets/*.obj
+.pytest_cache/
+.env
+*.pth
+*.pt
+*.onnx

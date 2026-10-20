@@ -1,0 +1,40 @@
+schema_version: 1
+product:
+  name: final_product_burger2
+blocks:
+- id: yellow_2x4_base
+  type: brick_4x2
+  color: yellow
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0
+    yaw_deg: 0.0
+- id: red_2x4_middle
+  type: brick_4x2
+  color: red
+  target:
+    position:
+    - -0.016
+    - 0.0
+    - 0.0192
+    yaw_deg: 0.0
+- id: red_2x2_middle_fill
+  type: brick_2x2
+  color: red
+  target:
+    position:
+    - 0.032
+    - 0.0
+    - 0.0192
+    yaw_deg: 90.0
+- id: yellow_2x4_top
+  type: brick_4x2
+  color: yellow
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0384
+    yaw_deg: 0.0

@@ -1,0 +1,45 @@
+{
+  "source_repository": "https://github.com/ma-haha-hehe/Workbenchmark",
+  "source_commit": "213acb19744607ca69ae285f205a851e7a78b7e2",
+  "transform": "target_relative = original_goal_position - source_frame_origin_m; no rotation or scaling",
+  "source_layout": "recorded XY/yaw; legacy center Z=.0495 mapped to model tabletop resting height",
+  "tasks": [
+    {
+      "source": "benchmark_tasks/tier2_task_001.yaml",
+      "product": "tier2_task_001.yaml",
+      "source_sha256": "6123f831b238aa31183bdc339d9bb544bacf84d5d94a9376c663a7f18a4ca22b",
+      "normalized_sha256": "4a0ab9e590cc0613ba185fd4216343cdb392b207b695ebdf17c744838a493aaa",
+      "source_frame_origin_m": [
+        0.0,
+        0.148,
+        0.0
+      ],
+      "imported_sha256": "4a0ab9e590cc0613ba185fd4216343cdb392b207b695ebdf17c744838a493aaa"
+    },
+    {
+      "source": "benchmark_tasks/tier3_task_079.yaml",
+      "product": "tier3_task_079.yaml",
+      "source_sha256": "106d5e91fbcc69a1c773b7a851d729a9fe968e7dfe6c1740619703330a4e641f",
+      "normalized_sha256": "1b90f72fc0aa17c24e132bbff2b7ab6aa30857b7e95c1f7ba345175adb6c4789",
+      "source_frame_origin_m": [
+        0.10399999999999998,
+        0.164,
+        0.0
+      ],
+      "imported_sha256": "1b90f72fc0aa17c24e132bbff2b7ab6aa30857b7e95c1f7ba345175adb6c4789"
+    },
+    {
+      "source": "benchmark_tasks/tier4_task_001.yaml",
+      "product": "tier4_task_001.yaml",
+      "source_sha256": "91afce0c10bd614f67a77b3f11165d3d4829d69bf262758f1be85d10733689cf",
+      "normalized_sha256": "758e00d89fdec3887e2d762cf72328cdc1e232fcc6bde663e614e7c7022966a0",
+      "source_frame_origin_m": [
+        -0.032,
+        0.132,
+        0.0
+      ],
+      "imported_sha256": "758e00d89fdec3887e2d762cf72328cdc1e232fcc6bde663e614e7c7022966a0"
+    }
+  ],
+  "scope": "Three fixed regression inputs; not a random or complete benchmark sample."
+}

@@ -1,0 +1,47 @@
+{
+  "scope": "Eight byte-preserved extended regression inputs, including six current-source execution failures. These are not an unbiased success-rate sample.",
+  "selection_manifest": "runs/clutch-hull-restored-sample/selection.json",
+  "baseline_results": "runs/project-audit-20261013/extended-current-results.json",
+  "tasks": [
+    {
+      "product": "tier1_task_001.yaml",
+      "sha256": "584bb65c38f0f2ebb69477b8de3f64a07c78ec1eccbe921fb81aa95672ed8ddc",
+      "preserved_from": "runs/project-audit-20261013/extended-regression-inputs/tier1_task_001.yaml"
+    },
+    {
+      "product": "tier1_task_097.yaml",
+      "sha256": "20d8b5b16c8a686b46a5012666087cd3f7945f92a1beb0675a757c2bef5d6502",
+      "preserved_from": "runs/project-audit-20261013/extended-regression-inputs/tier1_task_097.yaml"
+    },
+    {
+      "product": "tier2_task_020.yaml",
+      "sha256": "7f2b3cfb63daeaebf43ace1db62dc9b55667faa9e0f8c56c3515df3c0c524406",
+      "preserved_from": "runs/project-audit-20261013/extended-regression-inputs/tier2_task_020.yaml"
+    },
+    {
+      "product": "tier2_task_037.yaml",
+      "sha256": "8effb883936b2a0e9718f4711627878054c5162c6b57437623ef3251f04cf3d6",
+      "preserved_from": "runs/project-audit-20261013/extended-regression-inputs/tier2_task_037.yaml"
+    },
+    {
+      "product": "tier3_task_003.yaml",
+      "sha256": "612076f482c545f533ca25a07cb9c72d373310213754cf84eee3599f751629f5",
+      "preserved_from": "runs/project-audit-20261013/extended-regression-inputs/tier3_task_003.yaml"
+    },
+    {
+      "product": "tier3_task_005.yaml",
+      "sha256": "544cc38a6464d1f41fb7f2a6f7e1c4be94eab4c762a0759587648e4a2dfe24fd",
+      "preserved_from": "runs/project-audit-20261013/extended-regression-inputs/tier3_task_005.yaml"
+    },
+    {
+      "product": "tier3_task_065.yaml",
+      "sha256": "c8ad4d91e974e5500ee95ac6d4478ec3ceba12cbf794cd0db0792ebad9e2242f",
+      "preserved_from": "runs/project-audit-20261013/extended-regression-inputs/tier3_task_065.yaml"
+    },
+    {
+      "product": "tier4_task_051.yaml",
+      "sha256": "a131200d773102e8df96d13edf4d2fd58272ccd91a6b30918cf6d9064ed69505",
+      "preserved_from": "runs/project-audit-20261013/extended-regression-inputs/tier4_task_051.yaml"
+    }
+  ]
+}

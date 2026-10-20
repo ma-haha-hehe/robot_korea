@@ -1,0 +1,10 @@
+# Wall-clock resource budget for dense plastic-contact episodes.
+# Plastic execution additionally enforces 1 mm XY, 0.4 mm Z and 3 deg tilt.
+# The position tolerances below are the shared scoring defaults.
+target_body: lego_figure_1
+lift_height_m: 0.05
+hold_time_s: 0.5
+max_episode_time_s: 3600.0
+position_tolerance_xy_m: 0.006
+position_tolerance_z_m: 0.004
+yaw_tolerance_deg: 8.0

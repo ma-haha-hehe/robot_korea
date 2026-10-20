@@ -1,0 +1,13 @@
+instance_id: simple_shape_assembly_057
+task_class: simple_shape_assembly
+seed: 2056
+num_blocks: 3
+generator_version: 2
+verified: true
+validation_scope: static_grid_and_side_strip_proxy
+planner_checked: false
+static_assembly_order:
+- 2x2_brick_2
+- 2x2_brick_1
+- 4x2_brick_3
+shape_policy: simple_three_layer_row_v1

@@ -1,0 +1,175 @@
+schema_version: 1
+product:
+  name: tier4_task_001
+blocks:
+- id: 4x2_brick_1
+  type: brick_4x2
+  color: red
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0
+    yaw_deg: 0.0
+- id: 2x2_brick_2
+  type: brick_2x2
+  color: yellow
+  target:
+    position:
+    - 0.032
+    - 0.032
+    - 0.0
+    yaw_deg: 0.0
+- id: 4x2_brick_3
+  type: brick_4x2
+  color: red
+  target:
+    position:
+    - -0.048
+    - 0.032
+    - 0.0
+    yaw_deg: 90.0
+- id: 2x2_brick_4
+  type: brick_2x2
+  color: red
+  target:
+    position:
+    - -0.016
+    - 0.016
+    - 0.0191
+    yaw_deg: 0.0
+- id: 4x2_brick_5
+  type: brick_4x2
+  color: blue
+  target:
+    position:
+    - -0.016
+    - 0.016
+    - 0.0382
+    yaw_deg: 0.0
+- id: 4x2_brick_6
+  type: brick_4x2
+  color: blue
+  target:
+    position:
+    - 0.0
+    - -0.016
+    - 0.0191
+    yaw_deg: 0.0
+- id: 4x2_brick_7
+  type: brick_4x2
+  color: blue
+  target:
+    position:
+    - -0.048
+    - 0.016
+    - 0.0191
+    yaw_deg: 90.0
+- id: 4x2_brick_8
+  type: brick_4x2
+  color: red
+  target:
+    position:
+    - 0.032
+    - 0.016
+    - 0.0191
+    yaw_deg: 0.0
+- id: 4x2_brick_9
+  type: brick_4x2
+  color: yellow
+  target:
+    position:
+    - 0.0
+    - -0.032
+    - 0.0382
+    yaw_deg: 90.0
+- id: 2x2_brick_10
+  type: brick_2x2
+  color: yellow
+  target:
+    position:
+    - -0.016
+    - 0.0
+    - 0.0573
+    yaw_deg: 90.0
+- id: 4x2_brick_11
+  type: brick_4x2
+  color: yellow
+  target:
+    position:
+    - 0.0
+    - -0.048
+    - 0.0573
+    yaw_deg: 0.0
+- id: 2x2_brick_12
+  type: brick_2x2
+  color: yellow
+  target:
+    position:
+    - 0.0
+    - -0.032
+    - 0.0764
+    yaw_deg: 0.0
+initial_layout:
+  frame: world_tabletop
+  blocks:
+  - id: 2x2_brick_2
+    position_xy_m:
+    - 0.3708
+    - -0.2936
+    yaw_deg: 0.0
+  - id: 4x2_brick_1
+    position_xy_m:
+    - 0.6272
+    - -0.1287
+    yaw_deg: 0.0
+  - id: 4x2_brick_3
+    position_xy_m:
+    - 0.491
+    - -0.1116
+    yaw_deg: 0.0
+  - id: 2x2_brick_4
+    position_xy_m:
+    - 0.6286
+    - -0.2064
+    yaw_deg: 0.0
+  - id: 4x2_brick_6
+    position_xy_m:
+    - 0.2681
+    - -0.1246
+    yaw_deg: 0.0
+  - id: 4x2_brick_7
+    position_xy_m:
+    - 0.2576
+    - -0.2973
+    yaw_deg: 0.0
+  - id: 4x2_brick_8
+    position_xy_m:
+    - 0.5026
+    - -0.217
+    yaw_deg: 0.0
+  - id: 4x2_brick_5
+    position_xy_m:
+    - 0.3857
+    - -0.2123
+    yaw_deg: 0.0
+  - id: 4x2_brick_9
+    position_xy_m:
+    - 0.5067
+    - -0.2872
+    yaw_deg: 0.0
+  - id: 2x2_brick_10
+    position_xy_m:
+    - 0.2613
+    - -0.2191
+    yaw_deg: 0.0
+  - id: 4x2_brick_11
+    position_xy_m:
+    - 0.6131
+    - -0.2884
+    yaw_deg: 0.0
+  - id: 2x2_brick_12
+    position_xy_m:
+    - 0.3864
+    - -0.1091
+    yaw_deg: 0.0

@@ -1,0 +1,14 @@
+instance_id: balanced_order_sensitive_049
+task_class: balanced_order_sensitive
+seed: 3048
+num_blocks: 3
+generator_version: 2
+verified: true
+validation_scope: static_grid_and_side_strip_proxy
+planner_checked: false
+static_assembly_order:
+- 2x2_brick_1
+- 4x2_brick_2
+- 2x2_brick_3
+shape_policy: simple_three_layer_row_v1
+center_boundary_policy: upper_center_on_or_outside_ground_bbox_v1

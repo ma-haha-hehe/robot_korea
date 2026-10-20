@@ -1,0 +1,77 @@
+schema_version: 1
+product:
+  name: simple_shape_assembly_003
+blocks:
+- id: 2x2_brick_1
+  type: brick_2x2
+  color: blue
+  target:
+    position:
+    - -0.024
+    - 0.0
+    - 0.0
+    yaw_deg: 0.0
+- id: 2x2_brick_2
+  type: brick_2x2
+  color: red
+  target:
+    position:
+    - 0.024
+    - 0.0
+    - 0.0
+    yaw_deg: 0.0
+- id: 4x2_brick_3
+  type: brick_4x2
+  color: red
+  target:
+    position:
+    - 0.008
+    - 0.0
+    - 0.0192
+    yaw_deg: 0.0
+- id: 2x2_brick_4
+  type: brick_2x2
+  color: blue
+  target:
+    position:
+    - -0.008
+    - 0.0
+    - 0.0384
+    yaw_deg: 0.0
+- id: 2x2_brick_5
+  type: brick_2x2
+  color: blue
+  target:
+    position:
+    - 0.024
+    - 0.0
+    - 0.0384
+    yaw_deg: 0.0
+initial_layout:
+  frame: world_tabletop
+  blocks:
+  - id: 2x2_brick_1
+    position_xy_m:
+    - 0.578121
+    - -0.247578
+    yaw_deg: 180
+  - id: 2x2_brick_2
+    position_xy_m:
+    - 0.235278
+    - -0.132177
+    yaw_deg: 0
+  - id: 4x2_brick_3
+    position_xy_m:
+    - 0.240967
+    - -0.320214
+    yaw_deg: 180
+  - id: 2x2_brick_4
+    position_xy_m:
+    - 0.435889
+    - -0.130661
+    yaw_deg: 90
+  - id: 2x2_brick_5
+    position_xy_m:
+    - 0.479041
+    - -0.214718
+    yaw_deg: 270

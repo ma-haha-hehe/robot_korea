@@ -1,0 +1,13 @@
+instance_id: simple_multi_brick_stack_021
+task_class: simple_multi_brick_stack
+seed: 1020
+num_blocks: 3
+generator_version: 2
+verified: true
+validation_scope: static_grid_and_side_strip_proxy
+planner_checked: false
+static_assembly_order:
+- 2x2_brick_1
+- 2x2_brick_2
+- 2x2_brick_3
+stack_yaw_policy: independent_0_90_v1

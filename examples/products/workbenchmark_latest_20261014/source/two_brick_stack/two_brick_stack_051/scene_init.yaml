@@ -1,0 +1,53 @@
+geometry:
+  length_unit: m
+  rotation_unit: rad
+  pose_origin: xy_center_body_bottom
+  stud_pitch_m: 0.016
+  engaged_layer_height_m: 0.02
+  min_support_ratio: 0.5
+  gripper_side_clearance_m: 0.008
+  mesh_scale:
+  - 0.001
+  - 0.001
+  - 0.001
+  mesh_recenter_xy: true
+min_distance_m: 0.03
+parts_plate:
+  center:
+  - 0.0
+  - -0.16
+  - 0.0
+  size:
+  - 0.4
+  - 0.28
+assembly_plate:
+  center:
+  - 0.0
+  - 0.16
+  - 0.0
+  size:
+  - 0.32
+  - 0.28
+blocks:
+- name: 4x2_brick_1
+  type: brick_4x2
+  color: green
+  pos:
+  - -0.139377
+  - -0.20529
+  - 0.0
+  rotation:
+  - 0.0
+  - 0.0
+  - 3.14159265
+- name: 4x2_brick_2
+  type: brick_4x2
+  color: yellow
+  pos:
+  - 0.144576
+  - -0.1979
+  - 0.0
+  rotation:
+  - 0.0
+  - 0.0
+  - 0.0

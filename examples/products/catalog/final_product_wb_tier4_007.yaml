@@ -1,0 +1,85 @@
+schema_version: 1
+product:
+  name: final_product_wb_tier4_007
+blocks:
+- id: 4x2_brick_1
+  type: brick_4x2
+  color: green
+  target:
+    position:
+    - 0.016
+    - -0.032
+    - 0.0
+    yaw_deg: 0.0
+- id: 2x2_brick_2
+  type: brick_2x2
+  color: orange
+  target:
+    position:
+    - 0.048
+    - 0.0
+    - 0.0
+    yaw_deg: 90.0
+- id: 4x2_brick_3
+  type: brick_4x2
+  color: blue
+  target:
+    position:
+    - -0.016
+    - 0.016
+    - 0.0
+    yaw_deg: 90.0
+- id: 2x2_brick_4
+  type: brick_2x2
+  color: yellow
+  target:
+    position:
+    - -0.048
+    - -0.016
+    - 0.0
+    yaw_deg: 90.0
+- id: 2x2_brick_5
+  type: brick_2x2
+  color: red
+  target:
+    position:
+    - -0.032
+    - 0.0
+    - 0.0191
+    yaw_deg: 90.0
+- id: 2x2_brick_6
+  type: brick_2x2
+  color: yellow
+  target:
+    position:
+    - 0.0
+    - 0.016
+    - 0.0191
+    yaw_deg: 0.0
+- id: 4x2_brick_7
+  type: brick_4x2
+  color: white
+  target:
+    position:
+    - -0.032
+    - 0.016
+    - 0.0382
+    yaw_deg: 90.0
+- id: 2x2_brick_8
+  type: brick_2x2
+  color: red
+  target:
+    position:
+    - -0.016
+    - 0.0
+    - 0.0573
+    yaw_deg: 90.0
+- id: 4x2_brick_9
+  type: brick_4x2
+  color: green
+  target:
+    position:
+    - 0.032
+    - 0.032
+    - 0.0
+    yaw_deg: 0.0

@@ -1,0 +1,35 @@
+schema_version: 1
+product:
+  name: tier1_task_097
+blocks:
+- id: 4x2_brick_1
+  type: brick_4x2
+  color: green
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0
+    yaw_deg: 0.0
+- id: 4x2_brick_2
+  type: brick_4x2
+  color: green
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0191
+    yaw_deg: 0.0
+initial_layout:
+  frame: world_tabletop
+  blocks:
+  - id: 4x2_brick_1
+    position_xy_m:
+    - 0.2505
+    - -0.1272
+    yaw_deg: 0.0
+  - id: 4x2_brick_2
+    position_xy_m:
+    - 0.3829
+    - -0.1184
+    yaw_deg: 0.0

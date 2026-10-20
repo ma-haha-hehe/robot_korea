@@ -1,0 +1,35 @@
+schema_version: 1
+product:
+  name: two_brick_stack_009
+blocks:
+- id: 2x2_brick_1
+  type: brick_2x2
+  color: green
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0
+    yaw_deg: 90.0
+- id: 2x2_brick_2
+  type: brick_2x2
+  color: blue
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0192
+    yaw_deg: 90.0
+initial_layout:
+  frame: world_tabletop
+  blocks:
+  - id: 2x2_brick_1
+    position_xy_m:
+    - 0.266358
+    - -0.122807
+    yaw_deg: 0
+  - id: 2x2_brick_2
+    position_xy_m:
+    - 0.363461
+    - -0.316487
+    yaw_deg: 90

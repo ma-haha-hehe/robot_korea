@@ -1,0 +1,929 @@
+{
+  "scope": "alternate designs; not successful execution of the original invalid targets",
+  "changes": [
+    {
+      "source_product": "final_product",
+      "variant": "final_product_supported",
+      "block": "leg_left",
+      "original_target": {
+        "position": [
+          0.0,
+          0.03,
+          0.045
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0,
+          0.016,
+          0
+        ],
+        "yaw_deg": 0.0
+      }
+    },
+    {
+      "source_product": "final_product",
+      "variant": "final_product_supported",
+      "block": "leg_right",
+      "original_target": {
+        "position": [
+          0.0,
+          -0.03,
+          0.045
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0,
+          -0.016,
+          0
+        ],
+        "yaw_deg": 0.0
+      }
+    },
+    {
+      "source_product": "final_product",
+      "variant": "final_product_supported",
+      "block": "hips",
+      "original_target": {
+        "position": [
+          0.0,
+          0.0,
+          0.105
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0,
+          0,
+          0.0192
+        ],
+        "yaw_deg": 90.0
+      }
+    },
+    {
+      "source_product": "final_product",
+      "variant": "final_product_supported",
+      "block": "torso",
+      "original_target": {
+        "position": [
+          0.0,
+          0.0,
+          0.135
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0,
+          0,
+          0.0384
+        ],
+        "yaw_deg": 90.0
+      }
+    },
+    {
+      "source_product": "final_product",
+      "variant": "final_product_supported",
+      "block": "hand_left",
+      "original_target": {
+        "position": [
+          0.0,
+          0.06,
+          0.165
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0,
+          0.032,
+          0.0576
+        ],
+        "yaw_deg": 0.0
+      }
+    },
+    {
+      "source_product": "final_product",
+      "variant": "final_product_supported",
+      "block": "hand_right",
+      "original_target": {
+        "position": [
+          0.0,
+          -0.06,
+          0.165
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0,
+          -0.032,
+          0.0576
+        ],
+        "yaw_deg": 0.0
+      }
+    },
+    {
+      "source_product": "final_product",
+      "variant": "final_product_supported",
+      "block": "head",
+      "original_target": {
+        "position": [
+          0.0,
+          0.0,
+          0.195
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0,
+          0,
+          0.0576
+        ],
+        "yaw_deg": 0.0
+      }
+    },
+    {
+      "source_product": "final_product2",
+      "variant": "final_product2_supported",
+      "block": "leg_left",
+      "original_target": {
+        "position": [
+          0.0,
+          0.03,
+          0.045
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0,
+          0.016,
+          0
+        ],
+        "yaw_deg": 0.0
+      }
+    },
+    {
+      "source_product": "final_product2",
+      "variant": "final_product2_supported",
+      "block": "leg_right",
+      "original_target": {
+        "position": [
+          0.0,
+          -0.03,
+          0.045
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0,
+          -0.016,
+          0
+        ],
+        "yaw_deg": 0.0
+      }
+    },
+    {
+      "source_product": "final_product2",
+      "variant": "final_product2_supported",
+      "block": "hips",
+      "original_target": {
+        "position": [
+          0.0,
+          0.0,
+          0.105
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0,
+          0,
+          0.0192
+        ],
+        "yaw_deg": 90.0
+      }
+    },
+    {
+      "source_product": "final_product2",
+      "variant": "final_product2_supported",
+      "block": "torso",
+      "original_target": {
+        "position": [
+          0.0,
+          0.0,
+          0.135
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0,
+          0,
+          0.0384
+        ],
+        "yaw_deg": 90.0
+      }
+    },
+    {
+      "source_product": "final_product2",
+      "variant": "final_product2_supported",
+      "block": "hand_left",
+      "original_target": {
+        "position": [
+          0.0,
+          0.06,
+          0.165
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0,
+          0.032,
+          0.0576
+        ],
+        "yaw_deg": 0.0
+      }
+    },
+    {
+      "source_product": "final_product2",
+      "variant": "final_product2_supported",
+      "block": "hand_right",
+      "original_target": {
+        "position": [
+          0.0,
+          -0.06,
+          0.165
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0,
+          -0.032,
+          0.0576
+        ],
+        "yaw_deg": 0.0
+      }
+    },
+    {
+      "source_product": "final_product2",
+      "variant": "final_product2_supported",
+      "block": "head",
+      "original_target": {
+        "position": [
+          0.0,
+          0.0,
+          0.195
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0,
+          0,
+          0.0576
+        ],
+        "yaw_deg": 0.0
+      }
+    },
+    {
+      "source_product": "final_product_burger",
+      "variant": "final_product_burger_supported",
+      "block": "yellow_2x4_base",
+      "original_target": {
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "yaw_deg": 90.0
+      }
+    },
+    {
+      "source_product": "final_product_burger",
+      "variant": "final_product_burger_supported",
+      "block": "red_2x2_upper_left",
+      "original_target": {
+        "position": [
+          0.0,
+          -0.008,
+          0.0384
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0,
+          -0.016,
+          0.0192
+        ],
+        "yaw_deg": 0.0
+      }
+    },
+    {
+      "source_product": "final_product_burger",
+      "variant": "final_product_burger_supported",
+      "block": "blue_2x2_upper_right",
+      "original_target": {
+        "position": [
+          0.0,
+          0.008,
+          0.0384
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0,
+          0.016,
+          0.0192
+        ],
+        "yaw_deg": 0.0
+      }
+    },
+    {
+      "source_product": "final_product_burger",
+      "variant": "final_product_burger_supported",
+      "block": "green_2x2_top",
+      "original_target": {
+        "position": [
+          0.0,
+          0.0,
+          0.0576
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0,
+          0,
+          0.0384
+        ],
+        "yaw_deg": 0.0
+      }
+    },
+    {
+      "source_product": "final_product_door",
+      "variant": "final_product_door_supported",
+      "block": "yellow_4x2_brick_2",
+      "original_target": {
+        "position": [
+          0.016,
+          0.0,
+          0.0096
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0.016,
+          0.0,
+          0.0192
+        ],
+        "yaw_deg": 90.0
+      }
+    },
+    {
+      "source_product": "final_product_door",
+      "variant": "final_product_door_supported",
+      "block": "yellow_4x2_brick_3",
+      "original_target": {
+        "position": [
+          -0.016,
+          0.0,
+          0.0096
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          -0.016,
+          0.0,
+          0.0192
+        ],
+        "yaw_deg": 90.0
+      }
+    },
+    {
+      "source_product": "final_product_door",
+      "variant": "final_product_door_supported",
+      "block": "red_2x2_brick_4",
+      "original_target": {
+        "position": [
+          0.0,
+          -0.008,
+          0.0192
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0.0,
+          -0.016,
+          0.0384
+        ],
+        "yaw_deg": 0.0
+      }
+    },
+    {
+      "source_product": "final_product_door",
+      "variant": "final_product_door_supported",
+      "block": "red_2x2_brick_5",
+      "original_target": {
+        "position": [
+          0.0,
+          0.008,
+          0.0192
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0.0,
+          0.016,
+          0.0384
+        ],
+        "yaw_deg": 0.0
+      }
+    },
+    {
+      "source_product": "final_product_flower",
+      "variant": "final_product_flower_supported",
+      "block": "4x2_brick_2",
+      "original_target": {
+        "position": [
+          0.0,
+          0.0,
+          0.02
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0.0,
+          0.0,
+          0.0192
+        ],
+        "yaw_deg": 0.0
+      }
+    },
+    {
+      "source_product": "final_product_flower",
+      "variant": "final_product_flower_supported",
+      "block": "2x2_brick_3",
+      "original_target": {
+        "position": [
+          0.0,
+          0.0,
+          0.04
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0.0,
+          0.0,
+          0.0384
+        ],
+        "yaw_deg": 0.0
+      }
+    },
+    {
+      "source_product": "final_product_flower",
+      "variant": "final_product_flower_supported",
+      "block": "4x2_brick_5",
+      "original_target": {
+        "position": [
+          0.0,
+          -0.015,
+          0.06
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0.0,
+          -0.016,
+          0.0576
+        ],
+        "yaw_deg": 90.0
+      }
+    },
+    {
+      "source_product": "final_product_flower",
+      "variant": "final_product_flower_supported",
+      "block": "2x2_brick_6",
+      "original_target": {
+        "position": [
+          0.0,
+          -0.045,
+          0.08
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0.0,
+          -0.048,
+          0.0768
+        ],
+        "yaw_deg": 0.0
+      }
+    },
+    {
+      "source_product": "final_product_flower",
+      "variant": "final_product_flower_supported",
+      "block": "2x2_brick_7",
+      "original_target": {
+        "position": [
+          0.0,
+          0.0,
+          0.08
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0.0,
+          0.0,
+          0.0768
+        ],
+        "yaw_deg": 0.0
+      }
+    },
+    {
+      "source_product": "final_product_flower",
+      "variant": "final_product_flower_supported",
+      "block": "4x2_brick_8",
+      "original_target": {
+        "position": [
+          0.0,
+          0.015,
+          0.1
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0.0,
+          0.016,
+          0.096
+        ],
+        "yaw_deg": 90.0
+      }
+    },
+    {
+      "source_product": "final_product_flower",
+      "variant": "final_product_flower_supported",
+      "block": "2x2_brick_15",
+      "original_target": {
+        "position": [
+          0.0,
+          -0.045,
+          0.1
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0.0,
+          -0.048,
+          0.096
+        ],
+        "yaw_deg": 0.0
+      }
+    },
+    {
+      "source_product": "final_product_flower",
+      "variant": "final_product_flower_supported",
+      "block": "2x2_brick_9",
+      "original_target": {
+        "position": [
+          0.0,
+          0.045,
+          0.12
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0.0,
+          0.048,
+          0.1152
+        ],
+        "yaw_deg": 0.0
+      }
+    },
+    {
+      "source_product": "final_product_flower",
+      "variant": "final_product_flower_supported",
+      "block": "2x2_brick_11",
+      "original_target": {
+        "position": [
+          0.0,
+          0.0,
+          0.12
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0.0,
+          0.0,
+          0.1152
+        ],
+        "yaw_deg": 0.0
+      }
+    },
+    {
+      "source_product": "final_product_flower",
+      "variant": "final_product_flower_supported",
+      "block": "2x2_brick_12",
+      "original_target": {
+        "position": [
+          0.0,
+          0.0,
+          0.14
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0.0,
+          0.0,
+          0.1344
+        ],
+        "yaw_deg": 0.0
+      }
+    },
+    {
+      "source_product": "final_product_flower",
+      "variant": "final_product_flower_supported",
+      "block": "2x2_brick_13",
+      "original_target": {
+        "position": [
+          0.0,
+          0.045,
+          0.14
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0.0,
+          0.048,
+          0.1344
+        ],
+        "yaw_deg": 0.0
+      }
+    },
+    {
+      "source_product": "final_product_simple",
+      "variant": "final_product_simple_supported",
+      "block": "white 4x2 brick",
+      "original_target": {
+        "position": [
+          0.0,
+          0.0,
+          0.015
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0.0,
+          0.0,
+          0
+        ],
+        "yaw_deg": 90.0
+      }
+    },
+    {
+      "source_product": "final_product_simple",
+      "variant": "final_product_simple_supported",
+      "block": "blue 2x2 brick",
+      "original_target": {
+        "position": [
+          0.0,
+          0.016,
+          0.045
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0.0,
+          0.016,
+          0.0192
+        ],
+        "yaw_deg": 0.0
+      }
+    },
+    {
+      "source_product": "final_product_simple",
+      "variant": "final_product_simple_supported",
+      "block": "blue 2x2 brick_2",
+      "original_target": {
+        "position": [
+          0.0,
+          -0.016,
+          0.045
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0.0,
+          -0.016,
+          0.0192
+        ],
+        "yaw_deg": 0.0
+      }
+    },
+    {
+      "source_product": "final_product_simple",
+      "variant": "final_product_simple_supported",
+      "block": "yellow 4x2 brick",
+      "original_target": {
+        "position": [
+          0.0,
+          0.0,
+          0.075
+        ],
+        "yaw_deg": 90.0
+      },
+      "variant_target": {
+        "position": [
+          0.0,
+          0.0,
+          0.0384
+        ],
+        "yaw_deg": 90.0
+      }
+    },
+    {
+      "source_product": "final_product_simple",
+      "variant": "final_product_simple_supported",
+      "block": "white 4x2 brick_2",
+      "original_target": {
+        "position": [
+          0.0,
+          0.0,
+          0.105
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0.0,
+          0.0,
+          0.0576
+        ],
+        "yaw_deg": 0.0
+      }
+    },
+    {
+      "source_product": "final_product_t",
+      "variant": "final_product_t_supported",
+      "block": "base_4x2_lvl1",
+      "original_target": {
+        "position": [
+          -0.032,
+          0.0,
+          0.0
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          -0.032,
+          0.0,
+          0.0
+        ],
+        "yaw_deg": 90.0
+      }
+    },
+    {
+      "source_product": "final_product_t",
+      "variant": "final_product_t_supported",
+      "block": "base_4x2_lvl1_2",
+      "original_target": {
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "yaw_deg": 90.0
+      }
+    },
+    {
+      "source_product": "final_product_t",
+      "variant": "final_product_t_supported",
+      "block": "base_4x2_lvl1_3",
+      "original_target": {
+        "position": [
+          0.032,
+          0.0,
+          0.0
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0.032,
+          0.0,
+          0.0
+        ],
+        "yaw_deg": 90.0
+      }
+    },
+    {
+      "source_product": "final_product_t",
+      "variant": "final_product_t_supported",
+      "block": "base_4x2_lvl1_4",
+      "original_target": {
+        "position": [
+          -0.016,
+          0.0,
+          0.0192
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          -0.016,
+          0.0,
+          0.0192
+        ],
+        "yaw_deg": 90.0
+      }
+    },
+    {
+      "source_product": "final_product_t",
+      "variant": "final_product_t_supported",
+      "block": "base_4x2_lvl1_5",
+      "original_target": {
+        "position": [
+          0.016,
+          0.0,
+          0.0192
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0.016,
+          0.0,
+          0.0192
+        ],
+        "yaw_deg": 90.0
+      }
+    },
+    {
+      "source_product": "final_product_t",
+      "variant": "final_product_t_supported",
+      "block": "top_4x2_lvl4",
+      "original_target": {
+        "position": [
+          0.0,
+          0.0,
+          0.0384
+        ],
+        "yaw_deg": 0.0
+      },
+      "variant_target": {
+        "position": [
+          0.0,
+          0.0,
+          0.0384
+        ],
+        "yaw_deg": 90.0
+      }
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+schema_version: 1
+product:
+  name: final_product_magnet
+blocks:
+- id: red_2x2_base
+  type: brick_2x2
+  color: red
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0
+    yaw_deg: 0.0
+- id: blue_2x2_top
+  type: brick_2x2
+  color: blue
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0192
+    yaw_deg: 0.0

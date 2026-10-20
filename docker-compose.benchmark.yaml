@@ -1,0 +1,11 @@
+services:
+  lego-bench:
+    build:
+      context: .
+      dockerfile: Dockerfile.benchmark
+    network_mode: host
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - MUJOCO_GL=egl
+    volumes:
+      - ./runs:/workspace/runs

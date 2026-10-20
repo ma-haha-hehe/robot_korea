@@ -1,0 +1,11 @@
+instance_id: two_brick_stack_001
+task_class: two_brick_stack
+seed: 0
+num_blocks: 2
+generator_version: 2
+verified: true
+validation_scope: static_grid_and_side_strip_proxy
+planner_checked: false
+static_assembly_order:
+- 4x2_brick_1
+- 4x2_brick_2

@@ -1,0 +1,112 @@
+schema_version: 1
+product:
+  name: final_product_flower
+blocks:
+- id: 4x2_brick_1
+  type: brick_4x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0
+    yaw_deg: 0.0
+- id: 4x2_brick_2
+  type: brick_4x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.02
+    yaw_deg: 0.0
+- id: 2x2_brick_3
+  type: brick_2x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.04
+    yaw_deg: 0.0
+- id: 4x2_brick_5
+  type: brick_4x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - -0.015
+    - 0.06
+    yaw_deg: 0.0
+- id: 2x2_brick_6
+  type: brick_2x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - -0.045
+    - 0.08
+    yaw_deg: 0.0
+- id: 2x2_brick_7
+  type: brick_2x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.08
+    yaw_deg: 0.0
+- id: 4x2_brick_8
+  type: brick_4x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - 0.015
+    - 0.1
+    yaw_deg: 0.0
+- id: 2x2_brick_15
+  type: brick_2x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - -0.045
+    - 0.1
+    yaw_deg: 0.0
+- id: 2x2_brick_9
+  type: brick_2x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - 0.045
+    - 0.12
+    yaw_deg: 0.0
+- id: 2x2_brick_11
+  type: brick_2x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.12
+    yaw_deg: 0.0
+- id: 2x2_brick_12
+  type: brick_2x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.14
+    yaw_deg: 0.0
+- id: 2x2_brick_13
+  type: brick_2x2
+  color: gray
+  target:
+    position:
+    - 0.0
+    - 0.045
+    - 0.14
+    yaw_deg: 0.0

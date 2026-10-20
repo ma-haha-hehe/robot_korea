@@ -1,1 +1,0 @@
-/home/i6user/Desktop/robot_lego/build/panda_pick/ament_cmake_core/panda_pickConfig.cmake

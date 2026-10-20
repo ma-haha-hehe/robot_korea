@@ -113,97 +113,37 @@ def check_balance(target, remaining_blocks):
 # ================= 3. 主规划程序 =================
 
 def process_blueprint(input_yaml, output_yaml):
-    with open(input_yaml, 'r') as f:
-        blueprint = yaml.safe_load(f)
-
-    remaining_blocks = []
-    for b in blueprint.get('blocks', []):
-        bd = copy.deepcopy(b)
-        bd['abs_pos'] = np.array(b['pos'], dtype=float)
-        remaining_blocks.append(bd)
-
-    disassembly_tasks = []
-    print(f"\n" + "="*50)
-    print(f" 开始逆向推理规划 | 避障阈值: {THRESHOLD}m")
-    print(f"逻辑设定: 0度看Y轴轨道, 90度看X轴轨道")
-    print("="*50)
-
-    while len(remaining_blocks) > 0:
-        # 始终先尝试拆掉最高层的积木
-        remaining_blocks.sort(key=lambda x: x['abs_pos'][2], reverse=True)
-        
-        target = None
-        final_spin = 90
-        
-        print(f"\n正在寻找可拆卸的目标... (当前剩余: {len(remaining_blocks)} 块)")
-        
-        for cand in remaining_blocks:
-            print(f"  ▶ 检查积木: {cand['name']} (相对高度: {cand['pos'][2]})")
-            
-            # 1. 检查物理可行性
-            #if is_covered(cand, remaining_blocks):
-            #    print(f"    - 跳过: 上方有积木遮挡")
-            #    continue
-            #if not check_balance(cand, remaining_blocks):
-            #  print(f"    - 跳过: 拆掉后下方无支撑点或重心不稳")
-            #    continue
-            
-            # 2. 尝试 90 度抓取 (优先策略)
-            if check_accessibility(cand['abs_pos'], remaining_blocks, cand['name'], check_mode=90):
-                target, final_spin = cand, 90
-                print(f"    - 判定结果: 采用 90 度抓取")
-                break
-            
-            # 3. 尝试 0 度抓取 (备选策略)
-            print(f"    - 90度检测失败，正在尝试切换到 0度检测...")
-            if check_accessibility(cand['abs_pos'], remaining_blocks, cand['name'], check_mode=0):
-                target, final_spin = cand, 0
-                print(f"    - 判定结果: 采用 0 度抓取")
-                break
-            
-            print(f"  -  错误: 该积木在所有相位下均会发生碰撞")
-
-        if target is None:
-            target, final_spin = remaining_blocks[0], 90
-            print(f"  [警告] 无法找到完美避障路径，强制拆卸最高块: {target['name']}")
-
-        # 记录拆卸任务
-        rot_rpy = target.get('rotation', [0, 0, 0])
-        blueprint_yaw = rot_rpy[2] if isinstance(rot_rpy, list) else rot_rpy
-        src_xy = SOURCE_LOCATIONS.get(target['name'], [0.5, 0.0])
-        
-        disassembly_tasks.append({
-            "name": target['name'],
-            "type": target.get("type", ""),
-            "color": target.get("color", ""),
-            "vision_label": infer_vision_label(target),
-            "grasp_spin": final_spin,
-            "blueprint_yaw": to_native(math.radians(float(blueprint_yaw))),
-            "pick": {
-                "pos": to_native([src_xy[0], src_xy[1], 0.015]),
-                "orientation": get_strategy_quaternion(final_spin)
-            },
-            "place": {
-                "pos": to_native(target['pos']), 
-                "orientation": get_strategy_quaternion(final_spin)
-            }
+    """Export the shared assembly-by-disassembly plan in the legacy task format."""
+    from mj_bridge.benchmark_core import normalize_product
+    from mj_bridge.assembly_planner import plan_assembly
+    with open(input_yaml, 'r') as stream:
+        product = normalize_product(yaml.safe_load(stream))
+    blocks = {block['id']: block for block in product['blocks']}
+    targets = [dict(id=block['id'], type=block['type'],
+                    position=block['target']['position'],
+                    yaw_rad=math.radians(block['target']['yaw_deg']))
+               for block in product['blocks']]
+    plan = plan_assembly(targets)
+    tasks = []
+    for index, step in enumerate(plan):
+        block = blocks[step['block_id']]
+        spin = step['grasp_spin_deg']
+        src_xy = SOURCE_LOCATIONS.get(block['id'], [0.5, 0.0])
+        tasks.append({
+            'id': index, 'name': block['id'], 'type': block['type'],
+            'color': block['color'],
+            'vision_label': infer_vision_label(dict(block, name=block['id'])),
+            'grasp_spin': spin,
+            'blueprint_yaw': math.radians(block['target']['yaw_deg']),
+            'grasp_offset_rad': step['grasp_offset_rad'],
+            'pick': {'pos': [src_xy[0], src_xy[1], .015],
+                     'orientation': get_strategy_quaternion(spin)},
+            'place': {'pos': block['target']['position'],
+                      'orientation': get_strategy_quaternion(spin)},
         })
-        
-        # 模拟物理移除
-        print(f"  确认拆卸: {target['name']} | 轨道已清空")
-        remaining_blocks.remove(target)
-
-    # 将逆向拆卸顺序转为正向装配顺序
-    print(f"\n" + "="*50)
-    print(f" 所有积木处理完毕，正在生成正向装配清单...")
-    assembly_tasks = disassembly_tasks[::-1]
-    for i, task in enumerate(assembly_tasks):
-        task['id'] = i
-
-    with open(output_yaml, 'w') as f:
-        yaml.dump({"tasksh": assembly_tasks}, f, sort_keys=False)
-    print(f"最终文件已生成: {output_yaml}")
-    print("="*50 + "\n")
+    with open(output_yaml, 'w') as stream:
+        yaml.safe_dump({'tasksh': tasks}, stream, sort_keys=False)
+    print(f'Assembly-by-disassembly plan written to {output_yaml}')
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -216,7 +156,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "output_yaml",
         nargs="?",
-        default="/home/i6user/Desktop/robot_lego/src/panda_pick/src/plan.yaml",
+        default="plan.yaml",
         help="planner output YAML consumed by vision/execution",
     )
     args = parser.parse_args()

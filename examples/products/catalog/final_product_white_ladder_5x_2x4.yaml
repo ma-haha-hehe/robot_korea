@@ -1,0 +1,49 @@
+schema_version: 1
+product:
+  name: final_product_white_ladder_5x_2x4
+blocks:
+- id: white_2x4_base_left
+  type: brick_4x2
+  color: white
+  target:
+    position:
+    - -0.064
+    - 0.0
+    - 0.0
+    yaw_deg: 0.0
+- id: white_2x4_base_center
+  type: brick_4x2
+  color: white
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0
+    yaw_deg: 0.0
+- id: white_2x4_base_right
+  type: brick_4x2
+  color: white
+  target:
+    position:
+    - 0.064
+    - 0.0
+    - 0.0
+    yaw_deg: 0.0
+- id: white_2x4_top_left_cross
+  type: brick_4x2
+  color: white
+  target:
+    position:
+    - -0.032
+    - 0.0
+    - 0.0192
+    yaw_deg: 90.0
+- id: white_2x4_top_right_cross
+  type: brick_4x2
+  color: white
+  target:
+    position:
+    - 0.032
+    - 0.0
+    - 0.0192
+    yaw_deg: 90.0

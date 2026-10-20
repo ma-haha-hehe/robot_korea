@@ -7,7 +7,23 @@
   
 
   
+  <visual>
+    
+    
+    <headlight ambient="0.18 0.18 0.18" diffuse="0.4 0.4 0.4" specular="0.1 0.1 0.1"/>
+    
+    
+    <rgba haze="0.85 0.90 0.95 1"/>
+    
+  
+  </visual>
+  
+
+  
   <asset>
+    
+    
+    <texture name="studio_sky" type="skybox" builtin="gradient" rgb1="0.72 0.80 0.90" rgb2="0.95 0.97 1.0" width="512" height="3072"/>
     
     
     <mesh name="lego_2x2" file="LEGO_Duplo_brick_2x2.stl" scale="0.001 0.001 0.001"/>
@@ -24,21 +40,24 @@
     
 
     
-    <camera name="realsense" pos="0.4 0 1.2"/>
+    <camera name="realsense" pos="0.4 0 1.2" fovy="60"/>
     
     
-    <light pos="0 0 1.5" dir="0 0 -1"/>
+    <light name="key_light" pos="0.2 -0.4 1.8" dir="0.1 0.2 -1" directional="true" diffuse="0.4 0.4 0.4" ambient="0.04 0.04 0.04" castshadow="false"/>
+    
+    
+    <light name="fill_light" pos="0.8 0.6 1.2" dir="-0.3 -0.2 -1" directional="true" diffuse="0.18 0.18 0.18" castshadow="false"/>
     
 
     
-    <geom name="floor" type="plane" size="0 0 0.05"/>
+    <geom name="floor" type="plane" size="0 0 0.05" rgba="0.62 0.67 0.73 1"/>
     
 
     
     <body name="table" pos="0.40 0 0.02">
       
         
-      <geom name="table_geom" type="box" size="0.30 0.50 0.02" contype="1" conaffinity="1" friction="3 0.1 0.01" solref="0.001 1" solimp="0.999 0.9999 0.0001" density="10000"/>
+      <geom name="table_geom" rgba="0.44 0.48 0.53 1" type="box" size="0.30 0.50 0.02" contype="1" conaffinity="1" friction="3 0.1 0.01" solref="0.001 1" solimp="0.999 0.9999 0.0001" density="10000"/>
       
     
     </body>
@@ -235,6 +254,17 @@
       <geom type="cylinder" size="0.0042 0.0020" pos="-0.0080 0.0080 0.0025" rgba="0 0 0 0" friction="5.0 0.2 0.02" solref="0.004 1" solimp="0.90 0.98 0.002" density="30"/>
       <geom type="cylinder" size="0.0042 0.0020" pos="0.0080 -0.0080 0.0025" rgba="0 0 0 0" friction="5.0 0.2 0.02" solref="0.004 1" solimp="0.90 0.98 0.002" density="30"/>
       <geom type="cylinder" size="0.0042 0.0020" pos="0.0080 0.0080 0.0025" rgba="0 0 0 0" friction="5.0 0.2 0.02" solref="0.004 1" solimp="0.90 0.98 0.002" density="30"/>
+    </body>
+    <body name="lego_figure_1" pos="0.32000 0.05000 0.04000" quat="1.0000000000 0 0 0.0000000000">
+      <freejoint/>
+      <geom name="lego_figure_1_left_leg" type="box" size="0.0038 0.0040 0.0060" pos="-0.0043 0 0.0060" rgba="0.12 0.22 0.75 1" friction="1.2 0.08 0.005" solref="0.006 1" solimp="0.92 0.98 0.002" density="650"/>
+      <geom name="lego_figure_1_right_leg" type="box" size="0.0038 0.0040 0.0060" pos="0.0043 0 0.0060" rgba="0.12 0.22 0.75 1" friction="1.2 0.08 0.005" solref="0.006 1" solimp="0.92 0.98 0.002" density="650"/>
+      <geom name="lego_figure_1_hip" type="box" size="0.0082 0.0042 0.0022" pos="0 0 0.0138" rgba="0.12 0.22 0.75 1" friction="1.2 0.08 0.005" solref="0.006 1" solimp="0.92 0.98 0.002" density="650"/>
+      <geom name="lego_figure_1_torso" type="box" size="0.0090 0.0045 0.0070" pos="0 0 0.0230" rgba="0.82 0.10 0.08 1" friction="1.2 0.08 0.005" solref="0.006 1" solimp="0.92 0.98 0.002" density="650"/>
+      <geom name="lego_figure_1_left_arm" type="capsule" size="0.0022" rgba="0.82 0.10 0.08 1" friction="1.2 0.08 0.005" solref="0.006 1" solimp="0.92 0.98 0.002" density="650" fromto="-0.0105 0 0.0280 -0.0125 0 0.0170"/>
+      <geom name="lego_figure_1_right_arm" type="capsule" size="0.0022" rgba="0.82 0.10 0.08 1" friction="1.2 0.08 0.005" solref="0.006 1" solimp="0.92 0.98 0.002" density="650" fromto="0.0105 0 0.0280 0.0125 0 0.0170"/>
+      <geom name="lego_figure_1_head" type="cylinder" size="0.0052 0.0052" pos="0 0 0.0352" rgba="1.0 0.72 0.18 1" friction="1.2 0.08 0.005" solref="0.006 1" solimp="0.92 0.98 0.002" density="650"/>
+      <geom name="lego_figure_1_head_stud" type="cylinder" size="0.0030 0.0012" pos="0 0 0.0416" rgba="1.0 0.72 0.18 1" friction="1.2 0.08 0.005" solref="0.006 1" solimp="0.92 0.98 0.002" density="650"/>
     </body>
   </worldbody>
   

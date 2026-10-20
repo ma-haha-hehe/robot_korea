@@ -175,7 +175,7 @@ class RobotVisionNode:
                 frames = self.pipeline.wait_for_frames()
                 aligned_frames = self.align.process(frames)
                 img_bgr = np.asanyarray(aligned_frames.get_color_frame().get_data())
-               s img_pil = Image.fromarray(cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB))
+                img_pil = Image.fromarray(cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB))
                 
                 # --- 2. GroundingDINO 检测阶段 ---
                 print(f"🔍 [步骤 1] 正在全图搜索: {name}")

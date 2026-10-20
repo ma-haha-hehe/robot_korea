@@ -1,0 +1,63 @@
+schema_version: 1
+product:
+  name: simple_multi_brick_stack_030
+blocks:
+- id: 4x2_brick_1
+  type: brick_4x2
+  color: blue
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0
+    yaw_deg: 0.0
+- id: 4x2_brick_2
+  type: brick_4x2
+  color: red
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0192
+    yaw_deg: 90.0
+- id: 4x2_brick_3
+  type: brick_4x2
+  color: red
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0384
+    yaw_deg: 90.0
+- id: 4x2_brick_4
+  type: brick_4x2
+  color: red
+  target:
+    position:
+    - 0.0
+    - 0.0
+    - 0.0576
+    yaw_deg: 90.0
+initial_layout:
+  frame: world_tabletop
+  blocks:
+  - id: 4x2_brick_1
+    position_xy_m:
+    - 0.461127
+    - -0.204053
+    yaw_deg: 270
+  - id: 4x2_brick_2
+    position_xy_m:
+    - 0.571478
+    - -0.094036
+    yaw_deg: 270
+  - id: 4x2_brick_3
+    position_xy_m:
+    - 0.288885
+    - -0.15789
+    yaw_deg: 270
+  - id: 4x2_brick_4
+    position_xy_m:
+    - 0.53599
+    - -0.322529
+    yaw_deg: 0
