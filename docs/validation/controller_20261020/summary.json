@@ -1,0 +1,50 @@
+{
+  "date": "2026-10-20",
+  "baseline_commit": "b643fb1",
+  "tested_current_commit": "96dca00",
+  "source_regression_tests": {
+    "passed": 260,
+    "skipped": 1
+  },
+  "release_package_tests": {
+    "passed": 260,
+    "skipped": 1
+  },
+  "latest_workbenchmark_imports_verified": 400,
+  "latest_workbenchmark_source_commit": "ea17dc123a5f9bd8aae30fbe92e7fe1f0f0fa46a",
+  "latest_source_tree_sha256": "f91ef39ec76e23f452444b7cd2c2df8adbeeb88ba2bc1d1697f8ab95d056308d",
+  "latest_episode_manifests_generated": 400,
+  "full_dataset_physical_execution": false,
+  "physical_regression": {
+    "product": "examples/products/workbenchmark/tier2_task_001.yaml",
+    "seed": 42,
+    "robot_base_x_m": -0.05,
+    "connection_mode": "physics",
+    "contact_profile": "plastic",
+    "executor": "oracle-baseline",
+    "speed_scale": 1.5,
+    "baseline": {
+      "success": true,
+      "placed": 3,
+      "total": 3,
+      "execution_error": null
+    },
+    "current": {
+      "success": false,
+      "placed": 2,
+      "total": 3,
+      "execution_error": "released part drifted before pressing"
+    },
+    "status": "known regression; current controller not accepted for this task"
+  },
+  "artifact_sha256": {
+    "baseline_result.json": "ab2fe7052004b9f208ce524502812da33e555f9450704cdb9235a84d0ae1fe3b",
+    "contact_fixture.json": "53e6d287f3818743939402dc0313ffe122f6153a675284d8a12874180fe7e93f",
+    "current_result.json": "d2566b6d856ee59000ca1452dbb52d4864ae09a7aec30cbde0e85be8f5da4009",
+    "regression_tests.log": "ecaa3e3d31100039c393c7ed07466a2dd923427de3b74acf73bb2d7f2e939bbc"
+  },
+  "source_sha256": {
+    "reference_executor.py": "18eb4928f915f29c68db0c4f07919f87939e6b313e82d7ddade5ab04e76ab58a",
+    "assembly_planner.py": "ccbfc0a8714ef9cc3137c7469f9315f7f2f8e20387e685d3f067b68b457ec1c6"
+  }
+}
