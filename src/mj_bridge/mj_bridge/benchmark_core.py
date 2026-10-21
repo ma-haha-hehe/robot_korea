@@ -5,8 +5,10 @@ import json
 import copy
 import hashlib
 import math
+import os
 import random
 import re
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -345,6 +347,17 @@ def dump_yaml(path: str | Path, data: dict) -> None:
 
 
 def dump_json(path: str | Path, data: dict) -> None:
+    """Replace a journal only after its complete JSON payload is written."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    payload = json.dumps(data, indent=2, ensure_ascii=False)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8',
+                dir=path.parent, prefix=f'.{path.name}.', suffix='.tmp', delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(payload)
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)

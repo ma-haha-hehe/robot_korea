@@ -13,12 +13,42 @@ from mj_bridge.assembly_planner import plan_assembly, PlanningError
 import math
 
 
-def select(products, per_tier, seed, include):
+TASK_CLASSES = {'two_brick_stack': 1, 'simple_multi_brick_stack': 2,
+                'simple_shape_assembly': 3, 'balanced_order_sensitive': 4}
+
+
+def task_tier(name):
+    """Accept original task names and the version 2 instance names."""
+    legacy = re.fullmatch(r'tier([1-4])_task_\d+', name)
+    if legacy:
+        return int(legacy.group(1))
+    for task_class, tier in TASK_CLASSES.items():
+        if re.fullmatch(re.escape(task_class) + r'_\d+', name):
+            return tier
+    return None
+
+
+def count_group(count, tier):
+    if tier >= 3 and count <= 5:
+        return '3-5'
+    if count <= 3:
+        return '2-3'
+    if count <= 5:
+        return '4-5'
+    return '6-8' if count <= 8 else '9-12'
+
+
+def select(products, per_tier, seed, include, tiers=(1, 2, 3, 4)):
+    tiers = tuple(sorted(set(tiers)))
+    if not tiers or any(t not in (1, 2, 3, 4) for t in tiers):
+        raise ValueError('select at least one tier from 1..4')
+    if isinstance(per_tier, bool) or not isinstance(per_tier, int) or per_tier < 1:
+        raise ValueError('per-tier sample size must be a positive integer')
     groups = defaultdict(lambda: defaultdict(list))
     inventory = {}
-    for path in sorted(Path(products).glob('tier*_task_*.yaml')):
-        match = re.fullmatch(r'tier([1-4])_task_\d+', path.stem)
-        if not match:
+    for path in sorted(Path(products).glob('*.yaml')):
+        tier = task_tier(path.stem)
+        if tier not in tiers:
             continue
         p = normalized_from_path(str(path))
         blocks = p['blocks']
@@ -30,7 +60,6 @@ def select(products, per_tier, seed, include):
             angles = ['blocked']  # Include failures in the sampling population.
         signature = (len(blocks), sum(b['type']=='brick_4x2' for b in blocks),
                      round(max(b['target']['position'][2] for b in blocks), 5), tuple(angles))
-        tier = int(match.group(1))
         groups[tier][signature].append(path.stem)
         inventory[path.stem] = dict(path=path, tier=tier, stratum=signature)
     missing = set(include)-set(inventory)
@@ -39,12 +68,22 @@ def select(products, per_tier, seed, include):
     rng = random.Random(seed)
     chosen = set(include)
     coverage = {}
-    for tier in (1, 2, 3, 4):
+    for tier in tiers:
         strata = list(groups[tier].values())
         all_ids = sorted(x for group in strata for x in group)
         selected = {x for x in chosen if inventory[x]['tier']==tier}
         if not 1 <= per_tier <= len(all_ids) or len(selected)>per_tier:
             raise ValueError(f'invalid per-tier sample size for tier {tier}')
+        # Include larger, infrequent structures as well as the easy population.
+        # The resulting sample is for coverage, not a prevalence estimate.
+        count_groups = defaultdict(list)
+        for name in all_ids:
+            count_groups[count_group(inventory[name]['stratum'][0], tier)].append(name)
+        for label, names in sorted(count_groups.items()):
+            if len(selected) >= per_tier:
+                break
+            if not selected.intersection(names):
+                selected.add(rng.choice(names))
         rng.shuffle(strata)
         for group in strata:
             if len(selected)>=per_tier:
@@ -54,7 +93,10 @@ def select(products, per_tier, seed, include):
         selected.update(rng.sample(sorted(set(all_ids)-selected), per_tier-len(selected)))
         chosen.update(selected)
         coverage[tier] = dict(population=len(all_ids), selected=len(selected),
-            strata=len(strata), represented=sum(bool(selected.intersection(g)) for g in strata))
+            strata=len(strata), represented=sum(bool(selected.intersection(g)) for g in strata),
+            count_groups={label: {'population': len(names),
+                                 'selected': len(selected.intersection(names))}
+                          for label, names in sorted(count_groups.items())})
     return inventory, sorted(chosen), coverage
 
 
@@ -72,7 +114,7 @@ def restore_selection(products, selection_manifest, output_dir):
     names, payloads = set(), []
     for row in tasks:
         name = row['product']
-        if not re.fullmatch(r'tier[1-4]_task_\d+', name) or name in names:
+        if not isinstance(name, str) or task_tier(name) is None or name in names:
             raise ValueError('selection contains an invalid or duplicate task name')
         names.add(name)
         path = Path(products) / (name + '.yaml')
@@ -95,12 +137,14 @@ def main():
     parser.add_argument('--output-dir', type=Path, required=True)
     parser.add_argument('--per-tier', type=int, help='new selection size per tier (default: 60)')
     parser.add_argument('--seed', type=int, help='new selection seed (default: 42)')
+    parser.add_argument('--tiers', type=int, nargs='+', choices=(1, 2, 3, 4),
+                        help='tiers to sample (default: all); e.g. --tiers 1 2 3')
     parser.add_argument('--include', nargs='*', default=[])
     parser.add_argument('--selection-manifest', type=Path,
                         help='restore a recorded selection and verify each input hash')
     args = parser.parse_args()
     if args.selection_manifest:
-        if args.per_tier is not None or args.seed is not None or args.include:
+        if args.per_tier is not None or args.seed is not None or args.include or args.tiers:
             parser.error('a recorded selection cannot be combined with new sampling options')
         try:
             manifest = restore_selection(args.products, args.selection_manifest, args.output_dir)
@@ -113,7 +157,8 @@ def main():
     args.seed = 42 if args.seed is None else args.seed
     if args.output_dir.exists():
         parser.error('output directory already exists; preserve previous selections')
-    inventory, chosen, coverage = select(args.products, args.per_tier, args.seed, args.include)
+    inventory, chosen, coverage = select(args.products, args.per_tier, args.seed,
+                                         args.include, args.tiers or (1, 2, 3, 4))
     args.output_dir.mkdir(parents=True)
     rows=[]
     for name in chosen:
@@ -121,7 +166,7 @@ def main():
         shutil.copy2(item['path'], args.output_dir/item['path'].name)
         rows.append(dict(product=name, tier=item['tier'], stratum=item['stratum'],
                          input_sha256=hashlib.sha256(item['path'].read_bytes()).hexdigest()))
-    manifest=dict(scope='selected inputs only; not execution or success evidence', seed=args.seed,
+    manifest=dict(scope='coverage sample only; not execution evidence or an unbiased success-rate estimate', seed=args.seed,
         population=len(inventory), selected=len(chosen), tiers=coverage,
         mandatory=args.include, unselected=sorted(set(inventory)-set(chosen)), tasks=rows)
     (args.output_dir/'selection.json').write_text(json.dumps(manifest, indent=2)+'\n')

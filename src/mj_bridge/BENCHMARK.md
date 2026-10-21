@@ -37,5 +37,5 @@ The `physics` mode disables these connections. Snap results do not validate
 physical LEGO deformation or real-robot operation.
 
 Run directories retain the product, initial manifest, scene, final state and
-result. See `docs/PUBLIC_BENCHMARK_ZH.md` for interfaces and
-`docs/validation/REPORT_ZH.md` for measured coverage.
+result locally under `runs/`. See `docs/PUBLIC_BENCHMARK_ZH.md` for interfaces
+and `docs/VALIDATION_ZH.md` for validation commands and interpretation.

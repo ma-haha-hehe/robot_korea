@@ -1,75 +1,82 @@
-# 仿真验证说明
+# 自动评测与第三方方法接入
 
-本项目的验证分为配置/场景测试和机械臂实际执行测试。场景加载通过不能代表装配成功。
+评测从相同任务和初态开始，记录执行过程并独立检查末态。
+本仓库提供单例、产品批量和固定 Workbenchmark 抽样三种入口；
+运行输出保存到本地 `runs/`，不属于源码分发内容。
 
+常规检查在本地运行。GitHub Actions 仅保留 `workflow_dispatch` 手动入口，
+不会因 push 或 pull request 自动执行，也不上传实验产物。
+手动触发的任务仍会产生 GitHub 标准作业日志。
 
-## 夹爪接触修正（2026-09-23，本地复验中）
-
-可视化检查发现旧版夹爪会明显穿入积木。锤子 seed 42 的接触诊断测得最大
-穿透约 14.38 mm；因此此前 94 轮末态成功只能证明目标装配评分通过，不能
-作为抓取接触质量的验收证据。
-
-本地修正将每指驱动力限制为 5 N，使用高阻抗指尖接触，且禁止对仍接触夹爪的
-积木执行 snap。隔离夹爪测试检查实体表面开口、驱动力上限及小于 0.5 mm 的
-数值穿透；锤子完整执行诊断测得约 0.206 mm，组装成功。这仍是 MuJoCo
-软约束接触模型，不宣称数学意义的零穿透，也未校准到真实夹爪。
-
-最新纯物理回归记录于 `runs/physics-release-catalog`；接触模型与验收范围见 [纯物理说明](PHYSICS_VALIDATION_ZH.md)。早期 `runs/gripper-surface-regression` 有实际失败，不能作为验收通过记录。旧发布报告的源码
-指纹和成功数量属于旧版本，在全量重新验证前不得移用为此次修正的结果。
-
-## 可复现命令
+## 运行前检查
 
 ```bash
 source enter_sim_env.sh
 export PYTHONPATH="$PWD/src/mj_bridge:$PYTHONPATH"
 python -m pytest -q
-python -m mj_bridge.benchmark_cli run \
-  --product examples/products/catalog/final_product_trafficlight.yaml \
-  --seed 42 --headless --executor oracle-baseline --output-dir runs/trafficlight
-python scripts/test_product_suite.py \
-  --seeds 0 17 42 --jobs 4 --skip-invalid-products --output-dir runs/product-suite
+lego-bench validate examples/products/traffic_light.yaml
+lego-bench audit examples/products/traffic_light.yaml
+python scripts/plan_assembly.py examples/products/traffic_light.yaml
 ```
 
-`oracle-baseline` 使用 MuJoCo 关节雅可比逆运动学、力矩控制和实体夹爪接触。
-它不通过移动积木的 qpos 来完成抓取或搬运。`snap` 模式仍使用明确声明的
-简化扣合：接触底板后对齐 16 mm 网格，积木接触扣合的层间距为 19.2 mm。
-这不是对真实 LEGO 扣合形变的物理建模。`physics` 模式禁用上述吸附。
+`validate` 检查格式；`audit` 检查旋转后的实体轮廓、名义支撑和兼容层高；
+`plan_assembly.py` 检查拆解逆序与夹爪方向。它们都不能证明全身可达或动态装配成功。
 
-基线不具备完整的避障规划，也不保证任意随机布局的抓取成功。每轮失败、
-超时、部分完成均保留在 `summary.json` 和该轮 `execution.log` 中；进程失败返回非零。
-默认 `run` 仍启动供第三方执行器使用的 ROS 环境，必须显式选择基线才会自动执行。
+`examples/products/catalog/` 保留历史目标，其中部分配置包含悬空、实体重叠或不兼容层高。
+它们用于审计与适配研究，不应自动计为有效任务。
+[独立替代设计](../examples/products/supported_variants/README.md)使用明确的新文件名和变更记录，
+应分别统计。`--allow-invalid-product` 仅供诊断无效目标。
 
-`examples/products/catalog/` 保留了 36 个历史 `final_product*.yaml` 的规范化目标，
-没有为得到通过率而重写目标。某些历史文件含无支撑的悬空目标、非标准层高等，
-即使格式合法也可能无法按当前零件几何装配。
+## 单例与批量执行
 
-`lego-bench validate` 检查输入格式；`lego-bench audit PRODUCT.yaml` 检查
-实体重叠、支撑面积与 19.2 mm 扣合层高。检查采用旋转后的矩形交面积，
-通过检查并不保证机械臂可达或无碰撞。
+```bash
+python -m mj_bridge.benchmark_cli run \
+  --product examples/products/catalog/final_product_trafficlight.yaml \
+  --seed 42 --headless --executor oracle-baseline --connection-mode physics \
+  --output-dir runs/trafficlight-physics
+python scripts/test_product_suite.py \
+  --seeds 0 17 42 --jobs 2 --skip-invalid-products \
+  --connection-mode physics --output-dir runs/product-suite
+```
 
-当前目录的 36 个历史产品中，29 个通过几何检查；以下 7 个被明确拒绝：
-`final_product`、`final_product2`、`final_product_burger`、`final_product_door`、
-`final_product_flower`、`final_product_simple`、`final_product_t`。
-它们仍保留原始目标。运行时会打印具体积木 ID 和问题，不会把无效输入算作装配成功。
-仅在诊断原始失败时使用 `run --allow-invalid-product`。
+`--skip-invalid-products` 将静态无效输入单独列入摘要，不能计为成功执行。
+基线执行异常返回非零退出状态；缺少完整结果、超时或部分完成均不算成功。
+`run` 默认选择 `external`，需显式指定 `oracle-baseline` 才会自动执行参考控制器。
 
-另提供 [7 个明确命名的替代设计](../examples/products/supported_variants/README.md)，
-逐块坐标和方向改动记录于该目录的 `changes.json`。它们是独立目标，执行结果必须
-单独统计；不能把替代设计通过写成原历史产品通过。
+塑料任务应显式增加 `--contact-profile plastic --robot-base-x=-.05`，并按需要设置：
 
-批量命令的 `--skip-invalid-products` 会把这些配置写入 `summary.json` 的
-`invalid_products`，执行次数与成功次数只统计真正执行的产品。
-不加该参数时，遇到无效产品会记录非零退出状态。
+```bash
+export MJ_BRIDGE_BENCHMARK_CONFIG="$PWD/examples/config/plastic_benchmark.yaml"
+```
 
-方形积木在相邻同层零件旁放置时，会在等价的 0/90 度方向中选择夹指净空更大的方向。
-放置时检查已装零件的邻近关系：存在同层近邻或多个支撑时垂直下降，
-其余位置使用平滑关节轨迹。垂直路径采用关节三次插值保持速度连续。
-末端额外下压 2 mm，确保接触后再张开夹指，
-避免悬空释放时被夹指摩擦带偏。这个动作不修改目标或评分容差。
-每块释放后保存 `progress.json`，即使外部超时终止，
-也能查看最近一次完成的动作和当时的实际状态；进度文件不代表整轮成功。
+几何密集的接触场景可能消耗较长墙钟时间。增加预算不改变物理步长、目标或验收门槛。
+固定抽样、独立 ROS domain、整体截止时间和 CSV 报告见
+[执行状态机与抽样](EXECUTION_STATE_MACHINE_ZH.md)。
 
-## 视觉后端
+## 结果解释
+
+完整运行包含 `episode_manifest.yaml`、`assembly_plan.json`、`phase_trace.json`、
+`actual_state.json` 和 `result.json` 等文件；具体字段随执行入口和模式而异。
+产品批量摘要区分无效输入与执行结果，固定抽样报告额外重新核对输入/源码哈希、
+末态、物理接触、释放和坐实支撑。
+
+比较时至少记录：任务版本和输入哈希、初始布局、seed、观测模式、连接模式、接触参数、
+控制器源码、工位基座、墙钟预算，以及成功、失败、超时、未执行数量。
+规划器或控制器变化后通常应重新执行；仅目标末态相同不能证明过程约束相同。
+
+固定布局中更换 seed 不会自动产生新布局。少量有针对性的抽样不能作为整个数据集
+成功率的无偏估计。Oracle、RGB-D、snap 与不同物理配置需要分别报告。
+[能力范围](RELEASE_STATUS_ZH.md)与[物理验收](PHYSICS_VALIDATION_ZH.md)说明了各层验证的区别。
+
+## 接入自己的执行器
+
+使用 [外部执行器模板](../examples/external_executor.py)订阅目标和所需观测，
+将 `policy()` 替换为自己的动作生成逻辑。该模板默认订阅 Oracle，仅作为接口示例。
+完整 ROS 启动方式和话题表见 [README](../README.md#connect-an-external-method)。
+第三方方法可以使用 MoveIt 或直接发送 `FollowJointTrajectory`，执行完后调用
+`/mj_bridge/result` 保存独立评分。真实关节状态、末态评分和执行器自报成功应分别处理。
+
+## 可选 RGB-D 感知后端
 
 ```bash
 export FP_REPO=/absolute/path/to/FoundationPose
@@ -77,32 +84,24 @@ export SAM_CHECKPOINT=/absolute/path/to/sam_vit_h_4b8939.pth
 python -m mj_bridge.benchmark_cli doctor \
   --backend groundingdino-sam-foundationpose
 python -m mj_bridge.benchmark_cli perceive \
-  --frame frame.npz --product examples/products/traffic_light.yaml --output observations.json
+  --frame frame.npz --product examples/products/traffic_light.yaml \
+  --output observations.json
 ```
 
-`frame.npz` 必须含 `rgb`（H×W×3 uint8 RGB）、`depth`（H×W，米，缺失为 0）、
-`K`（3×3 内参）和 `camera_to_world`（4×4 光学相机到世界的刚体变换）。
-后端执行 GroundingDINO 检测、SAM 分割和 FoundationPose 位姿注册，不接收 Oracle 状态。
-同类物体返回独立 detection ID，不声称已与目标实例 ID 完成关联。
+`frame.npz` 必须含 `rgb`（H×W×3、uint8、RGB）、`depth`（H×W、米、缺失为0）、
+`K`（3×3 内参）和 `camera_to_world`（4×4 光学相机到世界变换）。
+后端使用 GroundingDINO 检测、SAM 分割和 FoundationPose 位姿注册；
+模型代码、CUDA 扩展及权重由使用者另行安装。依赖检查失败时不会回退到 Oracle。
 
-模型代码、CUDA 扩展、SAM 和 FoundationPose 权重需由使用者另行安装。
-后端检查失败时不回退到 Oracle，不生成视觉成功结果。
-视觉闭环入口（尚未在 GPU 环境验收）：
+视觉闭环接口：
 
 ```bash
 python -m mj_bridge.benchmark_cli run \
   --product examples/products/traffic_light.yaml --seed 42 --headless \
-  --executor baseline --backend groundingdino-sam-foundationpose --output-dir runs/vision
+  --executor baseline --backend groundingdino-sam-foundationpose \
+  --output-dir runs/vision
 ```
 
-该模式只通过渲染的 RGB-D 选择源零件，最终评分独立读取真实末态。同色同型多实例的
-目标身份关联尚未验证，严格按原实例 ID 评分可能判失败。视觉闭环执行尚未验收，
-不能把接口的存在当作测试通过。
-
-同一批量入口可显式选择视觉后端。建议单 GPU 使用 `--jobs 1`，缺少依赖时整批
-预检直接失败，不会逐个产品反复加载或回退 Oracle：
-
-```bash
-python scripts/test_product_suite.py --backend groundingdino-sam-foundationpose \
-  --seeds 42 --jobs 1 --skip-invalid-products --output-dir runs/vision-suite
-```
+该路径通过渲染 RGB-D 选择源零件，评分仍独立读取真实末态。
+同色同型多实例的目标身份关联、真实 GPU 闭环和视觉在手跟踪尚需单独验证。
+不能将 Oracle 接触反馈的结果当作视觉模型性能。单 GPU 批量运行建议 `--jobs 1`。

@@ -1,5 +1,8 @@
 name: benchmark-ci
-on: [push, pull_request]
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
 jobs:
   test:
     runs-on: ubuntu-22.04
@@ -40,14 +43,3 @@ jobs:
           export PYTHONPATH="$PWD/src/mj_bridge:$PYTHONPATH"
           python3 scripts/check_plastic_contact.py --output /tmp/plastic-contact-fixture.json
           python3 -m mj_bridge.benchmark_cli run --product examples/products/workbenchmark/tier2_task_001.yaml --seed 42 --headless --executor oracle-baseline --connection-mode physics --contact-profile plastic --robot-base-x=-.05 --output-dir /tmp/plastic-assembly
-      - name: Preserve execution evidence
-        if: always()
-        uses: actions/upload-artifact@v7.0.1
-        with:
-          name: oracle-results
-          path: |
-            /tmp/oracle-single
-            /tmp/oracle-adjacent
-            /tmp/oracle-slip
-            /tmp/plastic-contact-fixture.json
-            /tmp/plastic-assembly

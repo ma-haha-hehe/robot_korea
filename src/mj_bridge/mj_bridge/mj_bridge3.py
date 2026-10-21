@@ -88,7 +88,7 @@ def yaw_from_quat_wxyz(q: np.ndarray) -> float:
 def get_world_half_size(body_name: str, quat_wxyz: np.ndarray):
     """
     根据积木类型和 yaw，得到世界坐标下的 XY 半尺寸。
-    适合你的 0 / 90 / 180 / 270 度积木放置。
+    支持 0 / 90 / 180 / 270 度积木放置。
     """
     brick_type = infer_brick_type_from_name(body_name)
 
@@ -472,6 +472,9 @@ class MuJoCoActionServer(Node):
         self.max_gripper_penetration_m = 0.0
         self.max_part_penetration_m = 0.0
         self.max_robot_environment_penetration_m = 0.0
+        self.max_self_penetration_m = 0.0
+        self.self_collision_count = 0
+        self._active_self_contacts = set()
         self.collision_count = 0
         self.stability_violations = 0
         self._active_safety_contacts = set()
@@ -508,7 +511,8 @@ class MuJoCoActionServer(Node):
                 )
                 contact_valid = self.max_gripper_penetration_m <= 0.0005
                 physical_contacts_valid = (self.max_part_penetration_m <= .0005 and
-                                           self.max_robot_environment_penetration_m <= .0005)
+                                           self.max_robot_environment_penetration_m <= .0005 and
+                                           getattr(self, 'max_self_penetration_m', 0.) <= .0005)
                 scored["success"] = bool(scored["success"] and not self.episode_timeout
                                          and contact_valid and physical_contacts_valid)
                 scored.update({
@@ -520,6 +524,8 @@ class MuJoCoActionServer(Node):
                     "physical_contacts_valid": physical_contacts_valid,
                     "max_part_penetration_m": self.max_part_penetration_m,
                     "max_robot_environment_penetration_m": self.max_robot_environment_penetration_m,
+                    "max_self_penetration_m": getattr(self, 'max_self_penetration_m', 0.),
+                    "self_collision_count": getattr(self, 'self_collision_count', 0),
                     "attachment_count": len(self.fake_welds),
                     "max_gripper_penetration_m": self.max_gripper_penetration_m,
                     "collision_count": self.collision_count,
@@ -550,6 +556,9 @@ class MuJoCoActionServer(Node):
             return
         with self.mj_lock:
             contacts = set()
+            self_contacts = set()
+            robot_bodies = {"hand", "left_finger", "right_finger"} | {
+                f"link{i}" for i in range(8)}
             for index in range(self.data.ncon):
                 contact = self.data.contact[index]
                 body1 = int(self.model.geom_bodyid[contact.geom1])
@@ -557,14 +566,20 @@ class MuJoCoActionServer(Node):
                 name1 = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_BODY, body1) or "world"
                 name2 = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_BODY, body2) or "world"
                 names = {name1, name2}
-                robot_contact = any(name.startswith("panda_") or name == "hand" for name in names)
+                robot_contact = any(name.startswith("panda_") or name in robot_bodies for name in names)
                 environment_contact = any(
                     name in {"table", "assembly_base_plate", "world"} for name in names
                 )
                 if robot_contact and environment_contact:
                     contacts.add(tuple(sorted(names)))
+                if (all(name.startswith('panda_') or name in robot_bodies for name in (name1, name2))
+                        and contact.dist < -.00005):
+                    self_contacts.add(tuple(sorted(names)))
             self.collision_count += len(contacts - self._active_safety_contacts)
             self._active_safety_contacts = contacts
+            self.self_collision_count = getattr(self, 'self_collision_count', 0) + len(
+                self_contacts - getattr(self, '_active_self_contacts', set()))
+            self._active_self_contacts = self_contacts
 
             unstable = set()
             for item in self.episode_manifest["spawned_blocks"]:
@@ -1064,6 +1079,14 @@ class MuJoCoActionServer(Node):
                 elif actuator_name == "finger_actuator2":
                     self.data.ctrl[i] = self.gripper_control
 
+            unload_force = getattr(self, 'gripper_unload_force_n', None)
+            if unload_force is not None:
+                for finger in (1, 2):
+                    actuator = self.model.actuator(f'finger_actuator{finger}').id
+                    qadr = self.model.joint(f'panda_finger_joint{finger}').qposadr[0]
+                    gain = self.model.actuator_gainprm[actuator, 0]
+                    self.data.ctrl[actuator] = self.data.qpos[qadr] - unload_force / gain
+
             mujoco.mj_step(self.model, self.data)
             if self.episode_manifest and self.data.ncon:
                 if not hasattr(self, '_grasp_finger_mask'):
@@ -1072,6 +1095,7 @@ class MuJoCoActionServer(Node):
                     self._grasp_part_mask = np.array([name.startswith('bench__') for name in names])
                     robot_names = {'hand', 'left_finger', 'right_finger'} | {f'link{i}' for i in range(1,8)}
                     self._contact_robot_mask = np.array([name in robot_names for name in names])
+                    self._contact_self_mask = np.array([name in robot_names or name == 'link0' for name in names])
                     self._contact_environment_mask = np.array([name in {'world', 'table', 'assembly_base_plate'} for name in names])
                 a = self.model.geom_bodyid[self.data.contact.geom1]
                 b = self.model.geom_bodyid[self.data.contact.geom2]
@@ -1080,6 +1104,10 @@ class MuJoCoActionServer(Node):
                 parts = self._grasp_part_mask[a] | self._grasp_part_mask[b]
                 environment = ((self._contact_robot_mask[a] & self._contact_environment_mask[b]) |
                                (self._contact_robot_mask[b] & self._contact_environment_mask[a]))
+                robot_self = self._contact_self_mask[a] & self._contact_self_mask[b]
+                if np.any(robot_self):
+                    self.max_self_penetration_m = max(getattr(self, 'max_self_penetration_m', 0.),
+                                                     float(-np.min(self.data.contact.dist[robot_self])))
                 if np.any(parts):
                     self.max_part_penetration_m = max(self.max_part_penetration_m,
                                                      float(-np.min(self.data.contact.dist[parts])))

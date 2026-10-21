@@ -30,7 +30,7 @@ SCENE_OUTPUT_XML = os.path.join(BASE_DIR, "scene.xml")
 # 2. 桌子与积木高度
 # ============================================================
 
-# 你的 scene_template.xml 里桌子一般是：
+# scene_template.xml 中桌子的定义为：
 # <body name="table" pos="0.40 0 0.02">
 #   <geom type="box" size="0.30 0.50 0.02"/>
 # </body>
@@ -100,7 +100,7 @@ VISUAL_CONAFFINITY = "0"
 # 5. Duplo 几何参数
 # ============================================================
 
-# 你的 generator 里 STUD = 0.016，所以这里保持一致
+# 与任务生成器使用相同的凸点间距。
 STUD_PITCH = 0.016
 
 # ============================================================
@@ -111,9 +111,7 @@ ADD_ASSEMBLY_BASE_PLATE = True
 
 ASSEMBLY_BASE_NAME = "assembly_base_plate"
 
-# 你的 C++ 里装配区中心是:
-# ASSEMBLY_ORIGIN_X = 0.25
-# ASSEMBLY_ORIGIN_Y = 0.0
+# 默认装配底板中心，位于世界坐标系中。
 ASSEMBLY_BASE_CENTER_X = 0.35
 ASSEMBLY_BASE_CENTER_Y = 0.35
 

@@ -19,7 +19,9 @@ def launch_setup(context):
     headless = LaunchConfiguration("headless")
     observation = LaunchConfiguration("observation").perform(context)
     connection_mode = LaunchConfiguration("connection_mode").perform(context)
-    _, scene = generate(product, seed, output_dir)
+    contact_profile = LaunchConfiguration("contact_profile").perform(context)
+    _, scene = generate(product, seed, output_dir, connection_mode=connection_mode,
+                        contact_profile=contact_profile)
 
     moveit_config = (
         MoveItConfigsBuilder("moveit_resources_panda")
@@ -104,5 +106,7 @@ def generate_launch_description():
         DeclareLaunchArgument("headless", default_value="false"),
         DeclareLaunchArgument("observation", default_value="oracle"),
         DeclareLaunchArgument("connection_mode", default_value="snap"),
+        DeclareLaunchArgument("contact_profile", default_value="loose",
+                              choices=["loose", "plastic"]),
         OpaqueFunction(function=launch_setup),
     ])

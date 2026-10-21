@@ -4,6 +4,13 @@ install/
 log/
 runs/
 dist/
+tmp/
+local_records/
+docs/validation/
+results/
+logs/
+*.log
+/eval_results*.csv
 
 # Python 缓存
 __pycache__/

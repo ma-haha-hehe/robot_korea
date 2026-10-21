@@ -1,54 +1,91 @@
-# LEGO Bench: Panda + MuJoCo manipulation benchmark
+# LEGO Bench: Workbenchmark manipulation with Panda and MuJoCo
 
-LEGO Bench is a ROS 2 / MuJoCo environment for evaluating third-party LEGO
-planning, perception and execution methods. A product YAML describes the goal;
-the environment creates the required loose parts at deterministic random poses,
-exposes standard control/observation interfaces, and scores the final assembly.
+LEGO Bench provides a ROS 2 / MuJoCo environment for developing and evaluating
+LEGO-style manipulation methods. A product YAML defines the assembly target;
+the environment generates the scene, exposes robot and observation interfaces,
+and scores the resulting structure. It includes a guarded reference controller
+and adapters for the [Workbenchmark task dataset](https://github.com/ma-haha-hehe/benchmark_lego).
 
-中文完整说明见 [docs/PUBLIC_BENCHMARK_ZH.md](docs/PUBLIC_BENCHMARK_ZH.md).
+The environment supports planning and control experiments with simulation state,
+and provides RGB-D interfaces for perception methods. The reference controller
+uses simulated poses and contact forces. It is a baseline for studying execution,
+not a learned policy or a demonstration of real-robot generalization.
 
-The independent Ubuntu robot workspace is preserved under the
-[`ubuntu-workspace-20261020` tag](https://github.com/ma-haha-hehe/robot_korea/tree/ubuntu-workspace-20261020).
-See [workspace contents and validation](docs/WORKSPACE_SNAPSHOT_ZH.md) before
-choosing between that development line and the public benchmark on `main`.
+[中文使用指南](docs/PUBLIC_BENCHMARK_ZH.md) ·
+[Workbenchmark integration](docs/WORKBENCHMARK_INTEGRATION_ZH.md) ·
+[Execution state machine](docs/EXECUTION_STATE_MACHINE_ZH.md) ·
+[Evaluation guide](docs/VALIDATION_ZH.md)
 
-## Quick start
+## What the repository contains
 
-Requires Ubuntu 22.04 with ROS 2 Humble base already installed and its apt
-repository configured. The script below installs the additional simulation packages.
-Simulator dependencies are pinned in `requirements-sim.txt` to the versions used
-for the recorded validation.
+- Product validation, normalization, geometry auditing and deterministic scene generation.
+- Registered `brick_2x2` and `brick_4x2` parts, a Panda arm and a two-finger hand.
+- Oracle and RGB-D observations, ROS trajectory actions, reset and scoring services.
+- Assembly-by-disassembly planning with 0°/90° grasp directions.
+- A torque-controlled execution baseline with measured grasp/release checks,
+  collision screening, bounded recovery and final stability checks.
+- Simplified snap, loose rigid-body and compliant plastic-contact configurations.
+- Frozen task sampling, bounded parallel execution, independent result auditing,
+  CSV export and comparisons on identical inputs.
+
+This repository contains the simulation software and representative product
+YAMLs. The complete, versioned task collection and its images belong to
+[`benchmark_lego`](https://github.com/ma-haha-hehe/benchmark_lego).
+
+## Installation
+
+Use Ubuntu 22.04 with ROS 2 Humble installed and its apt repository configured.
+The simulator depends on MuJoCo 3.11.0; Python dependencies are pinned in
+[`requirements-sim.txt`](requirements-sim.txt). The installation script uses
+`sudo` for system packages and creates a local `.venv`.
 
 ```bash
+git clone https://github.com/ma-haha-hehe/robot_korea.git
+cd robot_korea
 bash install_sim_system_deps.sh
 source enter_sim_env.sh
 colcon build --base-paths src/mj_bridge --packages-select mj_bridge --symlink-install
 source enter_sim_env.sh
-
-lego-bench validate examples/products/traffic_light.yaml
-lego-bench generate --product examples/products/traffic_light.yaml --seed 42
-lego-bench run --product examples/products/traffic_light.yaml --seed 42 \
-  --headless --executor baseline --output-dir runs/traffic-light-42
+export PYTHONPATH="$PWD/src/mj_bridge:$PYTHONPATH"
 ```
 
-Interactive pure-physics preview (desktop display required):
+Source `enter_sim_env.sh` in each new terminal. If the installed command is not
+on `PATH`, use `python -m mj_bridge.benchmark_cli` in place of `lego-bench`.
+ROS packages come from apt rather than PyPI. A Mac can host the editor while
+these commands run in an Ubuntu SSH session; the simulation process and its
+files then remain on Ubuntu. See the [workspace guide](docs/WORKSPACE_SNAPSHOT_ZH.md).
+
+## Run a first example
+
+Validate the product and inspect its nominal geometry before running:
 
 ```bash
-source enter_sim_env.sh
-export PYTHONPATH="$PWD/src/mj_bridge:$PYTHONPATH"
+lego-bench validate examples/products/traffic_light.yaml
+lego-bench audit examples/products/traffic_light.yaml
+lego-bench generate --product examples/products/traffic_light.yaml \
+  --seed 42 --output-dir runs/traffic-light-scene
+lego-bench run --product examples/products/traffic_light.yaml --seed 42 \
+  --headless --executor oracle-baseline --connection-mode physics \
+  --output-dir runs/traffic-light-physics
+```
+
+`--executor oracle-baseline` executes the reference controller automatically.
+The default `external` executor starts the environment and waits for another
+method to command the robot. Always choose a fresh output directory when
+keeping comparable experiments.
+
+To watch a physics episode on an Ubuntu desktop:
+
+```bash
 MUJOCO_GL=glfw LP_NUM_THREADS=2 python scripts/view_physics_episode.py \
   --product examples/products/catalog/final_product_hammer.yaml --seed 42
 ```
 
-Change `--product` to select another registered design. The window stays open
-when execution ends; `result.json` records failures as well as successes.
-`--speed-scale` accepts 0.25–2 (default 1.5); final insertion remains slower.
+The viewer stays open after execution. `--speed-scale` accepts 0.25–2; contact
+insertion retains its slower motion schedule. Viewer output is a preview;
+use the batch or CLI entry points for repeatable evaluation.
 
-Workbenchmark plastic-contact tasks use a compliant interference fit and sliding,
-torsional and rolling friction. Run a bundled example with the tested robot-base
-position. The dedicated configuration allows up to 3600 seconds of wall-clock
-time for dense CPU simulations; reaching the limit is a failed run. It does not
-change the physics timestep or acceptance thresholds:
+## Execute a plastic-contact Workbenchmark example
 
 ```bash
 export MJ_BRIDGE_BENCHMARK_CONFIG="$PWD/examples/config/plastic_benchmark.yaml"
@@ -56,173 +93,156 @@ python -m mj_bridge.benchmark_cli run \
   --product examples/products/workbenchmark/tier2_task_001.yaml \
   --seed 42 --headless --executor oracle-baseline \
   --connection-mode physics --contact-profile plastic --robot-base-x=-.05 \
-  --output-dir runs/workbenchmark-plastic-example
-
-MUJOCO_GL=glfw LP_NUM_THREADS=2 python scripts/view_physics_episode.py \
-  --product examples/products/workbenchmark/tier2_task_001.yaml \
-  --seed 42 --contact-profile plastic --robot-base-x=-.05
+  --output-dir runs/workbenchmark-plastic
 ```
 
-For the current 400-task dataset in `benchmark_lego`, import the three-file
-instances from `versions/latest/tasks/`:
+The base offset moves the simulated robot 5 cm along negative world X; it does
+not move the target or loose parts. Plastic contact uses compliant ribs and
+friction rather than attachments. Its material parameters are uncalibrated
+simulation settings. Dense contact can consume substantial CPU time; the
+example configuration allows a 3600-second episode budget without changing
+the timestep or acceptance limits. See [contact modeling](docs/PLASTIC_CONTACT_ZH.md).
+
+## Import the current Workbenchmark dataset
+
+Clone the dataset alongside this repository, or substitute its actual path:
 
 ```bash
+git clone https://github.com/ma-haha-hehe/benchmark_lego.git ../benchmark_lego
 python scripts/import_workbenchmark_latest.py \
   --tasks-root ../benchmark_lego/versions/latest/tasks \
-  --output runs/workbenchmark-latest
+  --output runs/workbenchmark-import
 python scripts/import_workbenchmark_latest.py \
-  --output runs/workbenchmark-latest --verify-task two_brick_stack_001.yaml
+  --output runs/workbenchmark-import --verify-task two_brick_stack_001.yaml
 ```
 
-Use a fresh output directory. The importer freezes all three source files and
-their hashes. It preserves relative XY geometry and explicitly maps the source
-20 mm layer spacing to the simulator's 19.2 mm layer spacing. See the
-[import conventions](docs/WORKBENCHMARK_INTEGRATION_ZH.md) before execution.
+The current dataset contains 400 tasks across four tiers. Each source instance
+has `final_product.yaml`, `scene_init.yaml` and `metadata.yaml`. The importer
+freezes these inputs and hashes, preserves relative XY geometry and the
+recorded starting layout, and explicitly maps the source 20 mm layer spacing
+to the simulator's 19.2 mm spacing. This adaptation is recorded in the import
+manifest. Successful import is a data-integrity check, not an execution result.
 
-The older `benchmark_tasks/*.yaml` collection uses a separate importer:
+Select and execute a reproducible Tier 1–3 sample:
 
 ```bash
-python scripts/import_workbenchmark.py --repository ../Workbenchmark \
-  --initial-layout recorded --output runs/workbenchmark-recorded
+python scripts/select_workbenchmark_sample.py \
+  --products runs/workbenchmark-import --output-dir runs/workbenchmark-selection \
+  --tiers 1 2 3 --per-tier 6 --seed 42
+python scripts/run_workbenchmark_sample.py \
+  --products runs/workbenchmark-selection --output-dir runs/workbenchmark-sample \
+  --jobs 2 --episode-timeout 900 --ros-domain-base 200
+python scripts/report_workbenchmark_sample.py \
+  --suite runs/workbenchmark-sample --products runs/workbenchmark-selection \
+  --output-dir runs/workbenchmark-report
 ```
 
-For that older collection, restore the committed regression sample of 240 tasks
-(60 per difficulty tier):
+The runner uses isolated local ROS domains, freezes source/configuration
+fingerprints, and stops its own workers at the deadline. The default overall
+budget is four hours; `--deadline-utc` sets an absolute timezone-aware deadline.
+Recorded layouts do not change when only the seed changes. Sampling and
+report interpretation are described in the [state-machine guide](docs/EXECUTION_STATE_MACHINE_ZH.md).
+
+The older `benchmark_tasks/*.yaml` format has a separate importer:
 
 ```bash
-python scripts/select_workbenchmark_sample.py --products runs/workbenchmark-recorded \
-  --selection-manifest examples/validation/workbenchmark_selection.json \
-  --output-dir runs/workbenchmark-selected
-export MJ_BRIDGE_BENCHMARK_CONFIG="$PWD/examples/config/plastic_benchmark.yaml"
-python scripts/test_product_suite.py --products runs/workbenchmark-selected \
-  --seeds 42 --jobs 4 --timeout 3650 --connection-mode physics \
-  --contact-profile plastic --backend oracle --robot-base-x=-.05 \
-  --output-dir runs/workbenchmark-regression
+python scripts/import_workbenchmark.py --repository ../benchmark_lego \
+  --initial-layout recorded --output runs/workbenchmark-legacy
 ```
 
-Restoration checks every input hash and preserves the original selection metadata.
-The strata record part count, rectangular-part count, height and planned grasp
-angles at selection time. A fresh draw can change after planner updates, even
-with the same random seed. A saved selection records inputs, not successful tests.
+Use the importer that matches the dataset version. Do not mix current and
+legacy task IDs, layer conventions or evidence. See the
+[integration guide](docs/WORKBENCHMARK_INTEGRATION_ZH.md).
 
-Then select a generated task YAML with `--product`. Each importer records its
-geometry transform and preserves the recorded starting layout. Plastic parameters
-are simulation settings, not measured ABS properties; see
-[contact model and validation limits](docs/PLASTIC_CONTACT_ZH.md).
-The archived release checkpoint records 36 original tasks with verified Oracle
-physical execution. Validation is specific to the recorded controller version
-and task inputs; see [validation scope](docs/RELEASE_STATUS_ZH.md) and the linked evidence.
-Preview output is labelled separately from regression evidence.
+## Connect an external method
 
-Full Panda + MoveIt pipeline (for external executors):
+Launch the Panda, MoveIt and ROS bridge:
 
 ```bash
 ros2 launch mj_bridge lego_bench.launch.py \
-  product:=$PWD/examples/products/traffic_light.yaml seed:=42 headless:=true
+  product:=$PWD/examples/products/traffic_light.yaml seed:=42 headless:=true \
+  observation:=oracle connection_mode:=physics contact_profile:=loose
 ```
 
-Headless RGB-D episode:
+| Interface | ROS name |
+|---|---|
+| Arm trajectory action | `/mj_panda_arm_controller/follow_joint_trajectory` |
+| Hand trajectory action | `/mj_panda_hand_controller/follow_joint_trajectory` |
+| Joint states | `/joint_states` |
+| Target JSON (`std_msgs/String`) | `/lego_bench/goal` |
+| Oracle state JSON (`std_msgs/String`) | `/lego_bench/ground_truth` |
+| RGB and depth images | `/camera/color/image_raw`, `/camera/depth/image_raw` |
+| Camera calibration | `/camera/camera_info` |
+| Simulation segmentation | `/camera/segmentation` |
+| Reset / result services (`std_srvs/Trigger`) | `/mj_bridge/reset`, `/mj_bridge/result` |
+| Live score JSON (`std_msgs/String`) | `/mj_bridge/benchmark_state` |
+
+[`examples/external_executor.py`](examples/external_executor.py) is an Oracle
+subscription skeleton: replace `policy()` with trajectory generation. It does
+not implement a complete control policy. An RGB-D method should consume image
+observations rather than the Oracle subscription. Segmentation is MuJoCo's
+`32SC2` object-ID/object-type annotation, not an RGB-D perception prediction.
+The full launch publishes the `world -> realsense` optical-frame transform.
+
+Request a score after execution:
 
 ```bash
-lego-bench run --product examples/products/traffic_light.yaml --seed 42 \
-  --headless --observation rgbd --output-dir runs/traffic-light-42
+ros2 service call /mj_bridge/result std_srvs/srv/Trigger '{}'
 ```
 
-Docker:
+For image-only observations, set `observation:=rgbd`. The optional
+GroundingDINO/SAM/FoundationPose adapter and its installation requirements are
+covered in the [evaluation guide](docs/VALIDATION_ZH.md). GPU inference and
+real-robot operation require separate validation.
+
+## Evaluate and extend
 
 ```bash
-docker compose -f docker-compose.benchmark.yaml up --build
-```
-
-## Automatic simulation validation
-
-```bash
-source enter_sim_env.sh
-export PYTHONPATH="$PWD/src/mj_bridge:$PYTHONPATH"
 python -m pytest -q
-python -m mj_bridge.benchmark_cli run \
-  --product examples/products/catalog/final_product_trafficlight.yaml \
-  --seed 42 --headless --executor oracle-baseline --output-dir runs/trafficlight
-python scripts/test_product_suite.py --seeds 0 17 42 --skip-invalid-products
-```
-
-The executor uses assembly by disassembly, shared with the research
-`myplanner.py` adapter: remove accessible parts from the finished structure with
-a 0°/90° gripper approach, then reverse that order. It rejects an unavailable
-approach instead of forcing a grasp. For adjacent steps on the same layer,
-connecting a loaded support to another lower branch takes priority over a
-narrow-side hold. Any reordered pair must still have clear 0°/90° removal
-grasps; this support heuristic does not certify physical stability.
-Preview the plan before execution:
-
-```bash
 python scripts/plan_assembly.py examples/products/catalog/final_product_hammer.yaml
+python scripts/test_product_suite.py --seeds 0 17 42 --jobs 2 \
+  --skip-invalid-products --connection-mode physics \
+  --output-dir runs/product-suite
 ```
 
-Every automatic episode saves `assembly_plan.json`. The planner's world-frame
-gripper angle is converted to a part-relative offset for picking randomly
-oriented source parts; the finished part's orientation is preserved. Geometric
-accessibility does not establish dynamic stability or collision-free arm travel.
+Evaluation distinguishes schema validity, nominal geometry, actual robot
+execution, release/contact quality and final stability. Unit tests and static
+checks do not establish a dataset-wide task success rate. Results must state
+the controller version, exact inputs, observation mode, contact model, base
+position and resource budget. See [evaluation scope](docs/RELEASE_STATUS_ZH.md)
+and [physics criteria](docs/PHYSICS_VALIDATION_ZH.md).
 
-The torque-controlled Oracle baseline reports failed grasps and unreachable poses.
-It is not a complete collision-free planner. The 36 legacy product targets are
-preserved; some describe unsupported geometry or floating targets. See
-[validation scope and optional vision setup](docs/VALIDATION_ZH.md).
+`runs/` contains local experiment artifacts and is ignored by Git. A run can
+include scene and input manifests, actual states, phase traces, timing,
+per-part errors and a summary. Keep complete local outcomes when comparing
+methods, including timeouts and unfinished cases; the source distribution
+does not bundle individual execution logs.
 
-The [measured validation report](docs/validation/REPORT_ZH.md) records the tested
-products and seeds, with final states and per-part scores in its JSON evidence.
-This historical report predates the gripper-contact fixes and does **not**
-validate the current physics controller or prove nonpenetrating grasps.
-Current contact criteria and limitations are documented in
-[physics validation](docs/PHYSICS_VALIDATION_ZH.md).
-The historical Oracle/snap run passed 87 episodes across 29 original products and
-three seeds, plus seven separately named corrected designs. The seven invalid
-original targets remain available for inspection and are not counted as successes.
+Routine checks run locally. The GitHub Actions workflow is available only
+through manual `workflow_dispatch`; it does not run on pushes or pull requests
+and does not upload experiment artifacts. A manually started Actions run still
+has the standard GitHub job log.
 
-`lego-bench audit PRODUCT.yaml` diagnoses overlapping solids, inadequate support
-and incompatible layer heights. `run` rejects invalid snap targets before starting
-the simulator. Rejected products remain in the catalogue and in suite reports;
-they are never counted as successful executions.
+| Location | Purpose |
+|---|---|
+| `src/mj_bridge/mj_bridge/` | Core schema, scene builder, ROS bridge, planner, controller and scoring |
+| `src/mj_bridge/launch/` | ROS launch entry points |
+| `scripts/` | Import, plan, sample, run, inspect and report utilities |
+| `examples/products/` | Small examples, legacy catalog and explicitly named variants |
+| `examples/config/` | Alternative runtime configurations |
+| `examples/validation/` | Input-selection manifest; not execution results |
+| `docs/` | Installation, modeling, integration and evaluation guides |
 
-`lego-bench doctor --backend groundingdino-sam-foundationpose` checks optional GPU
-and weight dependencies. `lego-bench perceive` processes calibrated RGB-D NPZ
-frames through GroundingDINO, SAM and FoundationPose. The selectable
-`run --executor baseline --backend groundingdino-sam-foundationpose` integration
-is implemented but has not yet been validated with GPU weights.
+Register additional parts through `part_registry.yaml`, visual/collision assets,
+mass and symmetry metadata. Unknown types are rejected. The current baseline
+uses bounded collision checks and recovery; it does not guarantee arbitrary
+layouts or structures. Real hardware requires its own driver, calibration,
+controller limits and validation rather than direct use of simulation commands.
 
-## Public interfaces
+## License
 
-- Arm: `/mj_panda_arm_controller/follow_joint_trajectory`
-- Hand: `/mj_panda_hand_controller/follow_joint_trajectory`
-- Robot state: `/joint_states`
-- Goal: `/lego_bench/goal` (`std_msgs/String`, JSON)
-- Oracle state: `/lego_bench/ground_truth` (`std_msgs/String`, JSON)
-- RGB-D: `/camera/color/image_raw`, `/camera/depth/image_raw`, `/camera/camera_info`
-- Segmentation: `/camera/segmentation`
-- Reset: `/mj_bridge/reset`
-- Result: `/mj_bridge/result`
-- Live score: `/mj_bridge/benchmark_state`
-
-See [examples/external_executor.py](examples/external_executor.py) for the policy adapter.
-Segmentation uses MuJoCo's two-channel `32SC2` output (`object id`, `object type`).
-The optical frame is `realsense`, with a static `world -> realsense` transform in
-the full launch.
-
-## Scope
-
-Version 0.1 supports registered `brick_2x2` and `brick_4x2` parts. “Any product
-YAML” means any schema-valid product composed of registered parts. Add new part
-types through `part_registry.yaml` plus visual/collision assets.
-
-The `snap` connection mode is an explicit simplified stud-engagement model.
-Use `--connection-mode physics` to disable automatic connections. Results from
-different connection or observation modes must not be compared as one benchmark.
-
-## License and third-party components
-
-The public benchmark software and Panda model carry the Apache-2.0 license in
-`LICENSE`. FoundationPose is separately licensed by
-NVIDIA and is restricted to non-commercial research/evaluation. It is installed
-separately. Hardware SDK binaries, unverified legacy LEGO meshes, model weights,
-caches and real-robot data are excluded from the public benchmark; see
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+The public benchmark software and included Panda model use Apache-2.0; see
+[`LICENSE`](LICENSE). FoundationPose has a separate NVIDIA license restricted
+to non-commercial research/evaluation and must be installed separately.
+Hardware SDK binaries, model weights, caches and real-robot data are excluded.
+See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for component details.

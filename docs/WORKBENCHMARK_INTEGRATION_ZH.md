@@ -29,7 +29,7 @@ python -m mj_bridge.benchmark_cli run \
 ```bash
 source enter_sim_env.sh
 export PYTHONPATH="$PWD/src/mj_bridge:$PYTHONPATH"
-python scripts/import_workbenchmark.py --repository ../Workbenchmark \
+python scripts/import_workbenchmark.py --repository ../benchmark_lego \
   --output runs/workbenchmark-recorded --initial-layout recorded
 python -m mj_bridge.benchmark_cli run \
   --product runs/workbenchmark-recorded/tier1_task_001.yaml \
@@ -49,7 +49,7 @@ python -m mj_bridge.benchmark_cli run \
 - 成品几何检查与 0°/90° 抓取角度规划是静态检查，不是执行成功证据。
 - `check_target_stability.py` 在目标位置直接初始化积木，再以重力静置。其结果只诊断目标与模型的稳定性，不能当作机器人装配结果。
 - 正式执行必须同时满足末态位置、朝向、直立与接触穿透门槛。松爪后需要双指实际达到开度、速度稳定且脱离目标，才能撤离。
-- 可选 plastic 模式使用柔顺内筋、凸点干涉和六维摩擦接触，参数尚未由实物 ABS 标定。松配合 hollow 与 plastic 模式的证据分别记录。各版本的执行验证范围见[版本与验证范围](RELEASE_STATUS_ZH.md)。
+- 可选 plastic 模式使用柔顺内筋、凸点干涉和六维摩擦接触，参数尚未由实物 ABS 标定。松配合 hollow 与 plastic 模式的证据分别记录。各模式的能力与评测口径见[能力范围](RELEASE_STATUS_ZH.md)。
 
 真实视觉 GPU 推理与实机操作未验收。不得把接口可用、静态检查或历史 snap 末态结果写成全任务物理装配成功。
 
@@ -57,9 +57,8 @@ python -m mj_bridge.benchmark_cli run \
 
 当前 hollow 模型的外轮廓为 31.8×31.8 mm 或 63.8×31.8 mm，
 留出相邻块之间 0.2 mm 的名义间隙。16 mm 凸点节距和成品目标坐标不变。
-此前外轮廓等于完整网格宽度，相邻目标没有任何间隙；约 50–70 µm 的
-放置误差就能使下降中的长砖碰到邻块的硬边并翻转。该间隙是仿真近似，
-不是实物测量或制造商 CAD。旧版零间隙静置统计不能用于新版模型验收。
+该间隙用于表示相邻零件的制造间隙，属于仿真近似，
+不是实物测量或制造商 CAD。几何版本不同的结果需要分别评测。
 
 ## 工位基座位置
 

@@ -27,7 +27,8 @@ def require_physics_evidence(result):
     if result.get('connection_mode') != 'physics':
         raise ValueError('physics evidence has a different connection mode')
     for field in ('max_gripper_penetration_m', 'max_part_penetration_m',
-                  'max_robot_environment_penetration_m'):
+                  'max_robot_environment_penetration_m',
+                  *(('max_self_penetration_m',) if 'max_self_penetration_m' in result else ())):
         value = result.get(field)
         if not isinstance(value, (int, float)) or not math.isfinite(value) or not 0 <= value <= .0005:
             raise ValueError(f'invalid physics contact evidence: {field}')
@@ -133,7 +134,7 @@ def main():
                         help='required unique count across primary and supplementary suites')
     parser.add_argument('--selection-dir', help='fixed sample directory containing selection.json and inputs')
     parser.add_argument('--unit-tests', type=int, required=True)
-    parser.add_argument('--output', default='docs/validation')
+    parser.add_argument('--output', default='runs/validation')
     parser.add_argument('--invalid-products', help='JSON audit of excluded original designs')
     args = parser.parse_args()
     suite = json.loads((Path(args.suite)/'summary.json').read_text())

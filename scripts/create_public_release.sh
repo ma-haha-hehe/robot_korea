@@ -3,8 +3,8 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEST="${1:-${REPO}/dist/lego-bench-public}"
-DEST="$(realpath -m "${DEST}")"
-RELEASE_ROOT="$(realpath -m "${REPO}/dist")"
+DEST="$(python3 -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve())' "${DEST}")"
+RELEASE_ROOT="$(python3 -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve())' "${REPO}/dist")"
 if [[ "${DEST}" != "${RELEASE_ROOT}"/* ]]; then
   echo "Refusing unsafe release destination: ${DEST}" >&2
   echo "Release destinations must be below ${RELEASE_ROOT}" >&2
@@ -18,12 +18,14 @@ fi
 touch "${RELEASE_ROOT}/COLCON_IGNORE"
 rsync -a --delete --delete-excluded \
   --exclude '.git/' --exclude '.venv/' --exclude 'build/' --exclude 'install/' \
-  --exclude 'log/' --exclude 'runs/' --exclude 'FoundationPose/' \
+  --exclude 'log/' --exclude 'runs/' --exclude 'dist/' --exclude 'tmp/' \
+  --exclude 'local_records/' --exclude 'FoundationPose/' \
   --exclude '__pycache__/' --exclude '.pytest_cache/' --exclude '*.pyc' \
   --exclude 'weights/' --exclude '*.pt' --exclude '*.pth' --exclude '*.onnx' \
   --exclude 'LEGO_Duplo_brick_2x2.stl' --exclude 'LEGO_Duplo_brick_2x4.stl' \
   --exclude 'O3P_API-*/' --exclude 'calibration_images/' --exclude 'real_robot_eval/' \
   --exclude '/docs/WORK_PROGRESS.md' \
+  --exclude '/docs/validation/' \
   --include '/src/' --include '/src/mj_bridge/' \
   --include '/src/mj_bridge/package.xml' --include '/src/mj_bridge/setup.py' \
   --include '/src/mj_bridge/setup.cfg' --include '/src/mj_bridge/BENCHMARK.md' \
@@ -35,6 +37,11 @@ rsync -a --delete --delete-excluded \
   --include '/src/mj_bridge/test/test_held_part_guard.py' --include '/src/mj_bridge/test/test_sample_restore.py' \
   --include '/src/mj_bridge/test/test_suite_input_freeze.py' --include '/src/mj_bridge/test/fixtures/***' \
   --include '/src/mj_bridge/test/test_latest_workbenchmark.py' \
+  --include '/src/mj_bridge/test/test_latest_sampling.py' --include '/src/mj_bridge/test/test_execution_state_machine.py' \
+  --include '/src/mj_bridge/test/test_execution_phases.py' --include '/src/mj_bridge/test/test_grasp_approach.py' \
+  --include '/src/mj_bridge/test/test_controlled_release.py' --include '/src/mj_bridge/test/test_support_capture.py' \
+  --include '/src/mj_bridge/test/test_motion_collision.py' --include '/src/mj_bridge/test/test_sample_execution.py' \
+  --include '/src/mj_bridge/test/test_execution_journal.py' --include '/src/mj_bridge/test/test_sample_report.py' \
   --include '/src/mj_bridge/mj_bridge/' \
   --include '/src/mj_bridge/mj_bridge/assets/' --include '/src/mj_bridge/mj_bridge/assets/***' \
   --include '/src/mj_bridge/mj_bridge/__init__.py' \
@@ -45,6 +52,7 @@ rsync -a --delete --delete-excluded \
   --include '/src/mj_bridge/mj_bridge/recorded_layout.py' \
   --include '/src/mj_bridge/mj_bridge/plastic_contact.py' \
   --include '/src/mj_bridge/mj_bridge/reference_executor.py' \
+  --include '/src/mj_bridge/mj_bridge/execution_phases.py' --include '/src/mj_bridge/mj_bridge/support_geometry.py' \
   --include '/src/mj_bridge/mj_bridge/perception.py' \
   --include '/src/mj_bridge/mj_bridge/product_geometry.py' \
   --include '/src/mj_bridge/mj_bridge/benchmark_core.py' \
@@ -63,6 +71,8 @@ rsync -a --delete --delete-excluded \
   --include '/scripts/import_workbenchmark_latest.py' \
   --include '/scripts/check_target_stability.py' --include '/scripts/export_workbenchmark_parts.py' \
   --include '/scripts/check_plastic_contact.py' --include '/scripts/select_workbenchmark_sample.py' \
+  --include '/scripts/run_workbenchmark_sample.py' \
+  --include '/scripts/report_workbenchmark_sample.py' \
   --include '/scripts/direct_plan_reuse.py' --include '/scripts/unused_feedback_reuse.py' \
   --include '/.gitignore' --include '/pytest.ini' --include '/conftest.py' --include '/README.md' --include '/THIRD_PARTY_NOTICES.md' \
   --include '/LICENSE' --include '/.dockerignore' \

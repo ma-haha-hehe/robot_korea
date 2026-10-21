@@ -504,6 +504,7 @@ def test_parallel_shell_hulls_preserve_geometry_and_contact_depth():
 
 @pytest.mark.parametrize('force,support_height,released,penetration,expected', [
     (.02, 0., True, 0., 'contact'),
+    (.02, 0., 'base', 0., 'contact'),
     (.01, 0., True, 0., 'endpoint'),
     (.02, .0192, True, 0., 'endpoint'),
     (.02, 0., False, 0., 'endpoint'),
@@ -516,16 +517,23 @@ def test_insertion_contact_interrupts_only_for_loaded_supports(
     import mj_bridge.reference_executor as module
     executor = OracleExecutor.__new__(OracleExecutor)
     target = dict(id='part', body_name='part', position=[0., 0., .0192])
-    support = dict(id='support', body_name='support', position=[0., 0., support_height])
-    executor.events = [dict(block='support')] if released else []
+    executor.speed_scale = .4
+    support_name = 'assembly_base_plate' if released == 'base' else 'support'
+    support = dict(id='support', body_name=support_name, position=[0., 0., support_height])
+    executor.events = [dict(block='support')] if released is True else []
+    names = ['world', 'part', support_name]
+    def body(value):
+        index = names.index(value) if isinstance(value, str) else value
+        return SimpleNamespace(id=index, name=names[index])
     executor.qadr = np.array([0])
     executor.model = SimpleNamespace(
         opt=SimpleNamespace(timestep=.0005), geom_bodyid=np.array([1, 2]),
-        body=lambda name: SimpleNamespace(id={'part': 1, 'support': 2}[name]))
+        nbody=3, body=body)
     executor.data = SimpleNamespace(
         qpos=np.array([.12]), time=1., xpos=np.zeros((3, 3)),
         xquat=np.array([[1., 0., 0., 0.]]*3),
-        contact=[SimpleNamespace(geom1=0, geom2=1, dist=0.)])
+        contact=np.array([(0, 1, -.00025 if released == 'base' else 0.)],
+                         dtype=[('geom1', int), ('geom2', int), ('dist', float)]).view(np.recarray))
     stepped = []
     executor.node = SimpleNamespace(
         episode_manifest={'target_blocks': [target, support]},
@@ -554,3 +562,24 @@ def test_insertion_contact_interrupts_only_for_loaded_supports(
             assert executor.node.target_qpos[0] == .2
     assert executor._insertion_contact_guard is None
     assert executor.data.qpos[0] == .12
+
+
+def test_bulk_contact_selection_preserves_scalar_order_and_depth_gates():
+    import numpy as np
+    from mj_bridge.reference_executor import insertion_contact_indices
+    contacts = np.array([(0,1,0.), (1,0,-.0002), (2,3,-.001),
+                         (0,4,-.0001), (4,0,-.0002), (0,1,.0002),
+                         (0,2,0.), (2,0,0.)],
+                        dtype=[('geom1',int),('geom2',int),('dist',float)]).view(np.recarray)
+    model = SimpleNamespace(geom_bodyid=np.array([10,11,12,13,14]))
+    original = contacts.copy()
+    for bases in ((), (14,)):
+        expected=[]
+        for i,c in enumerate(contacts):
+            bodies={int(model.geom_bodyid[c.geom1]),int(model.geom_bodyid[c.geom2])}
+            if (10 in bodies and bodies & {11,12,14} and c.dist <= .0001
+                    and not (bodies & set(bases) and c.dist > -.0002)):
+                expected.append(i)
+        assert insertion_contact_indices(model,contacts,10,{11,12,14},bases).tolist()==expected
+    np.testing.assert_array_equal(contacts, original)
+    assert insertion_contact_indices(model,contacts[:0],10,{11}).size==0

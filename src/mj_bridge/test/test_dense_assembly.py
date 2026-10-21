@@ -14,6 +14,54 @@ from mj_bridge.assembly_planner import (
 from mj_bridge.reference_executor import ExecutionFailure, OracleExecutor
 
 
+@pytest.mark.parametrize('gap,height,kind,expected', [
+    (0., .0384, 'brick_2x2', True),
+    (.001, .0384, 'brick_2x2', True),
+    (.005, .0384, 'brick_2x2', False),
+    (0., .0192, 'brick_2x2', False),
+    (0., .0384, 'brick_4x2', False),
+])
+@pytest.mark.parametrize('rotation', [0., math.pi/2, math.pi/4])
+def test_dense_feedback_requires_an_upper_square_near_a_same_layer_neighbour(
+        gap, height, kind, expected, rotation):
+    from mj_bridge.reference_executor import requires_dense_pose_feedback
+    target = dict(id='target', type=kind, position=[.3, .2, .0384], yaw_rad=rotation)
+    neighbour = dict(id='neighbour', type='brick_2x2',
+                     position=[.3-(.032+gap)*math.sin(rotation),
+                               .2+(.032+gap)*math.cos(rotation), height], yaw_rad=rotation)
+    assert requires_dense_pose_feedback(target, [neighbour], 0.) is expected
+    assert not requires_dense_pose_feedback(dict(target, position=[.3, .2, 0.]), [neighbour], 0.)
+    assert not requires_dense_pose_feedback(target, [target], 0.)
+
+
+def test_dense_feedback_runs_before_the_ordinary_entry_and_records_its_trigger(monkeypatch):
+    monkeypatch.setattr('mj_bridge.reference_executor.requires_dense_pose_feedback', lambda *_: True)
+    target = dict(id='part', type='brick_2x2', position=[0., 0., .0192], yaw_rad=0.)
+    support = dict(target, id='support', position=[0., 0., 0.])
+    executor = OracleExecutor.__new__(OracleExecutor)
+    executor.perception = None
+    executor.speed_scale = 1.5
+    executor.events = [dict(block='support')]
+    executor.node = SimpleNamespace(episode_manifest={
+        'contact_profile': 'plastic', 'target_blocks': [support, target]})
+    executor.align_held_part = lambda _: (np.array(target['position']), 0.)
+    calls = []
+    executor.move_vertical = lambda position, yaw: calls.append('clearance')
+    def feedback(*_):
+        assert executor._descent_guard_target is None
+        calls.append('feedback')
+        executor.last_seating_confirmation = {'pose_feedback': {'steps': 1}}
+    executor.descend_with_pose_feedback = feedback
+    executor.descend_to_insertion_entry = lambda *_: pytest.fail('feedback must precede ordinary entry')
+    executor.seat_plastic_part = lambda *_: pytest.fail('completed feedback must not insert twice')
+    executor.refine_overhang_pose = lambda *_: calls.append('verify_support')
+    assert executor.place_physical(target) == 0.
+    assert calls == ['clearance', 'feedback', 'verify_support']
+    assert executor.last_seating_confirmation['pose_feedback']['trigger'] == 'near_same_layer_neighbour'
+    assert executor.speed_scale == 1.5
+    assert executor._descent_guard_target is None
+
+
 @pytest.mark.parametrize('name', ['tier3_task_079', 'tier4_task_051'])
 def test_dense_originals_get_explicit_fallback_without_moving_targets(name):
     targets = json.loads((Path(__file__).parent / 'fixtures' / f'{name}_targets.json').read_text())
@@ -44,14 +92,20 @@ def test_failed_release_prevents_retreat_or_press():
     executor.speed_scale = 1.5
     executor.node = SimpleNamespace(gripper_target=.02, connection_mode="physics",
                                     episode_manifest={"contact_profile": "plastic"})
+    executor.node.episode_manifest['target_blocks'] = [dict(position=[0., 0., 0.])]
     executor.align_held_part = lambda _: (np.zeros(3), 0.)
     moves = []
     executor.move_vertical = lambda position, yaw: moves.append(position.copy())
     def fail_release(_):
         raise ExecutionFailure('fingers not open')
     executor.open_gripper_before_retreat = fail_release
+    executor.lower_with_finger_friction = lambda _: {'mode': 'test_already_lowered'}
+    executor.unload_gripper_for_release = lambda: {}
+    executor.model = SimpleNamespace(body=lambda _: SimpleNamespace(id=0))
+    executor.data = SimpleNamespace(xpos=np.array([[0., 0., .003]]),
+                                    xquat=np.array([[1., 0., 0., 0.]]))
     with pytest.raises(ExecutionFailure, match='fingers not open'):
-        executor.place_with_release_above({})
+        executor.place_with_release_above({'body_name': 'part', 'position': np.zeros(3), 'type': 'brick_4x2'})
     assert [p[2] for p in moves] == [.06, .016]
     assert executor.node.gripper_target == .02
     assert executor.speed_scale == 1.5
@@ -60,9 +114,12 @@ def test_failed_release_prevents_retreat_or_press():
 @pytest.mark.parametrize('height,support_x,release_height', [
     (0., .1, .001), (.0192, 0., .001), (.0192, .02, .002),
 ])
+@pytest.mark.parametrize('kind,yaw', [
+    ('brick_2x2', 0.), ('brick_4x2', 0.), ('brick_4x2', math.pi/2),
+])
 def test_direct_release_uses_support_geometry_and_stops_on_release_failure(
-        height, support_x, release_height):
-    target = dict(id='part', type='brick_2x2', position=[0., 0., height], yaw_rad=0.)
+        height, support_x, release_height, kind, yaw):
+    target = dict(id='part', type=kind, position=[0., 0., height], yaw_rad=yaw)
     support = dict(target, id='support', position=[support_x, 0., 0.])
     executor = OracleExecutor.__new__(OracleExecutor)
     executor.perception = None
@@ -76,11 +133,18 @@ def test_direct_release_uses_support_geometry_and_stops_on_release_failure(
     def failed_release(*_):
         raise ExecutionFailure('fingers not open')
     executor.release_and_press = failed_release
-    executor.descend_to_insertion_entry = lambda target, endpoint, yaw: executor.move_vertical(endpoint, yaw)
+    executor.held_edge_insertion_required = lambda _: False
+    def insertion_entry(target, endpoint, gripper_yaw):
+        expected_guard = (height > .004 or (kind == 'brick_4x2'
+                          and abs(math.sin(target['yaw_rad'] - gripper_yaw)) > .7))
+        assert getattr(executor, '_descent_guard_target', None) == (target if expected_guard else None)
+        return executor.move_vertical(endpoint, gripper_yaw)
+    executor.descend_to_insertion_entry = insertion_entry
     with pytest.raises(ExecutionFailure, match='fingers not open'):
         executor.place_physical(target)
     assert [p[2] - height for p in moves] == pytest.approx([.04, release_height])
     assert executor.speed_scale == 1.5
+    assert executor._descent_guard_target is None
 
 
 @pytest.mark.parametrize('position,expected', [
@@ -271,11 +335,12 @@ def test_airborne_recovery_requires_clear_space_and_two_loaded_fingers(monkeypat
     import mujoco
     executor = OracleExecutor.__new__(OracleExecutor)
     executor.perception = None
+    executor.prepare_feedback_grip = lambda _: None
     executor.hand = 0
     executor.tool_offset = np.zeros(3)
     executor.qadr = np.array([0])
     angle = math.radians(9 if fault == 'large_tilt' else 3.5) / 2
-    height = .01 if fault == 'near_goal' else .04
+    height = .005 if fault == 'near_goal' else .04
     observed = {'position': [0., 0., height],
                 'quaternion_wxyz': [math.cos(angle), math.sin(angle), 0., 0.]}
     ids = {'part': 1, 'left_finger': 2, 'right_finger': 3}
@@ -285,8 +350,10 @@ def test_airborne_recovery_requires_clear_space_and_two_loaded_fingers(monkeypat
     contacts = [SimpleNamespace(geom1=0, geom2=1, dist=-.00001),
                 SimpleNamespace(geom1=2, geom2=3, dist=-.00001)]
     executor.data = SimpleNamespace(xmat=np.eye(3).reshape(1,9),
-                                   xpos=np.array([[0., 0., height]]),
+                                   xpos=np.array([[0., 0., height], [0., 0., height]]),
+                                   xquat=np.array([[1., 0., 0., 0.], observed['quaternion_wxyz']]),
                                    qpos=np.zeros(1), contact=contacts)
+    executor.part_contacts_observable = lambda _: True
     executor.node = SimpleNamespace(target_qpos=np.zeros(1),
         current_block_state=lambda: {'blocks': {'part': observed}})
     def force(model, data, index, output):
@@ -323,7 +390,7 @@ def test_unused_feedback_reuse_rejects_executed_feedback_and_other_control_chang
     verify = proof['verify_unused_feedback_reuse']
     current = Path(reference_executor.__file__)
     baseline = tmp_path / 'reference_executor.py'
-    baseline.write_text(current.read_text().replace('math.radians(8)', 'math.radians(7)'))
+    baseline.write_text(current.read_text().replace('if tilt > math.radians(8) or', 'if tilt > math.radians(7) or'))
     recorded = {'reference_executor.py': hashlib.sha256(baseline.read_bytes()).hexdigest()}
     manifest = {'target_blocks': [dict(id='p')]}
     result = {'success': True, 'events': [dict(block='p', seating_confirmation={'height_error_m': .0001})]}
@@ -366,3 +433,65 @@ def test_report_requires_near_seating_and_actual_clutch_load(gap, upward, kind, 
     else:
         with pytest.raises(ValueError, match='support'):
             check(result, manifest, state)
+
+
+@pytest.mark.parametrize('kind,yaw', [('brick_2x2', math.pi/2), ('brick_4x2', math.pi)])
+def test_feedback_corrects_tilt_without_rotating_symmetric_yaw(kind, yaw):
+    executor = OracleExecutor.__new__(OracleExecutor)
+    executor.perception = None
+    executor.prepare_feedback_grip = lambda _: None
+    executor.hand = 0
+    executor.qadr = np.array([0])
+    executor.tool_offset = np.zeros(3)
+    tilt = math.radians(.5)
+    q = [math.cos(yaw/2)*math.cos(tilt/2), math.cos(yaw/2)*math.sin(tilt/2),
+         math.sin(yaw/2)*math.sin(tilt/2), math.sin(yaw/2)*math.cos(tilt/2)]
+    observed = {'position': [0., 0., .03], 'quaternion_wxyz': q}
+    executor.data = SimpleNamespace(qpos=np.zeros(1),xpos=np.array([[0.,0.,.03]]),
+                                    xmat=np.eye(3).reshape(1,9))
+    executor.node = SimpleNamespace(target_qpos=np.zeros(1),
+        current_block_state=lambda: {'blocks': {'p': observed}})
+    rotations=[]
+    def ik(position, angle, **kwargs):
+        rotations.append(kwargs['target_rotation'].copy())
+        return np.zeros(1)
+    executor.ik=ik
+    executor.confirm_held_part=lambda _: 0.
+    executor.step=lambda _: observed.update(position=[0.,0.,.001])
+    executor.held_edge_insertion_required=lambda _: False
+    executor.release_and_press=lambda *args: setattr(executor,'last_seating_confirmation',{})
+    executor.descend_with_pose_feedback(dict(id='p',type=kind,position=[0.,0.,0.],yaw_rad=0.),0.)
+    assert len(rotations)==1
+    assert np.linalg.norm(rotations[0]-np.eye(3)) < .02
+    assert np.linalg.det(rotations[0]) == pytest.approx(1.)
+
+
+@pytest.mark.parametrize('case', ['loaded', 'unreleased', 'weak', 'asleep', 'xy', 'height', 'tilt'])
+def test_feedback_handover_requires_observed_placed_support_and_bounded_pose(monkeypatch, case):
+    import mujoco
+    executor = OracleExecutor.__new__(OracleExecutor)
+    target = dict(id='part', body_name='part', type='brick_2x2', position=[0., 0., .0192], yaw_rad=0.)
+    lower = dict(id='lower', body_name='lower', type='brick_2x2', position=[0., 0., 0.], yaw_rad=0.)
+    names = ['world', 'part', 'lower']
+    def body(key):
+        index = names.index(key) if isinstance(key, str) else key
+        return SimpleNamespace(id=index, name=names[index])
+    executor.model = SimpleNamespace(nbody=3, body=body, geom_bodyid=np.arange(3))
+    contacts = np.array([(1, 2, -.0001)], dtype=[('geom1', 'i4'), ('geom2', 'i4'), ('dist', 'f8')]).view(np.recarray)
+    executor.data = SimpleNamespace(contact=contacts, time=1., xpos=np.array([[0., 0., 0.], [0., 0., .021], [0., 0., 0.]]),
+                                    xquat=np.tile([1., 0., 0., 0.], (3, 1)))
+    executor.events = [] if case == 'unreleased' else [dict(block='lower')]
+    executor.node = SimpleNamespace(episode_manifest={'target_blocks': [target, lower]})
+    executor.part_contacts_observable = lambda _: case != 'asleep'
+    def force(model, data, index, output):
+        output[0] = .001 if case == 'weak' else .02
+    monkeypatch.setattr(mujoco, 'mj_contactForce', force)
+    if case == 'xy': executor.data.xpos[1, 0] = .002
+    if case == 'height': executor.data.xpos[1, 2] = .0242
+    if case == 'tilt': executor.data.xquat[1] = [math.cos(.04), math.sin(.04), 0., 0.]
+    if case in ('asleep', 'xy', 'height', 'tilt'):
+        with pytest.raises(ExecutionFailure): executor.feedback_support_contact(target)
+    else:
+        contact = executor.feedback_support_contact(target)
+        if case == 'loaded': assert contact['normal_force_n'] == pytest.approx(.02)
+        else: assert contact is None
