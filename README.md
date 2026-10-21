@@ -16,6 +16,20 @@ not a learned policy or a demonstration of real-robot generalization.
 [Execution state machine](docs/EXECUTION_STATE_MACHINE_ZH.md) ·
 [Evaluation guide](docs/VALIDATION_ZH.md)
 
+## Assembly demonstration
+
+[![Five-brick Tier 3 assembly in MuJoCo](docs/media/workbenchmark-tier3-demo.png)](docs/media/workbenchmark-tier3-demo.mp4)
+
+[Watch or download the video](https://raw.githubusercontent.com/ma-haha-hehe/robot_korea/main/docs/media/workbenchmark-tier3-demo.mp4)
+· [Demonstration details](docs/media/README.md)
+
+The reference controller assembles the five-brick Tier 3 task
+`simple_shape_assembly_056` with MuJoCo rigid-body dynamics and plastic contact.
+The two camera views show the same execution at 1× simulation time; the video
+lasts about 88 seconds. The controller uses Oracle poses and contact forces.
+This example illustrates the execution pipeline; it does not establish a
+dataset-wide success rate, a learned-policy result or real-hardware performance.
+
 ## What the repository contains
 
 - Product validation, normalization, geometry auditing and deterministic scene generation.
